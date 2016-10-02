@@ -1,0 +1,248 @@
+@name BMP Reader
+#@inputs HTTPData:string
+
+#[
+	ALX Wiremod E2 OS
+	Created by AlexALX
+	-------------------
+	BMP Parser, specifications:
+	- Max resolution is up to 512x512 (Digital Screen limitation)
+	- Only 24bit bmp files supported
+	- Very slow... :(
+]#
+
+if (INCLUDE) {
+    
+#include "alx_pc/gpu/alxos/_main_"
+
+function alxos_bmp_init(Args:table) {
+    if (!->DS) {    
+        "alxos_explorer_error"("Digital screen not connected! Rendering canceled.")
+        return   
+    }
+    
+    local FInfo = Args[1,table]
+    local ExplorerFS = Args[2,table]
+    DsHandler = "alxos_bmp_ds"    
+    #KeyHandler = "alxos_bmp_key"
+    dsSendDirect("fs_readfile",HDD_IO:entity(),table(entity(),"wm1",table(ExplorerFS,FInfo,0,54))) 
+    
+    local Parent = "alxos_explorer_dialogbg"("Opening file",400,80,"progress","alxos_explorer_listcurdir")[number]
+    
+    GpuData[1,table] = ExplorerFS
+    GpuData[2,table] = FInfo
+    GpuData[5,number] = 0
+    
+    GpuData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",vec2(0,-22))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    DS[1048574] = 0
+    DS[1048569] = 2
+    DS[1048575] = 1
+    
+}
+
+function alxos_bmp_draw(Data:string) {
+    local Size = GpuData[5,number]
+    local ExplorerFS = GpuData[1,table]
+    local FInfo = GpuData[2,table]
+    if (Size==0) {
+        #local Data = HTTPData:left(54)
+        local Format = Data:sub(1,2)
+        if (Format=="BM") {
+            local Size = str2byte(Data:sub(35,38))
+            
+            local Offset = str2byte(Data:sub(11,14))
+            
+            local Width = str2byte(Data:sub(19,22))
+            local Height = str2byte(Data:sub(23,26))
+            
+            local Compression = str2byte(Data:sub(31,34))
+            
+            local Colors = str2byte(Data:sub(47,50))
+            
+            local BitCount = str2byte(Data:sub(29,30))
+            if (BitCount!=24) {
+                "alxos_explorer_error"("Sorry, only 24bit BMP files is supported.")
+                return
+            }
+                 
+            if (Offset!=54 | Width<1 | Height<1 | Compression!=0 | Colors>0 | Size==0) {
+                "alxos_explorer_error"("Unsupported BMP file.")
+                return
+            }
+            
+            if (Width>512 | Height>512) {
+                "alxos_explorer_error"("Max BMP resolution is 512x512 (current is "+Width+"x"+Height+").")
+                return
+            }
+            
+            KeyHandler = "alxos_bmp_key"
+            
+            GpuData[3,number] = Width
+            GpuData[4,number] = Height
+            GpuData[5,number] = Size
+            local FSize = FInfo["size",number]
+            DS[1048573] = Width
+            DS[1048572] = Height
+            
+            GpuData[6,number] = 0
+            GpuData[7,number] = Height-1
+            
+            local Bytes = ceil(Width*3/4)*4 # how many bytes we read
+            if (FSize<Bytes) { Bytes = FSize-55 }
+            GpuData[10,number] = Bytes
+            
+            GpuData[9,number] = 0
+            GpuData[8,number] = 55
+            
+            GpuData[13,number] = ceil(Width*3/4)*4-Width*3
+            #GpuData[13,number] = 0
+            
+            dsSendDirect("fs_readfile",HDD_IO:entity(),table(entity(),"wm1",table(ExplorerFS,FInfo,55,Bytes))) 
+                     
+        } else {
+            "alxos_explorer_error"("This is not valid BMP file.")
+            return
+        }
+    } else {
+        local X = GpuData[6,number]
+        local Y = GpuData[7,number]
+        local I = GpuData[8,number]
+        
+        local Width = GpuData[3,number]
+        local Height = GpuData[4,number]
+        
+        local SI = GpuData[9,number]
+        
+        #local Bytes = GpuData[10,number]
+        #local Data = HTTPData:sub(I,I+Bytes-1)
+        
+        #[if (SI==0 & Y==Height-2) {
+            printTable(table(Data:replace(NB,"0"):left(200))) 
+            print("----")  
+            return
+        }]#
+
+        #if (X==0 & Y==Height-1) {
+            #print(Data:sub(55,59))
+            #Data = Data:sub(55,Data:length())
+            #print(Data:replace(NB,"0"))
+        #}
+        
+        local Max = Data:length()
+        
+        #[if (SI==Max) {
+            GpuData[100,string] = Data+GpuData[100,string]
+        }]#
+        
+        local PercID = GpuData[-4,number]
+        local BoxID = GpuData[-5,number]
+        local BoxW = GpuData[-6,number]
+        local CalcP = round(I/FInfo["size",number]*100)
+        BoxW = ceil(BoxW/100*CalcP)
+        if (BoxW<1) { BoxW = 1 }
+        EGP:egpSize(BoxID,vec2(BoxW,20))
+        EGP:egpText(PercID,CalcP+"%",EGP:egpPos(PercID))
+        
+        #local Of = GpuData[13,number]
+        
+        while(perf()) {
+            if (SI>=Max) {
+                SI = Max
+                break   
+            }
+                        
+            local Sub = str2byte(Data:sub(SI+1,SI+3))
+            
+            #local B = floor((Sub >> 16) && 0xFF) #toByte(Sub[1])
+            #local G = floor((Sub >> 8) && 0xFF)#toByte(Sub[2])
+            #local R = floor(Sub && 0xFF) #toByte(Sub[3])
+            DS[X+Y*Width] = Sub #R*65536 + G*256 + B 
+            
+            X++  
+            SI+=3
+            
+            if (X>=Width) {
+                SI += GpuData[13,number]
+                X = 0
+                Y--
+            }
+                 
+        }
+        
+        #GpuData[13,number] = Of
+        GpuData[9,number] = SI
+        GpuData[6,number] = X
+        GpuData[7,number] = Y
+        
+        local End = GpuData[12,number]
+        
+        if (Y<0 | End==1) {
+            #print(GpuData[100,string]:length()+" "+GpuData[5,number]+" "+FInfo["size",number])
+            
+            local Parent = "alxos_explorer_dialogbg"("BMP Reader",440,60,"ok","alxos_explorer_listcurdir")[number]
+            
+            GpuData[-10,table]:pushNumber(LAST_I)
+            EGP:egpText(LAST_I,"Opening BMP file success finished.",vec2(0,-12))
+            EGP:egpParent(LAST_I,Parent)
+            EGP:egpAlign(LAST_I,1)
+            EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+            
+            "alxos_explorer_handlers"()
+            
+            return  
+        }
+        
+        if (SI<Max) {
+            GpuData[11,string] = Data
+            runCmd("alxos_bmp_cmd",1)
+        } else {
+            
+            local Bytes = GpuData[10,number]
+            local Next = I+Bytes
+            
+            if (Next>FInfo["size",number]) {
+                #Bytes = Next*(-1) 
+                GpuData[12,number] = 1
+                Bytes = Next-FInfo["size",number]
+                Next = FInfo["size",number]
+                #GpuData[10,number] = Bytes
+            }
+            
+            GpuData[8,number] = Next
+            #GpuData[9,number] = Bytes
+            GpuData[9,number] = 0
+            
+            #print(I+" "+Next+" | "+Bytes)
+            dsSendDirect("fs_readfile",HDD_IO:entity(),table(entity(),"wm1",table(ExplorerFS,FInfo,Next,Bytes)))
+        }
+        
+    }   
+}
+
+function number alxos_bmp_cmd() {
+    alxos_bmp_draw(GpuData[11,string])
+    return 0
+}
+
+function alxos_bmp_ds(Name:string) {
+    if (Name=="fs_readfile") {
+        alxos_bmp_draw(dsGetString())
+    } elseif (Name=="clear") {
+        "alxos_explorer_handlers"()
+        "alxos_explorer_listcurdir"()
+    }
+}
+
+function alxos_bmp_key(Key:string,Pressed) {
+    if (!Pressed) { return }
+    if (Key=="f8") {
+        dsSendDirect("clear",HDD_IO:entity(),entity())
+    }   
+}
+    
+}

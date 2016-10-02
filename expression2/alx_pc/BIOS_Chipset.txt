@@ -1,0 +1,344 @@
+@name BIOS / Chipset
+@inputs ROM:wirelink Speaker:entity E2_CPU:entity E2_GPU:entity E2_SPU:entity HDD_IO:wirelink
+@inputs Keyboard:wirelink KeyboardUser:entity NullByte:string Power Reset
+@outputs BIOS:entity PowerInd HDDInd
+@persist INIT POST ERR_N ERR_I HDDS:table HDD_MAX FS_TYPES:table Shutdown ShutStep ShutMax Block SndBl
+@persist Reboot Reload HardReset BOOT_HDD NB:string
+@trigger 
+@model models/jaanus/wiretool/wiretool_controlchip.mdl
+
+#[
+    ALX Wiremod E2 PC
+    Created by AlexALX
+    -------------------
+    BIOS / Chipset, purpose:
+    - Handles all virtual devices
+    - Init virtual devices
+    - Error codes (beep)
+
+    Error Codes (beep):
+    1 long - OK
+    7 short - BIOS ROM error
+    1 short with different frequencies - CPU error
+    1 long 3 short - GPU error
+    1 long 2 short - GPU EGP limits error
+    2 long - Keyboard error
+    1 very long - Null Byte error
+]#
+
+if (first()|duped()) {
+    
+ERR_N = 0
+ERR_I = 0
+INIT = 0
+POST = 0
+Reload = 0
+BOOT_HDD = 0
+PowerInd = 0
+Block = 0
+SndBl = 0
+
+BIOS = entity()
+    
+function err() {
+    if (ERR_N==0) {
+        if (ERR_I==7) { exit() }
+        Speaker:soundPlay(0,0.25,"synth/square_440.wav")
+        timer("err",500)
+        ERR_I++
+    } elseif (ERR_N==1) {
+        if (ERR_I==1) {
+            Speaker:soundPlay(0,0.4,"synth/square_880.wav")
+            ERR_I = 0
+        } else {
+            Speaker:soundPlay(0,0.4,"synth/square_440.wav")
+            ERR_I = 1
+        }
+        timer("err",500)
+    } elseif (ERR_N==2 | ERR_N==3) {
+        if (ERR_I==ERR_N+1) { exit() }
+        if (ERR_I==0) {
+            Speaker:soundPlay(0,0.75,"synth/square_440.wav")
+            timer("err",1250)
+        } else {
+            Speaker:soundPlay(0,0.25,"synth/square_440.wav")
+            timer("err",500)
+        }
+        ERR_I++
+    } elseif (ERR_N==4) {
+        if (ERR_I==2) { exit() }
+        Speaker:soundPlay(0,0.75,"synth/square_440.wav")
+        timer("err",1250)
+        ERR_I++
+    } elseif (ERR_N==5) {
+        Speaker:soundPlay(0,2,"synth/square_440.wav")
+    } elseif (ERR_N==-1) {
+        Speaker:soundPlay(12,0.25,"synth/square_440.wav")
+    }
+    exit()
+}
+
+function shutdown() {
+    stopAllTimers()
+    if (!Reboot) { 
+        soundStop(99,0.3) 
+        Block = 1 
+        timer("block",400)
+        #SndBl = 0
+    }
+    if (INIT==2) {
+        #POST = 4
+        Shutdown = 1
+        "shutdownpost"("SHUTDOWN",1)
+    } else {
+        INIT = 0
+        POST = 0
+        Shutdown = 0
+        HDDInd = 0
+        if (Reboot) {
+            timer("init",500)       
+        } else {
+            PowerInd = 0
+        }
+    }   #[
+    if (HardReset) {
+        HardReset = 0  
+    }]#
+}
+
+function shutdownpost(Name:string,SDown) {
+    ShutStep = SDown
+    stoptimer("shutdownpost")
+    if (SDown==1) {
+        #ShutMax = HDDS:count()+4
+        stopAllTimers()
+        if (!Reboot) {
+            Keyboard["Kick",number] = 0
+        }
+        if (E2_CPU:isValid()) {
+            dsSendDirect(Name,E2_CPU,SDown)
+            timer("shutdownpost",100)
+        } else {
+            shutdownpost(Name,SDown+1)
+        }
+    } elseif (SDown==2) {
+        if (E2_GPU:isValid()) {
+            dsSendDirect(Name,E2_GPU,SDown)
+            timer("shutdownpost",100)
+        } else {
+            shutdownpost(Name,SDown+1)
+        }
+    } elseif (SDown==3) {
+        if (E2_SPU:isValid()) {
+            dsSendDirect(Name,E2_SPU,SDown)
+            timer("shutdownpost",100)
+        } else {
+            shutdownpost(Name,SDown+1)
+        }
+    #[} elseif (SDown>=4 & SDown<ShutMax) {
+        local HDD = HDDS[SDown-3,entity]
+        if (HDD:isValid() & 1==2) {
+            dsSendDirect(Name,HDD,SDown)
+        } else {
+            shutdownpost(Name,SDown+1)
+        } ]#
+    #} elseif (SDown>=ShutMax) {
+    } elseif (SDown==4) {
+        if (HDD_IO) {
+            HDDInd = 1
+            dsSendDirect(Name,HDD_IO:entity(),SDown)
+            timer("shutdownpost",100)
+        } else {
+            shutdownpost(Name,SDown+1)
+        }
+    } elseif (SDown==5) {
+        Shutdown = 0
+        INIT = 0
+        POST = 0
+        ShutStep = 0
+        HDDInd = 0
+        timer("block",400)
+        if (Reboot) {
+            timer("init",500)
+        } else {
+            PowerInd = 0
+        }
+    }    
+}
+
+function init_send(ID:string) {
+    if (ID=="hdd") {
+        dsSendDirect("init",HDD_IO:entity(),table(NB,entity(),Reload))
+    } else {
+        local Ent = (ID=="cpu" ? E2_CPU : E2_GPU)
+        dsSendDirect("init",Ent,table(NB,E2_CPU,E2_GPU,E2_SPU,array(Keyboard,->Keyboard),array(HDD_IO,->HDD_IO),BOOT_HDD,Reload,HDDS,HDD_MAX,FS_TYPES))
+    }
+}
+    
+function init() {
+    if (Block) { return } 
+    if (INIT) {
+        shutdown()
+    } else {
+        if (!SndBl) {
+            soundStop(99)
+            soundPlay(99,0,"ambient/machines/air_conditioner_cycle.wav")
+            soundPitch(99,150)
+            soundVolume(99,0.5)
+            timer("snd",3800)
+        }
+        SndBl = 0
+        ERR_N = 0
+        ERR_I = 0
+        INIT = 1
+        PowerInd = 1
+        HDDInd = 0
+        if (!->ROM) {
+            ERR_N = 0
+            timer("err",2500)
+            exit()
+        } elseif (!E2_CPU:isValid()) {
+            ERR_N = 1
+            timer("err",2500)
+            exit()
+        } elseif (!E2_GPU:isValid()) {
+            ERR_N = 3
+            timer("err",2500)
+            exit()
+        }
+        NB = NullByte
+        BOOT_HDD = (ROM[0] & 0xF)+1
+        POST = 1
+        Reload = 0
+        init_send("cpu")
+        timer("postinit",100)
+    }
+}
+
+function ready() {
+    INIT = 2
+    if (!Reload) {
+        dsSendDirect("ready",E2_CPU,1)
+    }
+}
+
+}
+
+if (dsClk()) {
+    local Name = dsClkName()
+    if (Name=="init") {
+        stoptimer("postinit")
+        local ID = dsGetString()
+        if (POST==1) {
+            init_send("gpu")
+            timer("postinit",100)
+        } elseif (POST==2) {
+            init_send("hdd")
+            timer("postinit",100)
+        }
+        POST++
+    } elseif (Name=="HDDInd") {
+        HDDInd = dsGetNumber()
+    } elseif (Name=="gethdds") {
+        dsSendDirect(Name,dsGetEntity(),table(HDDS,HDD_MAX,FS_TYPES))
+    } elseif (Name=="hddinfo") {
+        stoptimer("postinit")
+        local Tbl = dsGetTable()
+        HDDS = Tbl[1,table]
+        HDD_MAX = Tbl[2,number]
+        FS_TYPES = Tbl[3,table]
+        ready()
+    } elseif (Name=="reload") {
+        if (!INIT) { exit() }
+        local ID = dsGetString()
+        Reload = 1
+        init_send(ID)
+        Reload = 0
+    } elseif (Name=="SHUTDOWN") {
+        local End = dsGetNumber()
+        if (End>0) {
+            local Shutdown = End+1
+            shutdownpost(Name,Shutdown) 
+        } else {
+            if (Shutdown) { exit() }
+            shutdown()
+        }
+    } elseif (Name=="REBOOT") {
+        if (Reboot) { exit() }
+        Reboot = 1
+        shutdown()
+    } elseif (Name=="SAVE") {
+        if (Shutdown) { exit() }
+        BOOT_HDD = dsGetNumber()
+        ROM[0] = (BOOT_HDD-1) & 0xF
+        Reboot = 1
+        shutdown()
+    } elseif (Name=="err") {
+        ERR_N = dsGetNumber()
+        INIT = 2
+        err()
+    }
+    exit()
+}
+
+if (clk("init")) {
+    Reboot = 0 
+    SndBl = 1
+    init() 
+    exit()
+}
+
+if (clk("postinit")) {
+    ERR_N = POST
+    if (POST==2) { ERR_N = 3 }
+    if (POST==3) {
+        ready()
+        exit()
+    }
+    err()
+}
+
+if (clk("err")) {
+    err()
+}
+
+if (clk("shutdownpost")) {
+    local End = ShutStep+1
+    shutdownpost("SHUTDOWN",End) 
+}
+
+if (clk("block")) {
+    Block = 0   
+}
+
+if (clk("snd")) {
+    soundStop(99)
+    soundPlay(99,0,"ambient/machines/air_conditioner_loop_1.wav")   
+    soundPitch(99,150)
+    soundVolume(99,0.5)
+    SndBl = 0
+}
+
+if (inputClk()) {
+    
+    if (changed(Power)&Power) {
+        if (Reboot|Shutdown) { exit() }
+        init()
+        exit()
+    }
+    
+    if (changed(Reset)&Reset) {
+        if (INIT!=0) { Reboot = 1 }
+        Shutdown = 0
+        HardReset = 1
+        shutdown()
+        exit()
+    }
+    
+    local Name = inputClkName()
+    if (Name=="KeyboardUser") {
+        dsSendDirect("keyboard",E2_CPU,KeyboardUser)
+    }
+    
+    exit()
+}

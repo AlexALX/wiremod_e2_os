@@ -1,0 +1,203 @@
+@name Command Queue Interface
+@persist CurrentCmd:string CmdQueue:table CmdLastQueue 
+@persist CmdResult:table CmdDelay CmdAdd2Queue QueueShift CmdQueueTmp
+@persist CmdCallback:table CmdCompleteCallback:table CmdNextRun
+
+#[
+	ALX Wiremod E2 PC
+	Created by AlexALX
+	-------------------
+	Command queue interface
+	Used only in File System for now 
+]#
+
+if (first()|duped()) {
+    
+#include "alx_pc/shared/_main_"
+
+#[===========================]#
+#	Command Queue Interface
+#[===========================]#    
+#[
+function cmdAbort(Name:string) {
+    CurrentCmd = "" 
+    stoptimer(Name) 
+}]#
+
+function cmdNext() { #  & ops()<softQuota()*0.9
+    #[if (CmdNextRun & perf(80)) { # run in same tick if enough perf
+        CmdNextRun = 0
+        "cmdHandler"() # e2 error fix
+    } elseif (CmdDelay<0) {
+        CmdNextRun = 1
+        CmdDelay = 0
+    } else {
+        CmdNextRun = 0
+        timer(CurrentCmd,1)  
+    }]#
+    if (perf(75)) {
+        #stoptimer(CurrentCmd)
+        "cmdHandler"()
+        #CmdNextRun++
+    } else {
+        #CmdNextRun = 0
+        timer(CurrentCmd,1)
+    }
+    #exit()
+}
+
+function cmdEnd(Queue) {
+    if (!perf(90)) {
+        CmdQueueTmp = Queue
+        timer("cmd_End",1)
+        return
+    }    
+    
+    #CmdComplete = CmdQueue[Queue,table][1,string] #CurrentCmd:sub(5)
+    
+    #print(CmdComplete)
+    #CmdResult = CmdData
+    #CmdResult = CmdQueue[Queue,table][2,table]
+    local CmdComplete = CmdQueue[Queue,table][1,string]
+    local CmdCallback = CmdQueue[Queue,table][3,table]
+    #print(CmdComplete)
+    if (CmdLastQueue>1) {
+        CmdQueue[Queue,table] = CmdQueue[CmdLastQueue,table]
+        CmdQueue:remove(CmdLastQueue)
+        CmdLastQueue--
+        CurrentCmd = "cmd_"+CmdQueue[CmdLastQueue,table][1,string]
+        "cmdComplete"(CmdComplete)
+        #print(CurrentCmd)
+        #timer(CurrentCmd,1)
+        cmdNext()
+    } else {
+        CurrentCmd = "" 
+        #CmdData = table() 
+        CmdLastQueue = 0
+        CmdQueue = table()
+        "cmdComplete"(CmdComplete)
+    }
+    if (CmdCallback:count()) {
+        if (!perf(75)) {
+            CmdDelay = 1
+        }
+        # fix e2 editor error
+        "cmdRun"(CmdCallback[1,string],CmdCallback[2,table])
+    } 
+}
+    
+function cmdRun(Name:string,Data:table) {
+    #if (CurrentCmd!="") { return }
+    #CmdData = Data
+    #CmdQueue[CmdLastQueue,table][4,table] = CmdResult:clone()
+    if (CmdAdd2Queue==1 & CmdLastQueue>0) {
+        local Last = CmdLastQueue-QueueShift
+        CmdQueue:insertTable(Last,table(Name,Data,CmdCallback))
+        CmdLastQueue++
+        CmdAdd2Queue = 0
+        QueueShift++
+        CmdCallback = table()
+        #printTable(CmdQueue)
+        return   
+    }
+    CmdAdd2Queue = 0
+    CmdLastQueue++
+    CmdQueue[CmdLastQueue,table] = table(Name,Data,CmdCallback)
+    #CmdResult:clear()
+    CmdCallback = table()
+    CurrentCmd = "cmd_"+Name
+    if (CmdDelay>0) {
+        timer(CurrentCmd,CmdDelay) 
+        CmdDelay = 0  
+    } else {
+        cmdNext()
+    }
+}
+
+function cmdShutdown() {
+    CurrentCmd = ""
+    CmdQueue = table()
+    CmdCallback = table()
+    CmdResult = table()
+    CmdLastQueue = 0
+    CmdDelay = 0
+    CmdAdd2Queue = 0
+    QueueShift = 0
+    CmdQueueTmp = 0
+    stopAllTimers()
+}
+
+function cmdClearRes() {
+    CmdResult = table()   
+}
+
+#[
+function cmdRunNext(Name:string,Data:table) {
+    CmdCmdCallback = table(Name,Data)
+    timer("cmdCmdCallback",1)   
+}
+#[
+function CmdCallback() {
+    local Func = CmdCallback[1,string]
+    local Args = CmdCallback[2,table]
+    CmdCallback:clear()
+    Func(Args)    
+}]#
+
+function cmdHandler() {
+    QueueShift = 0
+    local Queue = CmdLastQueue
+    local CmdData = CmdQueue[Queue,table][2,table]
+    #if (!perf()) { timer(CurrentCmd,1) }
+    #print(CurrentCmd)
+    local Run = CurrentCmd(CmdData)[number]
+    if (QueueShift>0) { Queue += QueueShift }
+    if (Run) {
+        #print(CurrentCmd+" OK")
+        #[if (!CmdNextRun) {
+            CmdResult = table() # there is issue with result saving if command run in same tick
+        } else {
+            CmdNextRun = 0
+        }]#
+        # maybe will need fix this later
+        #CmdQueue[Queue,table][2,table] = CmdData
+        if (CurrentCmd!="") { cmdNext() } 
+    } else {
+        #print(perf())
+        cmdEnd(Queue)
+    }   
+}
+
+function cmd_timer(Name:string) {
+    if (Name=="") { return }
+    if (Name==CurrentCmd) {
+        cmdHandler()
+    } elseif (Name=="cmd_End") {
+        cmdEnd(CmdQueueTmp)
+    }
+}
+
+# Command Complete handler
+function cmdComplete(CmdComplete:string) {
+    if (CmdCompleteCallback:count() & CmdCompleteCallback[1,string]==CmdComplete) {
+        CmdCompleteCallback[2,string](CmdComplete,CmdCompleteCallback[3,table])
+        CmdCompleteCallback = table()
+    } 
+}
+
+#registerTimers("cmd","cmd_timer")
+
+}
+
+#[
+if (clk("CmdCallback")) {
+    CmdCallback()
+    exit()
+}
+
+if (clk("cmdCmdCallback")) {
+    CmdDelay = 1
+    cmdRun(CmdCmdCallback[1,string],CmdCmdCallback[2,table])
+    CmdCmdCallback:clear() 
+    exit()  
+}]#

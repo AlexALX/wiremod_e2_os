@@ -1,0 +1,237 @@
+@name BIOS GPU
+
+#[
+	ALX Wiremod E2 PC
+	Created by AlexALX
+	-------------------
+	BIOS GUI
+]#
+
+if (INCLUDE) {
+    
+#include "alx_pc/gpu/_main_"
+
+function biosheader() {
+    EGP:egpBox(LAST_I,vec2(0,0),vec2(512,512))
+    EGP:egpColor(LAST_I,0,0,168,255) LAST_I++
+    
+    EGP:egpText(LAST_I,"Simple BIOS v1.0 - (c) 2016",vec2(256,5))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
+    
+    EGP:egpBoxOutline(LAST_I,vec2(6,26),vec2(500,480))
+    EGP:egpColor(LAST_I,168,168,168,255) LAST_I++    
+    EGP:egpBoxOutline(LAST_I,vec2(10,30),vec2(492,472))
+    EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
+    
+    LAST_Y=50
+    
+    KeyHandler = "biospost_key"
+}
+
+function biosfooter() {
+    EGP:egpLine(LAST_I,vec2(10,442),vec2(502,442))
+    EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
+    
+    EGP:egpText(LAST_I,"F1 : Quit",vec2(20,452))
+    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++   
+    
+    EGP:egpText(LAST_I,"F8 : Save & Exit",vec2(20,472))
+    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++  
+    
+    EGP:egpText(LAST_I,toChar(30)+" "+toChar(31)+" : Select Item",vec2(256,452))
+    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++ 
+    #[
+    EGP:egpText(LAST_I,"Backspace : Go to previus menu",vec2(256,472))
+    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++ ]#
+}
+
+function bios_init() {
+    local Step = GpuData[1,number]
+    
+    if (!Step) {
+        
+    egpClear()
+    biosheader()
+    
+    local Y = LAST_Y
+    
+    GpuData[1,number] = 1
+    GpuData[2,number] = LAST_I
+    EGP:egpBox(LAST_I,vec2(30,LAST_Y),vec2(118,20))
+    EGP:egpColor(LAST_I,168,0,0,255) LAST_I++
+    
+    local IndexTbl = array()
+    local Index = 0
+    
+    IndexTbl[Index,number] = 118 Index++
+    EGP:egpText(LAST_I,"> Boot Devices",vec2(30,LAST_Y))
+    #EGP:egpSize(LAST_I,24)
+    EGP:egpColor(LAST_I,255,255,0,255) LAST_I++ LAST_Y+=30 
+    
+    IndexTbl[Index,number] = 135 Index++
+    EGP:egpText(LAST_I,"> PC Information",vec2(30,LAST_Y))
+    #EGP:egpSize(LAST_I,24)
+    EGP:egpColor(LAST_I,255,255,0,255) LAST_I++
+    
+    GpuData[3,array] = IndexTbl
+    
+    biosfooter()
+    
+    } elseif (Step==1) {
+        local Index = GpuData[4,number]
+        egpClear()
+        biosheader()
+        local Y = LAST_Y
+        if (Index==1) {
+            GpuData[1,number] = 2
+            
+            EGP:egpText(LAST_I,"PC Information",vec2(30,Y))
+            LAST_I++ Y+=24
+            
+            EGP:egpLine(LAST_I,vec2(25,Y),vec2(150,Y)) LAST_I++ Y+=5
+            
+            EGP:egpText(LAST_I,"CPU - "+softQuota()/1000+" Mhz",vec2(30,Y))
+            LAST_I++ Y+=20 
+            
+            EGP:egpText(LAST_I,"GPU - "+ceil(egpMaxObjects()/128)*1024+" KB",vec2(30,Y))
+            LAST_I++ Y+=20
+            
+            if (!E2_SPU:isValid()) { Status = "Not connected" } else { Status = "Connected" }
+            EGP:egpText(LAST_I,"Sound Card - "+Status,vec2(30,Y))
+            LAST_I++ Y+=20
+            
+            if (!->DS) { Status = "Not connected" } else { Status = "Connected" }
+            EGP:egpText(LAST_I,"Digital Screen - "+Status,vec2(30,Y))
+            LAST_I++ Y+=20
+            
+            if (!Keyboard) { Status = "Not connected" } else { Status = "Connected" }
+            EGP:egpText(LAST_I,"Keyboard - "+Status,vec2(30,Y))
+            LAST_I++ Y+=40
+            
+            EGP:egpText(LAST_I,"Wiremod Information",vec2(30,Y))
+            LAST_I++ Y+=24
+            
+            EGP:egpLine(LAST_I,vec2(25,Y),vec2(195,Y)) LAST_I++ Y+=5
+            
+            EGP:egpText(LAST_I,"Expression2 Soft Quota - "+softQuota(),vec2(30,Y))
+            LAST_I++ Y+=20 
+            
+            EGP:egpText(LAST_I,"Expression2 Hard Quota - "+hardQuota(),vec2(30,Y))
+            LAST_I++ Y+=20 
+            
+            EGP:egpText(LAST_I,"EGP Max Objects - "+egpMaxObjects(),vec2(30,Y))
+            LAST_I++ Y+=40
+            
+            EGP:egpBox(LAST_I,vec2(30,Y),vec2(188,20))
+            EGP:egpColor(LAST_I,168,0,0,255) LAST_I++
+            EGP:egpText(LAST_I,"> Back to previous menu",vec2(30,Y))
+            EGP:egpColor(LAST_I,255,255,0,255) LAST_I++
+            
+        } else {
+            GpuData[1,number] = 3
+                        
+            EGP:egpText(LAST_I,"Choose bootable device",vec2(30,Y))
+            LAST_I++ Y+=24
+            
+            EGP:egpLine(LAST_I,vec2(25,Y),vec2(210,Y)) LAST_I++ Y+=5
+            
+            #BOOT_HDD
+            
+            if (HDD_MAX==0|!HDD_IO) {
+                EGP:egpText(LAST_I,"> No hdd's found.",vec2(30,Y))
+                EGP:egpColor(LAST_I,100,100,100,255)
+                LAST_I++ Y+=20
+            } else {
+                local CurIndex = BOOT_HDD-1
+                if (!HDDS[BOOT_HDD,table]:count()) {
+                    CurIndex = 0   
+                } 
+            
+                GpuData[2,number] = LAST_I
+                GpuData[3,number] = CurIndex
+                
+                if (HDDS[CurIndex+1,table]:count()) {
+                    EGP:egpBox(LAST_I,vec2(30,Y+CurIndex*20),vec2(200,20))
+                    EGP:egpColor(LAST_I,168,0,0,255) LAST_I++
+                }
+            
+                for(I=1,HDD_MAX) {
+                    local Item = HDDS[I,table]
+                    if (Item:count()) {
+                        EGP:egpText(LAST_I,"> HDD"+(I-1)+" - Size "+(Item["size",number]*Item["sector_size",number])/1024+" KB",vec2(30,Y))
+                        EGP:egpColor(LAST_I,255,255,0,255)
+                        LAST_I++ Y+=20
+                    } else {
+                        EGP:egpText(LAST_I,"> HDD"+(I-1)+" - Not connected",vec2(30,Y))
+                        EGP:egpColor(LAST_I,100,100,100,255)
+                        LAST_I++ Y+=20
+                    }
+                }
+            }
+        }
+        
+        biosfooter()
+    }
+}
+   
+function biospost_key(Key:string,Pressed) {
+    if (!Pressed) { return }
+    local Step = GpuData[1,number]
+    if (Key=="f8") {
+        dsSendDirect("SAVE",BIOS,BOOT_HDD)
+        return
+    }
+    if (Step==1) {
+        if (Key=="f1") {
+            reboot()
+            return
+        }
+        local BoxID = GpuData[2,number]
+        local Index = GpuData[4,number]
+        local Max = 1
+        if (Key=="enter") {
+            bios_init()
+        } elseif (Key=="down" | Key=="up") {
+            if (Key=="down") {
+                Index = (Index==Max ? 0 : Index+1)
+            } else {
+                Index = (Index==0 ? Max : Index-1)
+            }
+            GpuData[4,number] = Index       
+            local Sz = GpuData[3,array][Index,number]     
+            local BOXID = GpuData[2,number]
+            EGP:egpPos(BOXID,EGP:egpPos(BoxID+Index+1))
+            EGP:egpSize(BOXID,vec2(Sz,20))
+        }          
+    } elseif (Step==2) {
+        if (Key=="enter"|Key=="f1") {
+            GpuData[1,number] = 0
+            bios_init()    
+        }
+    } elseif (Step==3) {
+        local BoxID = GpuData[2,number]
+        local Index = GpuData[3,number]
+        if (Key=="f1") {
+            GpuData[1,number] = 0
+            bios_init() 
+        } elseif (Key=="enter") {
+            BOOT_HDD = Index+1
+            GpuData[1,number] = 0
+            bios_init()
+        } elseif (Key=="down" | Key=="up") {
+            local Max = HDDS:count()-1
+            if (Max<1) { return }
+            if (Key=="down") {
+                Index = (Index==Max ? 0 : Index+1)
+            } else {
+                Index = (Index==0 ? Max : Index-1)
+            }
+            GpuData[3,number] = Index       
+            local BOXID = GpuData[2,number]
+            EGP:egpPos(BOXID,EGP:egpPos(BoxID+Index+1))
+        }   
+    }
+}
+
+}

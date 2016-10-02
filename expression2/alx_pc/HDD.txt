@@ -1,0 +1,39 @@
+@name HDD
+@inputs HDD_IO:wirelink Bank1:wirelink Bank2:wirelink Bank3:wirelink Bank4:wirelink
+@outputs HDD:entity
+@persist HDD_BANK_SIZE HDD_SECTOR_SIZE HDD_SIZE
+@persist HDD_Banks:array
+@trigger 
+@model models/expression 2/cpu_controller.mdl
+
+#[
+	ALX Wiremod E2 PC
+	Created by AlexALX
+	-------------------
+    HDD Bios - Handle HDD Banks 
+]#
+
+local Send = 0
+
+if (first()|duped()) {
+    
+dsJoinGroup("HDD_IO")
+
+HDD = entity()
+
+HDD_BANK_SIZE = 256*1024
+HDD_SECTOR_SIZE = 4
+Send = 1
+
+}
+
+if (dsClk("reload")&dsGetEntity()==HDD_IO:entity() | inputClk()&inputClkName()!="HDD_IO") {
+    Send = 1
+}
+
+if (Send) {
+    HDD_Banks = array(Bank1,Bank2,Bank3,Bank4)
+    HDD_SIZE = HDD_BANK_SIZE*HDD_Banks:count()
+    
+    dsSendDirect("hddinit",HDD_IO:entity(),table(entity(),HDD_SIZE,HDD_BANK_SIZE,HDD_SECTOR_SIZE,HDD_Banks))
+}

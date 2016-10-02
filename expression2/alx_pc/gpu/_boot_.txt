@@ -1,0 +1,34 @@
+@name Boot GPU handlers
+@persist BOOT_FUNC:table
+
+#[
+	ALX Wiremod E2 OS
+	Created by AlexALX
+	-------------------
+	Init boot menu
+]#
+
+if (INCLUDE) {
+    
+#include "alx_pc/gpu/_main_"
+
+function number initboot(Info:table) {
+    if (BOOT_FUNC:exists(Info[1,string])) {
+        Info[1,string](Info[2,string])
+    } else {
+        return 0
+    }
+    return 1
+}    
+
+# Custom Boot Functions
+
+BOOT_FUNC["alxos_boot",number] = 1
+function alxos_boot(Name:string) {
+    INCLUDE = 1
+    #include "alx_pc/gpu/alxos/bootmenu"
+    INCLUDE = 0
+    alxos_boot_init(Name)
+}
+    
+}

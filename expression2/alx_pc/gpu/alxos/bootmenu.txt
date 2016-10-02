@@ -1,0 +1,108 @@
+@name ALX OS Boot menu
+
+#[
+	ALX Wiremod E2 OS
+	Created by AlexALX
+	-------------------
+	Boot menu GUI and handler
+	For now without multiple OS support
+]#
+
+if (INCLUDE) {
+    
+#include "alx_pc/gpu/_main_" 
+
+function alxos_boot_init(Name:string) {
+    egpClear()
+    
+    local Info = dsGetTable()
+    
+    LAST_Y+=30
+    
+    EGP:egpText(LAST_I,"Please select the operating system to start:",vec2(BIOS_X,LAST_Y))
+    EGP:egpColor(LAST_I,168,168,168,255) LAST_I++ LAST_Y+=40
+    
+    EGP:egpBox(LAST_I,vec2(4,LAST_Y),vec2(432,20))
+    EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
+    
+    EGP:egpText(LAST_I,Name,vec2(BIOS_X,LAST_Y))
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++ LAST_Y+=40
+    
+    EGP:egpText(LAST_I,"Use the up and down arrow keys to move the highlight.",vec2(BIOS_X,LAST_Y))
+    EGP:egpColor(LAST_I,168,168,168,255) LAST_I++ LAST_Y+=20
+    
+    EGP:egpText(LAST_I,"Press Enter to choice.",vec2(BIOS_X,LAST_Y))
+    EGP:egpColor(LAST_I,168,168,168,255) LAST_I++ LAST_Y+=20
+    
+    EGP:egpText(LAST_I,"Seconds until highlighted choice will be started automatically:",vec2(BIOS_X,LAST_Y))
+    EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
+
+    GpuData[1,number] = LAST_I
+    GpuData[2,number] = 1
+    EGP:egpText(LAST_I,"5",vec2(480,LAST_Y))
+    EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
+    
+    KeyHandler = "alxos_boot_key"
+    DsHandler = "alxos_boot_ds"
+    
+    runCmd("alxos_boot_post",1000)
+            
+}
+
+function alxos_boot_ds(Name:string) {
+    if (Name=="alxos_fail") {
+        "alxos_fail"(dsGetString())  
+    } elseif (Name=="alxos_runprog") {
+        INCLUDE = 1
+        #include "alx_pc/gpu/alxos/_prog_"
+        INCLUDE = 0
+        local Info = dsGetTable()
+        if (ALXOS_PROGS:exists(Info[1,string])) {
+            Info[1,string]()   
+        } else {
+            "alxos_fail"("Function "+Info[1,string]+" is missing. Press F1 to reboot.")
+        }
+    }  
+}
+
+function alxos_boot_run() {
+    stoptimer("cmd")
+    egpClear()
+    dsSendDirect("alxos_init",E2_CPU,0)
+}
+
+function alxos_boot_key(Key:string,Pressed) {
+    if (!Pressed) { return }
+    if (Key=="enter") {
+        alxos_boot_run() 
+    }
+}
+
+function alxos_fail(Str:string) {
+    egpClear()
+    EGP:egpText(LAST_I,Str,vec2(BIOS_X,LAST_Y))
+    EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
+    KeyHandler = "alxos_fail_key"
+}
+
+function alxos_fail_key(Key:string,Pressed) {
+    if (!Pressed) { return }
+    if (Key=="f1") {
+        reboot()
+    }
+}
+
+function alxos_boot_post() {
+    local ID = GpuData[1,number]
+    local Cur = GpuData[2,number]
+    
+    if (Cur==5) {
+        alxos_boot_run()
+    } else {
+        GpuData[2,number] = Cur+1
+        EGP:egpText(ID,(5-Cur):toString(),EGP:egpPos(ID))
+        runCmd("alxos_boot_post",1000)
+    }
+}
+    
+}

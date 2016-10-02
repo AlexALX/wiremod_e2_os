@@ -1,0 +1,299 @@
+@name BOOT
+
+#[
+	ALX Wiremod E2 PC
+	Created by AlexALX
+	-------------------
+	PC boot GUI
+]#
+
+if (INCLUDE) {
+
+#include "alx_pc/gpu/_main_"
+
+function init() {
+    egpClear()
+    stopAllTimers()    
+    soundStop(0)
+    KeyHandler = ""
+    DsHandler = ""
+    ERR_C = 0
+    ERR_N = 0
+    LAST_I = 1
+    local X = BIOS_X
+    local Sz = BIOS_SZ
+    EGP:egpText(LAST_I,"Simple BIOS v1.0",vec2(X,0))
+    EGP:egpSize(LAST_I,Sz) LAST_I++
+    
+    LAST_Y = Sz
+    runCmd("initpost",2500)
+}
+
+registerTimers("boot_timer","hdd_timer")
+
+function hdd_timer() {
+    hddload(0)      
+}
+
+function initpost() {
+    local I = LAST_I
+    local X = BIOS_X
+    local Sz = BIOS_SZ
+    local Y = LAST_Y
+    BIOS_INIT = 1
+    
+    local Status = "OK"
+    if (softQuota()<2000) {
+        Status = "Error"
+        ERR_C = 1
+    } else { Status = "OK" }
+    EGP:egpText(I,"CPU "+softQuota()/1000+" Mhz - "+Status,vec2(X,Y))
+    EGP:egpSize(I,Sz) I++ Y+=Sz
+    if (ERR_C) { 
+        EGP:egpText(I,"ERROR: CPU is too slow.",vec2(X,Y))
+        EGP:egpSize(I,Sz) I++ Y+=Sz
+        EGP:egpText(I,"Minimum e2 softquota is 2000 on server.",vec2(X,Y))
+        EGP:egpSize(I,Sz) I++ Y+=Sz
+        EGP:egpText(I,"Current value is "+softQuota()+".",vec2(X,Y))
+        EGP:egpSize(I,Sz) I++ Y+=Sz
+        err() 
+    }
+        
+    if (egpMaxObjects()<300) {
+        Status = "Error"
+        ERR_C = 2
+    } else { Status = "OK" }
+    EGP:egpText(I,"GPU "+ceil(egpMaxObjects()/128)*1024+" KB - "+Status,vec2(X,Y))
+    EGP:egpSize(I,Sz) I++ Y+=Sz
+    if (ERR_C) { 
+        EGP:egpText(I,"ERROR: GPU memory is too small.",vec2(X,Y))
+        EGP:egpSize(I,Sz) I++ Y+=Sz
+        EGP:egpText(I,"Minimum EGP Objects is 300 on server.",vec2(X,Y))
+        EGP:egpSize(I,Sz) I++ Y+=Sz
+        EGP:egpText(I,"Current value is "+egpMaxObjects()+".",vec2(X,Y))
+        EGP:egpSize(I,Sz) I++ Y+=Sz
+        err() 
+    }
+    
+    if (!E2_SPU:isValid()) {
+        Status = "Not connected"
+    } else { Status = "Connected" }
+    EGP:egpText(I,"Sound Card - "+Status,vec2(X,Y))
+    EGP:egpSize(I,Sz) I++ Y+=Sz
+    
+    if (!->DS) {
+        Status = "Not connected"
+    } else { Status = "Connected" }
+    EGP:egpText(I,"Digital Screen - "+Status,vec2(X,Y))
+    EGP:egpSize(I,Sz) I++ Y+=Sz
+    
+    if (!Keyboard) {
+        Status = "Not connected"
+        ERR_C = 4
+    } else { Status = "Connected" }
+    EGP:egpText(I,"Keyboard - "+Status,vec2(X,Y))
+    EGP:egpSize(I,Sz) I++ Y+=Sz
+    if (ERR_C) { 
+        EGP:egpText(I,"ERROR: No keyboard detected",vec2(X,Y))
+        EGP:egpSize(I,Sz) I++ Y+=Sz
+        err() 
+    }
+    
+    if (toByte(NB)!=0) {
+        ERR_C = 5
+        EGP:egpText(I,"ERROR: Null byte is not correct!",vec2(X,Y))
+        EGP:egpSize(I,Sz) I++ Y+=Sz
+        EGP:egpText(I,"Please connect empty \"To Character\" gate",vec2(X,Y))
+        EGP:egpSize(I,Sz) I++ Y+=Sz
+        EGP:egpText(I,"\"Out\" output to \"NullByte\" input on BIOS.",vec2(X,Y))
+        EGP:egpSize(I,Sz) I++ Y+=Sz
+        err() 
+    }
+    
+    Y+=Sz
+    EGP:egpText(I,"Connected HDD's: ",vec2(X,Y))
+    EGP:egpSize(I,Sz) I++ Y+=Sz
+    
+    LAST_I = I
+    LAST_Y = Y
+    
+    hddload(1) 
+    DsHandler = "boot_ds"
+    dsSendDirect("gethdds",BIOS,entity())
+}
+
+function inithdd() {
+    local Info = dsGetTable()
+    HDDS = Info[1,table]
+    HDD_MAX = Info[2,number]
+    FS_TYPES = Info[3,table]
+    
+    local X = BIOS_X
+    local Sz = BIOS_SZ
+    
+    if (HDD_MAX==0|!HDD_IO) {
+        EGP:egpText(LAST_I,"No hdd's found.",vec2(X,LAST_Y))
+        EGP:egpSize(LAST_I,Sz) LAST_I++ LAST_Y+=Sz
+    } else {
+        for(I=1,HDD_MAX) {
+            local Item = HDDS[I,table]
+            if (Item:count()) {
+                EGP:egpText(LAST_I,"HDD"+(I-1)+" - Size "+(Item["size",number]*Item["sector_size",number])/1024+" KB",vec2(X,LAST_Y))
+                EGP:egpSize(LAST_I,Sz) LAST_I++ LAST_Y+=Sz
+            } else {
+                EGP:egpText(LAST_I,"HDD"+(I-1)+" - Not connected",vec2(X,LAST_Y))
+                EGP:egpSize(LAST_I,Sz) LAST_I++ LAST_Y+=Sz
+            }
+        }
+    }
+    
+    KeyHandler = "bios_key"
+    
+    EGP:egpText(LAST_I,"Press DEL to enter SETUP.",vec2(X,512-Sz))
+    EGP:egpSize(LAST_I,Sz) LAST_I++
+    
+    #soundPlay(12,0.25,"synth/square_440.wav")
+    ERR_C = -1
+    err()
+    
+    timer("boot_timer",100)
+    runCmd("boot",2000)
+    
+    #if (DEBUG) { "bios_key"("delete",1) }
+}
+
+function bios_key(Key:string,Pressed) {
+    if (!Pressed) { return }
+    if (Key=="delete") {
+        INCLUDE = 1
+        #include "alx_pc/gpu/bios"
+        INCLUDE = 0
+        stoptimer("cmd")
+        bios_init()   
+    }
+}
+
+function boot_ds(Name:string) {
+    if(Name=="gethdds") {
+        DsHandler = ""
+        inithdd()
+    } elseif(Name=="readfstbl") {
+        DsHandler = ""
+        "bootmenu"()
+    } elseif(Name=="fs_readfs") {
+        "bootmenu_post"(0)
+    } elseif(Name=="bootmenu") {
+        "bootmenu_post"(1)
+    }
+}
+
+function boot() {
+    egpClear()
+    
+    EGP:egpText(LAST_I,"Loading Boot Menu...",vec2(BIOS_X,LAST_Y))
+    EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
+    
+    local BootHDD = HDDS[BOOT_HDD,table]
+    
+    if (!BootHDD:count()|!HDD_IO) {
+        EGP:egpText(LAST_I,"No bootable device",vec2(BIOS_X,LAST_Y))
+        EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
+        
+        LAST_Y+=BIOS_SZ
+        EGP:egpText(LAST_I,"Press any key to reboot.",vec2(BIOS_X,LAST_Y))
+        EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
+        KeyHandler = "reboot"
+    } else {
+        DsHandler = "boot_ds"
+        dsSendDirect("readfstbl",HDD_IO:entity(),table(entity(),BootHDD))
+    }
+}
+
+function reboot(Key:string,Pressed) {
+    if (!Pressed) { return }
+    reboot()
+}
+
+function noboot(Msg:string) {
+    EGP:egpText(LAST_I,Msg,vec2(BIOS_X,LAST_Y))
+    EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
+    
+    LAST_Y+=BIOS_SZ
+    EGP:egpText(LAST_I,"Press ENTER to run Setup program.",vec2(BIOS_X,LAST_Y))
+    EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
+    EGP:egpText(LAST_I,"Or press F1 to reboot.",vec2(BIOS_X,LAST_Y))
+    EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
+    
+    KeyHandler = "bootmenu_key"   
+}
+
+function bootmenu() {
+    local BootHDD = HDDS[BOOT_HDD,table]
+    local FsTbl = dsGetTable()
+    if (FsTbl:count()) {
+        for(I=0,FsTbl:count()-1) {
+            if (FsTbl[I,table]["active",number]==1) {
+                DsHandler = "boot_ds"
+                dsSendDirect("fs_readfs",HDD_IO:entity(),table(entity(),"wm1",table(BootHDD,FsTbl[I,table])))
+                return
+            }   
+        }
+    }        
+    
+    noboot("No Bootable Volume")
+    
+    if (DEBUG) { runCmd("bootpost",1) }
+        
+}
+
+function bootmenu_post(Step:number) {
+    if (Step==0) {
+        local CurFs = dsGetTable()
+        
+        if (CurFs["boot_func",string]!="") {
+            dsSendDirect("bootmenu",E2_CPU,CurFs)   
+        } else {
+            noboot("Boot loader not found.")
+        }
+    } elseif (Step==1) {
+        local Type = dsGetType()
+        if (Type=="string") {
+            noboot(dsGetString())
+        } else {
+            INCLUDE = 1
+            #include "alx_pc/gpu/_boot_"
+            INCLUDE = 0
+            local Info = dsGetTable()
+            if (!initboot(Info)) {
+                noboot("Function "+Info[1,string]+" is missing.")   
+            }
+        }
+    }
+}
+
+function bootpost() {
+    INCLUDE = 1
+    #include "alx_pc/gpu/alxos/installos"
+    INCLUDE = 0
+    
+    LAST_Y+=BIOS_SZ
+    EGP:egpText(LAST_I,"Loading OS installation package...",vec2(BIOS_X,LAST_Y))
+    EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
+    
+    hddload(1)
+    
+    KeyHandler = ""
+    
+    runCmd("installos",2000,table(0))
+}
+
+function bootmenu_key(Key:string,Pressed) {
+    if (!Pressed) { return }
+    if (Key=="enter") {
+        bootpost()
+    } elseif (Key=="f1") {
+        reboot(Key,Pressed)
+    }
+}
+
+}

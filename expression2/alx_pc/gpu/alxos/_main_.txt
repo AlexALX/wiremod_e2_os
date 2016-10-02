@@ -1,0 +1,30 @@
+@name ALX Wiremod OS Main func
+@persist NL:string HTTP_Handler:string
+
+#[
+	ALX Wiremod E2 OS
+	Created by AlexALX
+	-------------------
+	Main functions/variables
+]#
+
+if (INCLUDE) {
+
+#include "alx_pc/gpu/_main_"
+
+function alxos_clear() {
+    HTTP_Handler = ""
+    ChatHandler = ""
+}
+
+NL = toChar(10) # new line char
+
+function string alxos_nicesize(Sz) {
+    local SzS = Sz+" Bytes"
+    if (Sz/1024>1) {
+        SzS = floor(Sz/1024,2)+" KB"
+    }
+    return SzS
+}
+
+}

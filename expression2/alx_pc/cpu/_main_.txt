@@ -1,0 +1,36 @@
+@name Main CPU func
+@inputs BIOS:entity
+@outputs E2_CPU:entity
+@persist E2_GPU:entity E2_SPU:entity HDDS:table HDD_MAX Keyboard:wirelink
+@persist KeyUser:entity CpuData:table HDD_IO:wirelink
+@persist CurFs:table INCLUDE DsHandler:string CMD:string CMDA:table DEBUG
+
+#[
+	ALX Wiremod E2 PC
+	Created by AlexALX
+	-------------------
+	CPU Main functions/variables + wire inputs/outputs
+]#
+
+if (first()|duped()) {
+    
+#include "alx_pc/shared/_main_"
+    
+function cpuClear() {
+    CpuData = table()
+}
+
+function runCmd(Cmd:string,Delay) {
+    if (DEBUG) { Delay = 1 }
+    CMD = Cmd
+    timer("cmd",Delay)
+}
+
+function runCmd(Cmd:string,Delay,Arg:table) {
+    if (DEBUG) { Delay = 1 }
+    CMD = Cmd
+    CMDA = Arg
+    timer("cmd",Delay)
+}
+   
+}

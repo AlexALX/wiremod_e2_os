@@ -1,0 +1,142 @@
+@name GPU
+@model models/expression 2/cpu_processor.mdl
+
+#[
+	ALX Wiremod E2 PC
+	Created by AlexALX
+	-------------------
+	E2 GPU, purpose:
+	- EGP and Digital Screen handler
+	- GUI for BIOS/Boot/ALX OS
+	- alxos e2 gpu programs
+]#
+
+if (first()|duped()) {
+    
+#include "alx_pc/gpu/_main_"
+    
+E2_GPU = entity() # stupid fix for entity loss on reload
+dsSendDirect("reload",BIOS,"gpu")
+
+BIOS_X = 10
+BIOS_SZ = 24
+
+BOOT_HDD = 1
+
+DEBUG = 0
+
+function initGpu() {
+    local Info = dsGetTable()
+    NB = Info[1,string]
+    E2_CPU = Info[2,entity]
+    E2_SPU = Info[4,entity]
+    local KeyboardArr = Info[5,array]
+    Keyboard = (KeyboardArr[2,number] ? KeyboardArr[1,wirelink] : nowirelink()) # bug - empty wirelink crash e2!
+    local HDDIO_Arr = Info[6,array]
+    HDD_IO = (HDDIO_Arr[2,number] ? HDDIO_Arr[1,wirelink] : nowirelink())
+    BOOT_HDD = Info[7,number]
+    HDDS = Info[9,table]
+    HDD_MAX = Info[10,number]
+    FS_TYPES = Info[11,table]
+    if (!Info[8,number]) {
+        dsSendDirect("init",BIOS,"gpu")
+        egpClear()
+        dsClear()
+    }
+}
+
+function ready() {
+    INCLUDE = 1
+    #include "alx_pc/gpu/boot"
+    INCLUDE = 0
+    init()
+}
+
+function shutdown() {
+    if (ShutHandler!="") {
+        ShutHandler()   
+        ShutHandler = ""
+    }
+    stopAllTimers()
+    egpClear()
+    dsClear()
+    dsSendDirect("SHUTDOWN",E2_CPU,dsGetNumber())
+}
+
+}
+
+
+if (!BIOS:isValid()) { exit() }
+
+#[
+if (changed(E2_CPU)|first()) {
+    dsSendDirect("initgpu",E2_CPU,entity())   
+}]#
+
+if (dsClk("keyboard")) {
+    local KeyArr = dsGetArray()
+    if (KeyHandler=="") {
+        #if (Key==13 & !BIOS_INIT) { init() }
+    } else {
+        KeyHandler(KeyArr[1,string],KeyArr[2,number])
+    }
+    exit()
+}
+
+if (dsClk()) {
+    local Name = dsClkName()
+    if (Name=="ready") {
+        ready()
+    } elseif (Name=="init") {
+        initGpu()
+    } elseif (Name=="SHUTDOWN") {
+        #DEBUG = 0
+        shutdown()
+    } elseif (Name=="CMD") {
+        local Cmd = dsGetString()
+        Cmd()   
+    } elseif (DsHandler!="") {
+        DsHandler(Name)
+    }
+    exit()
+}
+
+if (clk(clkName())) {
+    local Name = clkName()
+    if (SharedTimers:exists(Name)) {
+        SharedTimers[Name,string]()
+    }
+    #[
+    for(I=1,SharedTimers:count()) {
+        local CName = SharedTimers[I,string]+"_"
+        if (Name:left(CName:length())==CName) {
+               
+        }
+    }   ]#
+}
+
+if (clk("cmd")) {
+    if (CMDA:count()) {
+        local ID = CMDA:id()
+        if (!CMD(CMDA)[number]) {
+            if (CMDA:id()==ID) {
+                CMDA = table()
+            }
+        }
+    } else {
+        CMD()
+    }
+    exit()
+}
+
+if (httpClk()) {
+    if (HTTP_Handler!="") {
+        HTTP_Handler()   
+    }   
+}
+
+if (chatClk(ChatPlayer)) {
+    if (ChatHandler!="") {
+        ChatHandler(ChatPlayer)  
+    }
+}

@@ -1,0 +1,1472 @@
+@name explorer.e2e
+@persist ExplorerFS:table ExplorerAllFs:table ExplorerDir:table ExplorerPath:table ExplorerFile:string
+@persist ExplorerKeyH:string ExplorerDsH:string
+
+#[
+	ALX Wiremod E2 OS
+	Created by AlexALX
+	-------------------
+	Explorer GUI
+]#
+
+if (INCLUDE) {
+ 
+#include "alx_pc/gpu/alxos/_main_"
+
+function alxos_explorer_bg() {
+    EGP:egpBox(LAST_I,vec2(0,0),vec2(512,472))
+    EGP:egpColor(LAST_I,0,0,168,255) LAST_I++
+    
+    EGP:egpBoxOutline(LAST_I,vec2(2,2),vec2(508,468))
+    EGP:egpColor(LAST_I,85,255,255,255) LAST_I++
+    
+    EGP:egpBoxOutline(LAST_I,vec2(5,5),vec2(502,462))
+    EGP:egpColor(LAST_I,85,255,255,255) LAST_I++
+    
+    LAST_Y=8
+}
+
+function alxos_explorer_ft(Opts:array) {
+    local LAST_X = 5
+    local Quit = 0
+    
+    local ReDraw = GpuData[-100,number]
+    if (!ReDraw) { GpuData[-100,number] = LAST_I }
+    GpuData[-103,array] = Opts
+
+    for(I=1,8) {
+        # quit always last
+        if (I<8 & Opts[I,string]=="Quit") { 
+            Opts[8,string] = Opts[I,string] 
+            Opts[I,string] = ""
+        }
+        if (ReDraw) {
+            local ID = ReDraw+(I-1)*3+2
+            EGP:egpText(ID,Opts[I,string],EGP:egpPos(ID))
+        } else {
+            EGP:egpText(LAST_I,I:toString(),vec2(LAST_X,495))
+            EGP:egpSize(LAST_I,14)
+            EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
+            LAST_X += 12
+            
+            EGP:egpBox(LAST_I,vec2(LAST_X,492),vec2(47,20))
+            EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
+            LAST_X += 2
+            
+            EGP:egpText(LAST_I,Opts[I,string],vec2(LAST_X,495))
+            EGP:egpSize(LAST_I,14)
+            EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+            LAST_X += 50
+        }
+    }      
+    
+    if (ReDraw) { return }     
+    
+    EGP:egpText(LAST_I,ExplorerPath:concat("/")+"/"+ExplorerFile,vec2(5,472))
+    EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
+}
+
+function number alxos_explorer_listdir_draw(Info:table) {
+    
+    local CmdRun = GpuData[-5,number]
+    
+    if (CmdRun==0) {
+    
+        if (Info:count()<=1) {
+            EGP:egpText(LAST_I,"Directory is empty.",vec2(12,LAST_Y))
+            EGP:egpColor(LAST_I,128,255,255,255) LAST_I++
+            return 0  
+        }
+        
+        # selector
+        GpuData[1,number] = LAST_I
+        EGP:egpBox(LAST_I,vec2(7,28),vec2(498,20))
+        EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
+        
+        GpuData[2,table] = Info
+        ExplorerDir[3,table] = Info
+        GpuData[6,table] = table()
+        GpuData[8,number] = 1
+        
+        GpuData[-5,number] = 1
+        runCmd("alxos_explorer_listdir_draw",1,Info) 
+        return 1
+    
+    } elseif (CmdRun==1) {
+    
+        local Entries = GpuData[6,table]
+        local EntryID = GpuData[8,number]
+        
+        # folders first
+        local Max = Info:count()
+        local I = GpuData[9,number]
+        local TotalDirs = GpuData[3,number]
+        while(perf()) {
+            if (I>Max) { 
+                break    
+            }
+            local Entry = Info[I,table]
+            I++
+            if (Entry["name",string]=="." | !((Entry["attr",number] >> 4) && 1)) { continue }
+            
+            local Col = vec4(128,255,255,255)
+            if (EntryID==1) {
+                Col = vec4(0,0,0,255) 
+            }
+            
+            Entries[EntryID,table] = table(LAST_Y,LAST_I,Entry)
+            EntryID++
+            
+            EGP:egpText(LAST_I,Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : ""),vec2(12,LAST_Y))
+            EGP:egpColor(LAST_I,Col) LAST_I++
+            
+            local UP_DIR = (Entry["name",string]==".." ? 1 : 0)
+            
+            EGP:egpText(LAST_I,(UP_DIR ? "UP-DIR" : "SUB-DIR"),vec2(175,LAST_Y))
+            EGP:egpColor(LAST_I,Col) LAST_I++
+            
+            local Date = date(Entry["time_create",number])
+            local DateStr = Date["day",number]+"/"+Date["month",number]+"/"+Date["year",number]
+            if (UP_DIR) { DateStr = "---" }
+            EGP:egpText(LAST_I,DateStr,vec2(300,LAST_Y))
+            EGP:egpColor(LAST_I,Col) LAST_I++
+            
+            local DateStr = Date["hour",number]+":"+Date["min",number]+":"+Date["sec",number]
+            if (UP_DIR) { DateStr = "---" }
+            EGP:egpText(LAST_I,DateStr,vec2(425,LAST_Y))
+            EGP:egpColor(LAST_I,Col) LAST_I++
+            
+            LAST_Y += 20
+            TotalDirs++ 
+        }  
+        GpuData[3,number] = TotalDirs
+        GpuData[8,number] = EntryID
+        GpuData[6,table] = Entries 
+        
+        if (I<Max) { 
+            GpuData[9,number] = I
+        } else {
+            GpuData[-5,number] = 2
+            GpuData[4,number] = 0
+            GpuData[10,number] = 0
+            GpuData[9,number] = 0
+        }
+        
+        runCmd("alxos_explorer_listdir_draw",1,Info) 
+        return 1
+
+    } else {
+        # files
+        local Entries = GpuData[6,table]
+        local EntryID = GpuData[8,number]
+        
+        local Max = Info:count()-1
+        local I = GpuData[9,number]
+        local TotalFiles = GpuData[4,number]
+        local TotalSize = GpuData[10,number]
+        while(perf()) {
+            if (I>Max) { 
+                break    
+            }
+            local Entry = Info[I,table]
+            I++
+            if (((Entry["attr",number] >> 4) && 1)) { continue }
+            
+            Entries[EntryID,table] = table(LAST_Y,LAST_I,Entry)
+            EntryID++
+            
+            EGP:egpText(LAST_I,Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : ""),vec2(12,LAST_Y))
+            EGP:egpColor(LAST_I,128,255,255,255) LAST_I++
+            
+            EGP:egpText(LAST_I,alxos_nicesize(Entry["size",number]),vec2(175,LAST_Y))
+            EGP:egpColor(LAST_I,128,255,255,255) LAST_I++
+            
+            local Date = date(Entry["time_create",number])
+            local DateStr = Date["day",number]+"/"+Date["month",number]+"/"+Date["year",number]
+            EGP:egpText(LAST_I,DateStr,vec2(300,LAST_Y))
+            EGP:egpColor(LAST_I,128,255,255,255) LAST_I++
+            
+            local DateStr = Date["hour",number]+":"+Date["min",number]+":"+Date["sec",number]
+            EGP:egpText(LAST_I,DateStr,vec2(425,LAST_Y))
+            EGP:egpColor(LAST_I,128,255,255,255) LAST_I++
+            
+            LAST_Y += 20 
+            TotalFiles++
+            TotalSize += Entry["size",number]
+        }
+        
+        GpuData[8,number] = EntryID
+        GpuData[6,table] = Entries 
+        GpuData[4,number] = TotalFiles
+        GpuData[5,number] = TotalSize
+        
+        if (I<Max) { 
+            GpuData[9,number] = I
+            runCmd("alxos_explorer_listdir_draw",1,Info) 
+            return 1
+        } else {
+            GpuData[8,number] = EntryID-1
+            GpuData[7,number] = 1
+        }
+    
+    }
+    
+    KeyHandler = "alxos_explorer_key"
+    return 0
+}
+
+function alxos_explorer_listdir(FS:table,Dir,Sd) {
+    ExplorerDsH = ""
+    egpClear()
+    alxos_explorer_bg()
+    ExplorerDir[1,number] = Dir
+    ExplorerDir[2,number] = Sd
+    
+    EGP:egpText(LAST_I,"Name",vec2(50,LAST_Y))
+    EGP:egpColor(LAST_I,255,255,0,255) LAST_I++
+    
+    EGP:egpBox(LAST_I,vec2(170,7),vec2(1,458))
+    EGP:egpColor(LAST_I,85,255,255,255) LAST_I++
+    
+    EGP:egpText(LAST_I,"Size",vec2(210,LAST_Y))
+    EGP:egpColor(LAST_I,255,255,0,255) LAST_I++
+    
+    EGP:egpBox(LAST_I,vec2(295,7),vec2(1,458))
+    EGP:egpColor(LAST_I,85,255,255,255) LAST_I++
+    
+    EGP:egpText(LAST_I,"Date",vec2(335,LAST_Y))
+    EGP:egpColor(LAST_I,255,255,0,255) LAST_I++
+    
+    EGP:egpBox(LAST_I,vec2(420,7),vec2(1,458))
+    EGP:egpColor(LAST_I,85,255,255,255) LAST_I++
+    
+    EGP:egpText(LAST_I,"Time",vec2(450,LAST_Y))
+    EGP:egpColor(LAST_I,255,255,0,255) LAST_I++
+    
+    LAST_Y += 20
+    
+    GpuData[9,number] = 0
+    
+    ExplorerFile = ""
+    dsSendDirect("fs_listdir",HDD_IO:entity(),table(entity(),"wm1",table(FS,Dir,Sd)))
+    
+    ExplorerKeyH = "listdir"
+    alxos_explorer_ft(array("Info","Menu","Open","View","MkDir","MkFile","Delete","Quit"))
+}
+
+function alxos_explorer_handlers() {
+    DsHandler = "alxos_explorer_ds"  
+    KeyHandler = "alxos_explorer_key" 
+}
+
+function alxos_explorer_listcurdir() {
+    alxos_explorer_listdir(ExplorerFS,ExplorerDir[1,number],ExplorerDir[2,number])     
+}
+
+function alxos_explorer_info() {
+    local Info = GpuData
+    egpClear()    
+    alxos_explorer_bg()
+    
+    EGP:egpText(LAST_I,"The ALX Wiremod E2 OS Explorer",vec2(256,LAST_Y))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,255,255,0,255) LAST_I++ LAST_Y += 20
+    
+    EGP:egpText(LAST_I,"Version 1.0, 31 August 2016",vec2(256,LAST_Y))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ LAST_Y += 25
+    
+    EGP:egpLine(LAST_I,vec2(8,LAST_Y),vec2(504,LAST_Y))
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ LAST_Y += 5
+    
+    local Sz = ExplorerFS["total_clusters",number]*ExplorerFS["sectors_in_cluster",number]*ExplorerFS["bytes_in_sector",number]
+    EGP:egpText(LAST_I,alxos_nicesize(Sz)+" total space on drive "+ExplorerPath[1,string],vec2(256,LAST_Y))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ LAST_Y += 20
+    
+    local Sz = ExplorerFS["free_clusters",number]*ExplorerFS["sectors_in_cluster",number]*ExplorerFS["bytes_in_sector",number]
+    EGP:egpText(LAST_I,alxos_nicesize(Sz)+" free on drive "+ExplorerPath[1,string],vec2(256,LAST_Y))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ LAST_Y += 20
+    
+    EGP:egpText(LAST_I,Info[4,number]+" files and "+Info[3,number]+" directories ",vec2(256,LAST_Y))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ LAST_Y += 20
+    
+    EGP:egpText(LAST_I,"use "+alxos_nicesize(Info[5,number])+" in",vec2(256,LAST_Y))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ LAST_Y += 20
+    
+    EGP:egpText(LAST_I,ExplorerPath:concat("/"),vec2(256,LAST_Y))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ LAST_Y += 25
+    
+    EGP:egpLine(LAST_I,vec2(8,LAST_Y),vec2(504,LAST_Y))
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ LAST_Y += 5
+    
+    EGP:egpText(LAST_I,"Volume Label: "+ExplorerFS["volume_name",string],vec2(256,LAST_Y))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ LAST_Y += 20
+    
+    EGP:egpText(LAST_I,"Serial number: "+ExplorerFS["volume_serial",number]:toString(),vec2(256,LAST_Y))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ LAST_Y += 25
+    
+    EGP:egpLine(LAST_I,vec2(8,LAST_Y),vec2(504,LAST_Y))
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ LAST_Y += 5
+    
+    ExplorerKeyH = "quit"
+    alxos_explorer_ft(array("Quit"))    
+}
+
+function alxos_explorer_menubg(Title:string,Width,Height,Col:table) {
+    local Parent = LAST_I
+    
+    local ReDraw = GpuData[-101,number]
+    if (ReDraw) {
+        local Parent = GpuData[-1,number]
+
+        EGP:egpSize(Parent,vec2(Width,Height))
+        EGP:egpPos(Parent,vec2(256-(Width/2),256-(Height/2)))
+        
+        EGP:egpSize(Parent+1,vec2(Width-16,Height-16))
+        EGP:egpPos(Parent+1,vec2((256+8)-(Width/2),(256+8)-(Height/2)))
+        EGP:egpSize(Parent+2,vec2(Width-22,Height-22))
+        EGP:egpPos(Parent+2,vec2((256+11)-(Width/2),(256+11)-(Height/2)))
+        
+        local Sz = Title:length()*12
+        EGP:egpPos(Parent+3,vec2(0-Sz/2,0-Height/2))
+        EGP:egpSize(Parent+3,vec2(Sz,22))
+        
+        EGP:egpText(Parent+4,Title,vec2(0,0-Height/2))
+        return   
+    }
+    EGP:egpBox(LAST_I,vec2(256-(Width/2),256-(Height/2)),vec2(Width,Height))
+    EGP:egpColor(LAST_I,Col[1,vector4]) LAST_I++
+    
+    EGP:egpBoxOutline(LAST_I,vec2((256+8)-(Width/2),(256+8)-(Height/2)),vec2(Width-16,Height-16))
+    EGP:egpColor(LAST_I,Col[2,vector4]) LAST_I++
+    
+    EGP:egpBoxOutline(LAST_I,vec2((256+11)-(Width/2),(256+11)-(Height/2)),vec2(Width-22,Height-22))
+    EGP:egpColor(LAST_I,Col[2,vector4]) LAST_I++
+    
+    local Sz = Title:length()*12
+    EGP:egpBox(LAST_I,vec2(0-Sz/2,0-Height/2),vec2(Sz,22))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,Col[1,vector4]) LAST_I++
+    
+    EGP:egpText(LAST_I,Title,vec2(0,0-Height/2))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,Col[2,vector4]) LAST_I++
+    
+    GpuData[-1,number] = Parent
+    
+    GpuData[-101,number] = 1
+    
+}
+
+function alxos_explorer_menubg(Title:string,Width,Height) {
+    alxos_explorer_menubg(Title,Width,Height,table(vec4(0,168,168,255),vec4(255,255,255,255)))
+}
+
+function alxos_explorer_menu(Title:string,MenuTree:table,Width) {
+    local ReDraw = GpuData[-101,number]
+    local Height = MenuTree:count()*20+40
+    alxos_explorer_menubg(Title,Width,Height)
+    
+    local Parent = GpuData[-1,number]
+    local LAST_Y = 20-Height/2
+    local LeftPos = 20-Width/2
+
+    ExplorerKeyH = "mainmenu"
+    alxos_explorer_ft(array("Quit"))
+    
+    if (ReDraw) {
+        local Tbl = GpuData[-3,table]
+        for(I=1,Tbl:count()) {
+            EGP:egpRemove(Tbl[I,table][4,number])   
+        }
+    } else {    
+        GpuData[-2,number] = LAST_I
+        EGP:egpBox(LAST_I,vec2(LeftPos-4,LAST_Y),vec2(Width-32,20))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    }
+    
+    for(I=1,MenuTree:count()) {
+        MenuTree[I,table][6,table] = MenuTree[I,table][4,table]
+        MenuTree[I,table][4,number] = LAST_I
+        MenuTree[I,table][5,vector2] = vec2(LeftPos-4,LAST_Y)
+        
+        EGP:egpText(LAST_I,MenuTree[I,table][2,string],vec2(LeftPos,LAST_Y))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,vec4(255,255,255,255)) LAST_I++ LAST_Y+=20
+    }
+
+    GpuData[-3,table] = MenuTree
+    GpuData[-4,number] = 1
+    GpuData[-5,number] = MenuTree:count()
+    
+}
+
+function alxos_explorer_mainmenu(Info:table) {
+    local MenuTree = table(
+        table(0,"System Information","alxos_explorer_sysinfo"),
+        table(0,"Change volume","alxos_explorer_chvolume"),
+        table(0,"Shutdown PC","alxos_explorer_shutdown")
+    )
+    alxos_explorer_menu("Menu",MenuTree,280)
+}
+
+function alxos_explorer_shutdown(Info:table) {
+    dsSendDirect("SHUTDOWN",BIOS,0)    
+}
+
+function number alxos_explorer_dialogbg(Title:string,Width,Height,Type:string,Callback:string) {
+    alxos_explorer_menubg(Title,Width,Height,table(vec4(168,168,168,255),vec4(0,0,0,255)))
+    
+    local Parent = GpuData[-1,number]
+    
+    local ReDraw = GpuData[-101,number]
+    if (ReDraw) {
+        local Entities = GpuData[-4,table]
+        for(I=1,Entities:count()) {
+            EGP:egpRemove(Entities[I,number])   
+            EGP:egpRemove(Entities[I,number]+1) 
+        }
+        Entities = GpuData[-10,table]
+        for(I=1,Entities:count()) {
+            EGP:egpRemove(Entities[I,number])   
+        }
+    }
+    
+    GpuData[-2,string] = Type
+    GpuData[-3,string] = Callback
+    GpuData[-102,string] = ExplorerKeyH
+    ExplorerKeyH = "dialog"
+    
+    GpuData[-10,table] = table()
+    
+    if (Type=="yesno") {
+        
+        alxos_explorer_ft(array("Quit"))
+        
+        local Entries = table()
+        
+        local Sz = 40
+        Entries[1,number] = LAST_I   
+        GpuData[-10,table]:pushNumber(LAST_I)   
+        EGP:egpBox(LAST_I,vec2((Sz/2)-100,(Height/2)-22),vec2(Sz,20))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
+        
+        GpuData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Yes",EGP:egpPos(LAST_I-1)+vec2(5,0))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+        
+        local Sz = 30
+        Entries[2,number] = LAST_I
+        GpuData[-10,table]:pushNumber(LAST_I)
+        EGP:egpBox(LAST_I,vec2((Sz/2)+48,(Height/2)-22),vec2(Sz,20))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,168,0,255) LAST_I++
+        
+        GpuData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"No",EGP:egpPos(LAST_I-1)+vec2(5,0))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+
+        GpuData[-5,number] = 2
+        GpuData[-4,table] = Entries
+
+    } elseif (Type=="okcancel") {
+        
+        alxos_explorer_ft(array("Quit"))
+        
+        local Entries = table()
+        
+        local Sz = 30
+        Entries[1,number] = LAST_I   
+        GpuData[-10,table]:pushNumber(LAST_I)   
+        EGP:egpBox(LAST_I,vec2((Sz/2)-100,(Height/2)-22),vec2(Sz,20))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
+        
+        GpuData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"OK",EGP:egpPos(LAST_I-1)+vec2(5,0))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+        
+        local Sz = 60
+        Entries[2,number] = LAST_I
+        GpuData[-10,table]:pushNumber(LAST_I)
+        EGP:egpBox(LAST_I,vec2((Sz/2)+20,(Height/2)-22),vec2(Sz,20))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,168,0,255) LAST_I++
+        
+        GpuData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Cancel",EGP:egpPos(LAST_I-1)+vec2(5,0))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+
+        GpuData[-5,number] = 2
+        GpuData[-4,table] = Entries
+
+    } elseif (Type=="ok") {
+        alxos_explorer_ft(array("Quit"))
+        
+        local Sz = 30
+        GpuData[-10,table]:pushNumber(LAST_I)
+        EGP:egpBox(LAST_I,vec2(0-(Sz/2),(Height/2)-22),vec2(Sz,20))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,168,0,255) LAST_I++
+        
+        GpuData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"OK",EGP:egpPos(LAST_I-1)+vec2(5,0))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+        
+    } elseif (Type=="progress") {
+        alxos_explorer_ft(array("Quit"))
+        
+        local LAST_Y = Height/2-40
+        local LeftPos = 20-Width/2
+        
+        GpuData[-10,table]:pushNumber(LAST_I)
+        EGP:egpBox(LAST_I,vec2(LeftPos,LAST_Y),vec2(Width-40,20))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,125,125,125,255) LAST_I++
+
+        GpuData[-5,number] = LAST_I
+        GpuData[-6,number] = Width-40
+        GpuData[-10,table]:pushNumber(LAST_I)
+        EGP:egpBox(LAST_I,vec2(LeftPos,LAST_Y),vec2(1,20))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+        
+        GpuData[-4,number] = LAST_I
+        GpuData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"0%",vec2(0,LAST_Y))
+        EGP:egpAlign(LAST_I,1)
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,200,200,200,255) LAST_I++
+        
+    }
+    
+    return Parent
+    
+}
+
+function alxos_explorer_closedialog() {
+    local Parent = GpuData[-1,number]
+    for(I=Parent,Parent+5) {
+        EGP:egpRemove(I)   
+    }   
+    local Rm = GpuData[-10,table]
+    for(I=1,Rm:count()) {
+        EGP:egpRemove(Rm[I,number])
+    }
+    ExplorerKeyH = GpuData[-102,string]
+    GpuData[-101,number] = 0
+    #alxos_explorer_ft(GpuData[-103,array])
+}
+
+function alxos_explorer_error(Msg:string) {
+    local Parent = alxos_explorer_dialogbg("Error",440,60,"ok","alxos_explorer_listcurdir")
+    GpuData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,Msg,vec2(0,-12))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    DsHandler = "alxos_explorer_ds"
+}
+
+function alxos_explorer_delete(Info:table) {
+    local Parent = alxos_explorer_dialogbg("Delete",400,60,"yesno","alxos_explorer_delact")
+    
+    GpuData[6,table] = Info
+    local Entry = Info[3,table]
+    
+    GpuData[7,number] = LAST_I
+    local FName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
+    GpuData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Are you sure want to delete '"+FName+"'?",vec2(-180,-12))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+}
+
+function alxos_explorer_delact() {
+    local Del = (GpuData[-5,number]==1 ? 1 : 0 )
+    if (Del) {
+        local Entry = GpuData[6,table][3,table]
+        if ((Entry["attr",number] >> 4) && 1) {
+            ExplorerDsH = "alxos_explorer_delpre"
+            dsSendDirect("fs_listdir",HDD_IO:entity(),table(entity(),"wm1",table(ExplorerFS,Entry["cluster",number],Entry["data_sector",number])))    
+        } else {
+        
+            local Parent = alxos_explorer_dialogbg("Removing file",400,80,"progress","")
+        
+            GpuData[-10,table]:pushNumber(LAST_I)
+            EGP:egpText(LAST_I,"Please wait, this can take few minutes...",vec2(0,-22))
+            EGP:egpParent(LAST_I,Parent)
+            EGP:egpAlign(LAST_I,1)
+            EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+            
+            runCmd("alxos_explorer_cmd",100)
+        
+            ExplorerDsH = "alxos_explorer_delpost"
+            dsSendDirect("fs_removefile",HDD_IO:entity(),table(entity(),"wm1",table(ExplorerFS,Entry["cluster",number],Entry["data_sector",number])))
+        }
+    } else {
+        alxos_explorer_listcurdir()
+    }   
+}
+
+function number alxos_explorer_cmd() {
+    local CurTask = HDD_IO["CurTask",table]
+    
+    if (CurTask:count()) { runCmd("alxos_explorer_cmd",100) }
+    else { return 0 }
+    
+    local Max = CurTask[1,number]
+    local Cur = CurTask[2,number]
+    if (Max==0) { return 0 }
+    
+    local PercID = GpuData[-4,number]
+    local BoxID = GpuData[-5,number]
+    local BoxW = GpuData[-6,number]
+    local CalcP = round(Cur/Max*100)
+    BoxW = ceil(BoxW/100*CalcP)
+    if (BoxW<1) { BoxW = 1 }
+    EGP:egpSize(BoxID,vec2(BoxW,20))
+    EGP:egpText(PercID,CalcP+"%",EGP:egpPos(PercID))
+
+    return 0
+}
+
+function alxos_explorer_delpre() {
+    local Info = dsGetTable()
+    local Entry = GpuData[6,table][3,table]
+    if (Info:count()>2) {
+        ExplorerDsH = ""
+        local Parent = alxos_explorer_dialogbg("Error",400,60,"ok","alxos_explorer_listcurdir")
+        
+        local FName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
+        local TxtID = GpuData[7,number]
+        EGP:egpText(TxtID,"Directory '"+FName+"' is not empty, cannot remove.",EGP:egpPos(TxtID))
+        EGP:egpOrder(TxtID,LAST_I)
+    } else {
+        ExplorerDsH = "alxos_explorer_delpost"
+        dsSendDirect("fs_removefile",HDD_IO:entity(),table(entity(),"wm1",table(ExplorerFS,Entry["cluster",number],Entry["data_sector",number])))
+    }
+}
+
+function alxos_explorer_delpost() {
+    ExplorerDsH = ""
+    alxos_explorer_listcurdir()
+}
+
+function alxos_explorer_mkdir() {
+    local Parent = alxos_explorer_dialogbg("Create Folder",400,80,"okcancel","alxos_explorer_mkdirpre")
+    GpuData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Folder name:",vec2(-180,-22))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    GpuData[-10,table]:pushNumber(LAST_I)
+    EGP:egpBox(LAST_I,vec2(-180,-4),vec2(360,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
+    
+    GpuData[-10,table]:pushNumber(LAST_I)
+    GpuData[7,number] = LAST_I
+    EGP:egpText(LAST_I,"_",vec2(-178,-4))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    ExplorerKeyH = "mkdir"
+    
+}
+
+function alxos_explorer_mkdirpre() {
+    local MkDir = (GpuData[-5,number]==1 ? 1 : 0 )
+    if (!MkDir) {
+        alxos_explorer_listcurdir()
+        return   
+    }
+    
+    local FName = GpuData[8,string]
+    for(I=0,ExplorerDir[3,table]:count()) {
+        local Entry = ExplorerDir[3,table][I,table]
+        local FullName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
+        if (FullName==FName) {
+            local Parent = alxos_explorer_dialogbg("Error",400,60,"ok","alxos_explorer_listcurdir")
+            EGP:egpText(LAST_I,"Folder or file with this name already exists.",vec2(-180,-12))
+            EGP:egpParent(LAST_I,Parent)
+            EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+            return 
+        }
+    } 
+    
+    ExplorerDsH = "alxos_explorer_mkdirpost"
+    dsSendDirect("fs_mkfile",HDD_IO:entity(),table(entity(),"wm1",table(ExplorerFS,FName,"",1,ExplorerDir[1,number])))   
+}
+
+function alxos_explorer_mkdirpost() {
+    ExplorerDsH = ""
+    alxos_explorer_listcurdir()
+}
+
+function alxos_explorer_mkfile() {
+    local Parent = alxos_explorer_dialogbg("Create File",400,160,"okcancel","alxos_explorer_mkfilepre")
+    local Entries = table()
+    
+    GpuData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"File name:",vec2(-180,-67))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    GpuData[-10,table]:pushNumber(LAST_I)
+    EGP:egpBox(LAST_I,vec2(-180,-49),vec2(310,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
+    
+    GpuData[-10,table]:pushNumber(LAST_I)
+    Entries[0,table] = table(LAST_I,"")
+    EGP:egpText(LAST_I,"_",vec2(-178,-49))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    GpuData[-10,table]:pushNumber(LAST_I)
+    EGP:egpBox(LAST_I,vec2(140,-49),vec2(40,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
+    
+    GpuData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,".",vec2(133,-49))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    GpuData[-10,table]:pushNumber(LAST_I)
+    Entries[1,table] = table(LAST_I,"")
+    EGP:egpText(LAST_I,"",vec2(142,-49))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    GpuData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"File content URL: (not necessary)",vec2(-180,-29))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    GpuData[-10,table]:pushNumber(LAST_I)
+    EGP:egpBox(LAST_I,vec2(-180,-9),vec2(360,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
+    
+    GpuData[-10,table]:pushNumber(LAST_I)
+    Entries[2,table] = table(LAST_I,"http://")
+    EGP:egpText(LAST_I,Entries[2,table][2,string],vec2(-178,-9))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    GpuData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Note: you can paste url here using command",vec2(-180,16))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    GpuData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"\"!url http://URL\" in chat",vec2(-180,36))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    ExplorerKeyH = "mkfile"
+    
+    ChatHandler = "alxos_explorer_chat"
+    runOnChat(1)
+    ChatPlayer = Keyboard["User",entity]
+    
+    GpuData[7,table] = Entries
+    GpuData[8,number] = 0
+}
+
+function alxos_explorer_chat(Ply:entity) {
+    local Said = Ply:lastSaid():trim()
+    local Find = Said:find(" ")
+    local Cmd = Said:left(Find-1)
+    local Url = Said:sub(Find+1)  
+    if (Cmd=="!url") {
+        local Entry = GpuData[7,table][2,table]
+        local ID = Entry[1,number]
+        Entry[2,string] = Url
+        EGP:egpText(ID,Url,EGP:egpPos(ID))
+    }  
+}
+
+function alxos_explorer_mkfilepre() {
+    local MkFile = (GpuData[-5,number]==1 ? 1 : 0 )
+    if (!MkFile) {
+        alxos_explorer_listcurdir()
+        return   
+    }
+    
+    ChatHandler = ""
+    runOnChat(0)
+    ChatPlayer = noentity()
+    
+    local FNameT = GpuData[7,table][0,table]
+    local FNameE = GpuData[7,table][1,table]
+    local FNameL = GpuData[7,table][2,table]
+    local FName = FNameT[2,string]+(FNameE[2,string]!=""?"."+FNameE[2,string] : "")
+    for(I=0,ExplorerDir[3,table]:count()) {
+        local Entry = ExplorerDir[3,table][I,table]
+        local FullName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
+        if (FullName==FName) {
+            local Parent = alxos_explorer_dialogbg("Error",400,60,"ok","alxos_explorer_listcurdir")
+            EGP:egpText(LAST_I,"Folder or file with this name already exists.",vec2(-180,-12))
+            EGP:egpParent(LAST_I,Parent)
+            EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+            return 
+        }
+    } 
+    
+    ExplorerDsH = "alxos_explorer_mkfilepost"
+    dsSendDirect("fs_mkfile",HDD_IO:entity(),table(entity(),"wm1",table(ExplorerFS,FNameT[2,string],FNameE[2,string],0,ExplorerDir[1,number])))   
+}
+
+function alxos_explorer_mkfilepost() {
+    local Type = dsGetType()
+    local URL = GpuData[7,table][2,table][2,string]
+    if (Type=="table" & URL!="http://"&URL!="") {
+        
+        local Parent = alxos_explorer_dialogbg("Writing file",400,80,"progress","")
+    
+        GpuData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Please wait, this can take few minutes...",vec2(0,-22))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpAlign(LAST_I,1)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++    
+        
+        GpuData[9,table] = dsGetTable()
+        runOnHTTP(1)
+        HTTP_Handler = "alxos_explorer_mkfilehttp"
+        httpRequest(URL)
+        local DB = DEBUG
+        DEBUG = 0
+        runCmd("alxos_http_timeout",10000)
+        DEBUG = DB
+        return
+    }
+    ExplorerDsH = ""
+    alxos_explorer_listcurdir()
+}
+
+function number alxos_explorer_mkfile_progress() {
+    local CurTask = HDD_IO["CurTask",table]
+    
+    if (CurTask:count()) { runCmd("alxos_explorer_mkfile_progress",100) }
+    else { return 0 }
+    
+    local Max = CurTask[2,number]
+    local Cur = CurTask[3,number]
+    if (Max==0) { return 0 }
+    
+    local PercID = GpuData[-4,number]
+    local BoxID = GpuData[-5,number]
+    local BoxW = GpuData[-6,number]
+    local CalcP = round(Cur/Max*100)
+    BoxW = ceil(BoxW/100*CalcP)
+    if (BoxW<1) { BoxW = 1 }
+    EGP:egpSize(BoxID,vec2(BoxW,20))
+    EGP:egpText(PercID,CalcP+"%",EGP:egpPos(PercID))
+
+    return 0
+}
+
+function alxos_explorer_mkfilehttp() {
+    runOnHTTP(0)
+    HTTP_Handler = ""
+    stoptimer("cmd")
+    local Data = httpData()
+    if (Data!="") {
+        local Entry = GpuData[9,table]
+        local C = Entry["cluster",number]
+        local Sd = Entry["data_sector",number]
+        ExplorerDsH = "alxos_explorer_mkfilehttp_post"
+        
+        runCmd("alxos_explorer_mkfile_progress",100)    
+        
+        #printTable(table(Data))
+        
+        dsSendDirect("fs_writefile",HDD_IO:entity(),table(entity(),"wm1",table(ExplorerFS,C,Sd,Data)))    
+    }    
+}
+
+function number alxos_http_timeout() {
+    local Parent = alxos_explorer_dialogbg("Error",400,60,"ok","alxos_explorer_listcurdir")
+    EGP:egpText(LAST_I,"Server timeout.",vec2(-180,-12))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    local Entry = GpuData[9,table]
+    ExplorerDsH = ""
+    dsSendDirect("fs_removefile",HDD_IO:entity(),table(entity(),"wm1",table(ExplorerFS,Entry["cluster",number],Entry["data_sector",number])))
+    return 0
+}
+
+function alxos_explorer_mkfilehttp_post() {
+    local Ret = dsGetNumber()
+    if (Ret==-2) {
+        local Parent = alxos_explorer_dialogbg("Error",400,60,"ok","alxos_explorer_listcurdir")
+        EGP:egpText(LAST_I,"Not enough space on disk.",vec2(-180,-12))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+        local Entry = GpuData[9,table]
+        ExplorerDsH = ""
+        dsSendDirect("fs_removefile",HDD_IO:entity(),table(entity(),"wm1",table(ExplorerFS,Entry["cluster",number],Entry["data_sector",number])))
+    } elseif (Ret!=1) {
+        local Parent = alxos_explorer_dialogbg("Error",400,60,"ok","alxos_explorer_listcurdir")
+        EGP:egpText(LAST_I,"File system internal error.",vec2(-180,-12))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    } else {
+        alxos_explorer_listcurdir()
+    }  
+}
+
+function alxos_explorer_chvolume(Info:table) {
+    local CurSerial = ExplorerFS["volume_serial",number]
+    if (Info[6,table]:count()) {
+        local Entry = Info[6,table]
+        ExplorerFS = Entry[1,table]
+        ExplorerPath = table(Entry[2,string])
+        alxos_explorer_listdir(ExplorerFS,ExplorerFS["root_dir_cluster",number],0)
+        return   
+    }
+    
+    local MenuTree = table()
+    
+    local CurVol = "C:"
+    local I = 1
+    foreach(K,V:table=ExplorerAllFs) {
+        if (K=="C") {
+            MenuTree:unshiftTable(table(0,K+": ["+V["volume_name",string]+"]","alxos_explorer_chvolume",table(V,K+":")))
+        } else {
+            MenuTree:pushTable(table(0,K+": ["+V["volume_name",string]+"]","alxos_explorer_chvolume",table(V,K+":")))
+        }
+        if (V["volume_serial",number]==CurSerial) {
+            CurVol = K+":"
+        }
+    }
+    alxos_explorer_menu("Select Volume",MenuTree,280)
+    
+    local CurVolI = 1
+    for(I=1,MenuTree:count()) {
+        if (MenuTree[I,table][6,table][2,string]==CurVol) {
+            CurVolI = I  
+            break 
+        }   
+    }
+    
+    GpuData[-4,number] = CurVolI
+
+    local BoxID = GpuData[-2,number]
+    local Info = GpuData[-3,table][CurVolI,table]    
+    EGP:egpPos(BoxID,Info[5,vector2])
+     
+}
+
+function alxos_explorer_sysinfo(Info:table) {
+    egpClear()
+    alxos_explorer_bg()
+    
+    ExplorerKeyH = "quit"
+    alxos_explorer_ft(array("Quit"))
+    
+    local Y = LAST_Y
+    EGP:egpText(LAST_I,"PC Information",vec2(30,Y))
+    EGP:egpColor(LAST_I,255,255,0,255) LAST_I++ Y+=24
+    
+    EGP:egpLine(LAST_I,vec2(10,Y),vec2(502,Y)) 
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ Y+=5
+    
+    EGP:egpText(LAST_I,"CPU - "+softQuota()/1000+" Mhz",vec2(30,Y))
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ Y+=20 
+    
+    EGP:egpText(LAST_I,"GPU - "+ceil(egpMaxObjects()/128)*1024+" KB",vec2(30,Y))
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ Y+=20
+    
+    if (!E2_SPU:isValid()) { Status = "Not connected" } else { Status = "Connected" }
+    EGP:egpText(LAST_I,"Sound Card - "+Status,vec2(30,Y))
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ Y+=20
+    
+    if (!->DS) { Status = "Not connected" } else { Status = "Connected" }
+    EGP:egpText(LAST_I,"Digital Screen - "+Status,vec2(30,Y))
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ Y+=20
+    
+    if (!Keyboard) { Status = "Not connected" } else { Status = "Connected" }
+    EGP:egpText(LAST_I,"Keyboard - "+Status,vec2(30,Y))
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ Y+=20
+    
+    if (!Keyboard["User",entity]:isValid()) { Status = "Not user" } else { Status = Keyboard["User",entity]:name() }
+    EGP:egpText(LAST_I,"Keyboard User - "+Status,vec2(30,Y))
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ Y+=40
+    
+    EGP:egpText(LAST_I,"Connected HDDs",vec2(30,Y))
+    EGP:egpColor(LAST_I,255,255,0,255) LAST_I++ Y+=24
+    
+    EGP:egpLine(LAST_I,vec2(10,Y),vec2(502,Y)) 
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ Y+=5
+    
+    for(I=1,HDD_MAX) {
+        local Item = HDDS[I,table]
+        if (Item:count()) {
+            EGP:egpText(LAST_I,"HDD"+(I-1)+" - Size "+(Item["size",number]*Item["sector_size",number])/1024+" KB",vec2(30,Y))
+            EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ Y+=20
+        } else {
+            EGP:egpText(LAST_I,"HDD"+(I-1)+" - Not connected",vec2(30,Y))
+            EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ Y+=20
+        }
+    }
+    
+    Y+=20
+    
+    EGP:egpText(LAST_I,"Wiremod Information",vec2(30,Y))
+    EGP:egpColor(LAST_I,255,255,0,255) LAST_I++ Y+=24
+    
+    EGP:egpLine(LAST_I,vec2(10,Y),vec2(502,Y)) 
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ Y+=5
+    
+    EGP:egpText(LAST_I,"Expression2 Soft Quota - "+softQuota(),vec2(30,Y))
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ Y+=20 
+    
+    EGP:egpText(LAST_I,"Expression2 Hard Quota - "+hardQuota(),vec2(30,Y))
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ Y+=20 
+    
+    EGP:egpText(LAST_I,"EGP Max Objects - "+egpMaxObjects(),vec2(30,Y))
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ Y+=40    
+}
+
+function alxos_explorer_key(Key:string,Pressed) {
+    if (!Pressed) { return } 
+    if (ExplorerKeyH=="listdir") {
+        if (Key=="f1") {
+            alxos_explorer_info()       
+        }
+        if (Key=="f8") {
+            DEBUG = 0
+            reboot()       
+        }
+        local Index = GpuData[7,number]
+        if (Key=="down" | Key=="up") { 
+            local Max = GpuData[8,number]
+            if (Max<2) { return }
+            local Ind = Index
+            if (Key=="down") {
+                Index = (Index==Max ? 1 : Index+1)
+            } else {
+                Index = (Index==1 ? Max : Index-1)
+            }
+            GpuData[7,number] = Index
+            local BoxID = GpuData[1,number]
+            local Info = GpuData[6,table][Index,table]            
+            EGP:egpPos(BoxID,vec2(7,Info[1,number]))
+            local LAST_ID = Info[2,number]
+            local CUR_ID = GpuData[6,table][Ind,table][2,number]
+            for (I=0,3) {
+                EGP:egpColor(CUR_ID+I,128,255,255,255)
+                EGP:egpColor(LAST_ID+I,0,0,0,255)
+            }
+        } elseif (Key=="enter" | Key=="f3") {
+            local Info = GpuData[6,table][Index,table]
+            local Entry = Info[3,table]
+            if (((Entry["attr",number] >> 4) && 1)) {
+                if (Entry["name",string]!="..") {
+                    ExplorerPath:pushString(Entry["name",string])
+                } else {
+                    ExplorerPath:pop()  
+                }
+                alxos_explorer_listdir(ExplorerFS,Entry["cluster",number],Entry["data_sector",number])    
+            } else {
+                if (Entry["ext",string]=="e2e") {
+                    dsSendDirect("alxos_execute",E2_CPU,table(entity(),ExplorerFS,Entry))
+                } else {
+                    dsSendDirect("alxos_openfile",E2_CPU,table(entity(),Entry))
+                }
+            }
+        } elseif (Key=="f4") {
+            local Info = GpuData[6,table][Index,table]
+            local Entry = Info[3,table]
+            if (((Entry["attr",number] >> 4) && 1)) {
+                alxos_explorer_key("enter",1)
+            } else {
+                "alxos_explorer_reader_init"(Entry)
+            }
+        } elseif (Key=="f2") {
+            local Info = GpuData[6,table][Index,table]
+            alxos_explorer_mainmenu(Info)
+        } elseif (Key=="f7" | Key=="delete") {
+            local Info = GpuData[6,table][Index,table]
+            alxos_explorer_delete(Info)
+        } elseif (Key=="f5") {
+            alxos_explorer_mkdir()
+        } elseif (Key=="f6") {
+            alxos_explorer_mkfile()
+        }
+    } elseif (ExplorerKeyH=="quit") {
+        if (Key=="f8") {
+            alxos_explorer_listcurdir()    
+        }
+    } elseif (ExplorerKeyH=="reader" | ExplorerKeyH=="readermove") {
+        if (Key=="f8") {
+            dsSendDirect("clear",HDD_IO:entity(),entity())
+            alxos_explorer_handlers()
+            alxos_explorer_listcurdir()        
+        }
+        if (ExplorerKeyH=="readermove") {
+            if (Key=="right" | Key=="left") {
+                #[ Old code - without monowidth font
+                local Lines = GpuData[11,table]
+                local VEC = vec2(400,0)   
+                local FPos = EGP:egpPos(Lines[1,number])
+                if (Key=="right") { VEC *= -1 }
+                elseif (FPos:x()>0) { VEC = vec2(0,VEC:y()) }            
+                for(I=1,Lines:count()) {
+                    local ID = Lines[I,number]
+                    EGP:egpPos(ID,EGP:egpPos(ID)+VEC)   
+                }  ]#
+                local Lines = GpuData[11,table]
+                local St = GpuData[13,number]
+                local AddMax = 48
+                local Max = 30
+                local Ed = St+Max
+                if (Key=="left") { St -= Max Ed = St+AddMax }
+                else { St += Max Ed += AddMax }
+                if (St<=1) { St = 1 Ed = St+AddMax }
+                GpuData[13,number] = St
+                for(I=1,Lines:count()) {
+                    local Item = Lines[I,array]
+                    EGP:egpText(Item[1,number],Item[2,string]:sub(St,Ed),EGP:egpPos(Item[1,number]))   
+                }              
+            } elseif (Key=="up" | Key=="down") {
+                "alxos_explorer_reader_move"(Key)
+            }
+        }
+    } elseif (ExplorerKeyH=="mainmenu") {
+        if (Key=="f8") {
+            alxos_explorer_listcurdir()      
+        }
+        local Index = GpuData[-4,number]
+        if (Key=="down" | Key=="up") { 
+            local Max = GpuData[-5,number]
+            if (Max<2) { return }
+            local Ind = Index
+            if (Key=="down") {
+                Index = (Index==Max ? 1 : Index+1)
+            } else {
+                Index = (Index==1 ? Max : Index-1)
+            }
+            GpuData[-4,number] = Index
+            local BoxID = GpuData[-2,number]
+            local Info = GpuData[-3,table][Index,table]            
+            EGP:egpPos(BoxID,Info[5,vector2])
+        } elseif (Key=="enter") {
+            local Info = GpuData[-3,table][Index,table]
+            Info[3,string](Info)          
+        }
+    } elseif (ExplorerKeyH=="dialog" | ExplorerKeyH=="mkdir" | ExplorerKeyH=="mkfile") {
+        if (ExplorerDsH!="") { return }
+        local Index = GpuData[-5,number]
+        local Type = GpuData[-2,string]
+        if ((Type=="yesno" | Type=="okcancel") & (Key=="left" | Key=="right")) {
+            local Max = 2
+            local Ind = Index
+            if (Key=="right") {
+                Index = (Index==Max ? 1 : Index+1)
+            } else {
+                Index = (Index==1 ? Max : Index-1)
+            }
+            GpuData[-5,number] = Index
+            local CurID = GpuData[-4,table][Index,number]     
+            local PrevID = GpuData[-4,table][Ind,number]  
+            EGP:egpColor(PrevID,168,168,168,255)
+            EGP:egpColor(CurID,0,168,0,255)
+        } elseif (Key=="enter" | Key=="f8") {
+            if ((Type=="yesno" | Type=="okcancel") & Key=="f8") { GpuData[5,number] = 2 }
+            local Callback = GpuData[-3,string]
+            if (Callback!="") { Callback() }
+        } elseif (ExplorerKeyH=="mkdir") {
+            local D_I = GpuData[7,number]
+            local D_V = GpuData[8,string]
+            if (Key=="backspace") {
+                D_V = D_V:sub(0,D_V:length()-1)
+                EGP:egpText(D_I,D_V+"_",EGP:egpPos(D_I))
+                GpuData[8,string] = D_V
+            } else {
+                local KMem = Keyboard["Memory",number] # handle capital/small without writting own code
+                local Char = toChar((KMem>=128 ? KMem-80 : KMem))
+                if (Char:findRE("^[A-Za-z0-9_ -]$") & KMem<=122) {
+                    D_V = (D_V+Char):left(10)
+                    EGP:egpText(D_I,D_V+"_",EGP:egpPos(D_I))
+                    GpuData[8,string] = D_V
+                }
+            }
+        } elseif (ExplorerKeyH=="mkfile") {
+            local Index = GpuData[8,number]
+            if (Key=="down" | Key=="up" | Key=="tab") { 
+                local Max = 2
+                local Ind = Index
+                if (Key!="up") {
+                    Index = (Index==Max ? 0 : Index+1)
+                } else {
+                    Index = (Index==0 ? Max : Index-1)
+                }
+                GpuData[8,number] = Index
+                local CurID = GpuData[7,table][Index,table]
+                local PrevID = GpuData[7,table][Ind,table]
+                EGP:egpText(CurID[1,number],CurID[2,string]+"_",EGP:egpPos(CurID[1,number]))
+                EGP:egpText(PrevID[1,number],PrevID[2,string],EGP:egpPos(PrevID[1,number]))
+            } else {
+                local D_I = GpuData[7,table][Index,table][1,number]
+                local D_V = GpuData[7,table][Index,table][2,string]
+                if (Key=="backspace") {
+                    D_V = D_V:sub(0,D_V:length()-1)
+                    EGP:egpText(D_I,D_V+"_",EGP:egpPos(D_I))
+                    GpuData[7,table][Index,table][2,string] = D_V
+                } else {
+                    local KMem = Keyboard["Memory",number] # handle capital/small without writting own code
+                    local Char = toChar((KMem>=128 ? KMem-80 : KMem))
+                    
+                    local RE = "^[A-Za-z0-9_ -]$"
+                    local MC = 10
+                    if (Index==1) {
+                        RE = "^[A-Za-z0-9]$"
+                        MC = 3   
+                    } elseif (Index==2) {
+                        RE = "^[A-Za-z0-9_&$#?@!*()\"'^%%+.,|/\\ %[%]-]$"
+                        MC = 100
+                    }
+                    
+                    if (Char:findRE(RE) & KMem<=122) {
+                        D_V = (D_V+Char):left(MC)
+                        EGP:egpText(D_I,D_V+"_",EGP:egpPos(D_I))
+                        GpuData[7,table][Index,table][2,string] = D_V
+                    }
+                }
+            }            
+        }
+    }
+}
+
+function alxos_explorer_reader_init(FInfo:table) {
+    egpClear()
+    alxos_explorer_bg()
+    
+    ExplorerFile = FInfo["name",string]+(FInfo["ext",string]!="" ? "."+FInfo["ext",string] : "")
+    alxos_explorer_ft(array("Edit","Quit"))
+    
+    local LAST_SI = GpuData[100,number]
+    if (LAST_SI>0) { LAST_I = LAST_SI } else { GpuData[100,number] = LAST_I }
+    
+    local Parent = alxos_explorer_dialogbg("Opening file",400,80,"progress","alxos_explorer_listcurdir")
+    
+    GpuData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",vec2(0,-22))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    ExplorerDsH = "alxos_explorer_reader"
+    ExplorerKeyH = "reader"
+    GpuData[7,table] = FInfo
+    local End = ExplorerFS["bytes_in_sector",number]*ExplorerFS["sectors_in_cluster",number]
+    GpuData[8,number] = End
+    GpuData[12,number] = 0
+    GpuData[13,number] = 1
+    GpuData[14,table] = table()
+    GpuData[15,number] = 1
+    dsSendDirect("fs_readfile",HDD_IO:entity(),table(entity(),"wm1",table(ExplorerFS,FInfo,0,End)))        
+}
+
+function alxos_explorer_reader_move(Key:string) {
+    
+    local Start = GpuData[9,string]:length()
+    local Offset = GpuData[12,number]
+    local PosTbl = GpuData[14,table]
+    local CurPos = GpuData[15,number]
+    
+    #print(Start+" | "+Offset)  
+
+    if (Key=="down") {
+        #GpuData[13,number] = Start
+        PosTbl[CurPos,number] = Offset #array(Start,Offset)
+        Start += Offset  
+        CurPos++
+    } else {
+        if (Offset<=0) { return }
+        #Start = 0 #Offset-GpuData[13,number]
+        # sorry i'm lazy to do this correct, just move to start
+        #if (Start<0) { Start = 0 }
+        CurPos--
+        #local Item = PosTbl[CurPos,array]
+        Start = PosTbl[CurPos,number] #Item[1,number]
+        #Offset = Item[2,number]
+    }
+    
+    local Lines = GpuData[11,table]
+    for(I=1,Lines:count()) {
+        local ID = Lines[I,array][1,number]
+        if (I==1) { LAST_Y = EGP:egpPos(ID):y() }
+        EGP:egpRemove(ID)   
+    }
+    
+    local LAST_SI = GpuData[100,number]
+    if (LAST_SI>0) { LAST_I = LAST_SI } else { GpuData[100,number] = LAST_I }
+    
+    local Parent = alxos_explorer_dialogbg("Opening file",400,80,"progress","alxos_explorer_listcurdir")
+    
+    GpuData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",vec2(0,-22))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    local FInfo = GpuData[7,table]
+    
+    ExplorerDsH = "alxos_explorer_reader"
+    ExplorerKeyH = "reader"
+    local End = ExplorerFS["bytes_in_sector",number]*ExplorerFS["sectors_in_cluster",number]
+    GpuData[8,number] = End
+    GpuData[9,string] = ""
+    GpuData[10,number] = 0
+    GpuData[11,table] = table()
+    GpuData[12,number] = Start
+    #GpuData[13,number] = 1
+    GpuData[14,table] = PosTbl
+    GpuData[15,number] = CurPos
+    dsSendDirect("fs_readfile",HDD_IO:entity(),table(entity(),"wm1",table(ExplorerFS,FInfo,Start,End)))     
+}
+
+function number alxos_explorer_reader_cmd(Args:table) {
+    local Data = Args[2,string]
+    local Last = Args[3,number]
+    local Max = Args[4,number]
+    local TotalLines = Args[5,number]
+    local CurStr = ""
+    local Lines = Args[6,table]
+    while(perf()) {
+        local Find = Data:find(NL,Last)
+        if (Find>0) {
+            CurStr = Data:sub(Last,Find)
+            Last = Find+1
+        } else {
+            CurStr = Data:sub(Last,Data:length()) #Data:sub(Last,Max)#:left(65)
+            Last = Max
+        }       
+        
+        Lines:pushArray(array(LAST_I,CurStr))
+        local St = GpuData[13,number]
+        local Ed = St+48
+        
+        EGP:egpText(LAST_I,CurStr:sub(St,Ed),vec2(10,LAST_Y))
+        EGP:egpFont(LAST_I,"Courier New") # monowidth font, sorry not cross-platform :(
+        EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ LAST_Y += 19
+        
+        TotalLines++ 
+        if (TotalLines>23 | Last>=Max) { 
+            GpuData[11,table] = Lines
+            ExplorerDsH = "" 
+            ExplorerKeyH = "readermove"  
+            return 0 
+        } 
+    }
+    Args[5,number] = TotalLines
+    Args[3,number] = Last
+    runCmd("alxos_explorer_reader_cmd",1,Args)
+    return 1
+}
+
+function alxos_explorer_reader(Data:string) { 
+    local FInfo = GpuData[7,table] 
+    local Count = GpuData[10,number]+(Data:explode(NL):count()-1)
+    local Offset = GpuData[12,number]
+    if (Count<=24 & FInfo["size",number]>GpuData[8,number]+Offset) {
+        local Start = GpuData[8,number]
+        local End = ExplorerFS["bytes_in_sector",number]*ExplorerFS["sectors_in_cluster",number]
+        GpuData[8,number] = Start+End
+        local Str = GpuData[9,string]
+        GpuData[9,string] = Str+Data
+        if (GpuData[10,number]!=Count) {
+            local PercID = GpuData[-4,number]
+            local BoxID = GpuData[-5,number]
+            local BoxW = GpuData[-6,number]
+            local CalcP = round(Count/24*100)
+            BoxW = ceil(BoxW/100*CalcP)
+            EGP:egpSize(BoxID,vec2(BoxW,20))
+            EGP:egpText(PercID,CalcP+"%",EGP:egpPos(PercID))
+        }
+        GpuData[10,number] = Count
+        #print(Start+Offset+" | "+End)
+        dsSendDirect("fs_readfile",HDD_IO:entity(),table(entity(),"wm1",table(ExplorerFS,FInfo,Start+Offset,End)))      
+    } else {
+        alxos_explorer_closedialog()
+    
+        local Str = GpuData[9,string]+Data
+        # fix for lines
+        if (Count>24) {
+            local Tbl = Str:explode(NL)
+            local MTbl = Tbl:count()
+            local Rm = Count-23
+            for (I=1,Rm) {
+                Tbl:pop()  
+            }
+            Str = Tbl:concat(NL)
+            GpuData[10,number] = 24
+        }
+        GpuData[9,string] = Str+NL        
+        alxos_explorer_reader_cmd(table(FInfo,Str,0,Str:length(),0,table()))
+    }
+}
+
+function alxos_explorer_ds(Name:string) {
+    if (Name=="fs_listdir") {
+        if (ExplorerDsH!="") {
+            ExplorerDsH()
+        } else {
+            alxos_explorer_listdir_draw(dsGetTable())   
+        }   
+    } elseif (Name=="fs_readfile") { 
+        local FileData = dsGetString()
+        ExplorerDsH(FileData)
+    } elseif (Name=="alxos_runprog") {
+        local Info = dsGetTable()
+        if (Info[1,string]=="alxos_explorer_reader") {
+            alxos_explorer_reader_init(Info[2,table])   
+        } elseif(Info[1,string]=="alxos_explorer") {
+            "alxos_explorer_init"()
+        } else {
+            local TInfo = table(Info[2,table],ExplorerFS)
+            "alxos_execute"(Info[1,string],TInfo)
+        }
+    } elseif (Name=="fs_removefile" | Name=="fs_mkfile" | Name=="fs_writefile") {
+        if (ExplorerDsH!="") { ExplorerDsH() }
+    }
+}
+
+function alxos_explorer_init() {
+    egpClear()
+    local Info = dsGetTable()
+    ExplorerFS = Info[2,table]
+    ExplorerAllFs = Info[3,table] 
+    
+    ShutHandler = "alxos_clear"
+    
+    ExplorerDsH = ""
+    ExplorerKeyH = ""
+    DsHandler = "alxos_explorer_ds"    
+    ExplorerPath = table("C:")
+    alxos_explorer_listdir(ExplorerFS,ExplorerFS["root_dir_cluster",number],0)       
+}
+    
+}

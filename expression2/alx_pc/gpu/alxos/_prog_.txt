@@ -1,0 +1,39 @@
+@name ALX Wiremod OS GPU Programs
+@persist ALXOS_PROGS:table
+
+#[
+	ALX Wiremod E2 OS
+	Created by AlexALX
+	-------------------
+	Custom gpu programs
+]#
+
+if (INCLUDE) {
+ 
+#include "alx_pc/gpu/alxos/_main_"
+
+function alxos_execute(Name:string,Args:table) {
+    if (ALXOS_PROGS:exists(Name)) {
+        Name(Args)   
+    } else {
+        "alxos_explorer_error"("Function "+Name+" is missing.")
+    }
+}
+
+ALXOS_PROGS["alxos_explorer",number] = 1
+function alxos_explorer() {
+    INCLUDE = 1
+    #include "alx_pc/gpu/alxos/explorer"
+    INCLUDE = 0
+    alxos_explorer_init()
+}   
+
+ALXOS_PROGS["alxos_bmp_reader",number] = 1
+function alxos_bmp_reader(Args:table) {
+    INCLUDE = 1
+    #include "alx_pc/gpu/alxos/bmp"
+    INCLUDE = 0
+    alxos_bmp_init(Args)
+}   
+    
+}

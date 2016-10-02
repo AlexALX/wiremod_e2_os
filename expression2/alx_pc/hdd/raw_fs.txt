@@ -1,0 +1,31 @@
+@name Raw File System
+
+#[
+	ALX Wiremod E2 FS
+	Created by AlexALX
+	-------------------
+	Raw file system 
+	Used for debug file system table functions
+]#
+
+if (first()|duped()) {
+
+#include "alx_pc/hdd/_main_"
+
+FS_TYPES[1,string] = "RAW"
+
+function string raw_mkfs_check(Args:array) {
+    #return "ERR_NOT_IMPLEMENTED"
+    return ""
+}
+
+function number raw_mkfs(Args:table) {    
+    local HDD = Args[1,table]
+    local FsTbl = Args[2,table]
+    local Index = Args[3,number]
+    local Size = Args[4,number]
+    addfs2tbl(HDD,FsTbl,Index,0,1,Size)
+    return 1
+}
+   
+}

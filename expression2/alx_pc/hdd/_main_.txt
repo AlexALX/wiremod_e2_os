@@ -1,0 +1,178 @@
+@name Main hdd func
+@inputs BIOS:entity
+@outputs HDD_IO:wirelink CurTask:table
+@persist HDDS:table HDD_MAX FS_Delay DsTbl:table
+@persist FS_TYPES:table FS_TBL_SIZE HDD_MAX_ADDR
+
+#[
+	ALX Wiremod E2 FS
+	Created by AlexALX
+	-------------------
+	HDD main functions and File System table functions 
+
+    Partition table specifications: 
+        Max partitions: 4, Extended Partition Tables not supported
+        Max FS Size: 64MB
+]#
+
+if (first()|duped()) {
+    
+function hddload(Num) {
+    dsSendDirect("HDDInd",BIOS,Num) 
+}
+    
+#[===========================]#
+#	HDD Functions
+#[===========================]#
+
+HDD_MAX_ADDR = 1024*256-1
+    
+function writeCell(HDD:table,Addr,Data) {
+    if (Addr<0|Addr>=HDD["size",number]|!HDD["banks",number]) {
+        print("HDD Write Error "+Addr)
+        return
+    }
+    local Ind = ceil((Addr+1)/HDD["bank_size",number])
+    local Bank = HDD["bank",array][Ind,wirelink]
+    if (Ind>1) {
+        Addr -= (Ind-1)*HDD["bank_size",number]
+    }
+    if (Addr>HDD["bank_size",number]-1|Addr>HDD_MAX_ADDR) { print("HDD Write Error"+Addr+" on Bank "+Ind) }
+    Bank[Addr] = Data
+}
+
+function number readCell(HDD:table,Addr) {
+    if (Addr<0|Addr>=HDD["size",number]|!HDD["banks",number]) {
+        print("HDD Read Error "+Addr)
+        return 0
+    }
+    local Ind = ceil((Addr+1)/HDD["bank_size",number])
+    local Bank = HDD["bank",array][Ind,wirelink]
+    if (Ind>1) {
+        Addr -= (Ind-1)*HDD["bank_size",number]
+    }
+    if (Addr>HDD["bank_size",number]-1|Addr>HDD_MAX_ADDR) { print("HDD Read Error"+Addr+" on Bank "+Ind) }
+    return Bank[Addr]  
+}
+
+function formatDisk(HDD:table) {
+    for(I=1,HDD["banks",number]) {
+        HDD["bank",array][I,wirelink]["Clear",number] = 1   
+    }
+}
+
+#[===========================]#
+# File System Table (aka MBR)
+#[===========================]#
+
+FS_TBL_SIZE = 9
+
+function mkfstbl(HDD:table) {
+    for(N=0,3) {
+        local O = N*2
+        writeCell(HDD,O,0)  
+        writeCell(HDD,O+1,0)  
+    }  
+    writeCell(HDD,FS_TBL_SIZE-1,0x55AA) 
+}
+
+function number findfreetbl(FsTbl:table) {
+    for(K=0,3) {
+        local V = FsTbl[K,table]
+        if (V["type",number]==0) { return K }
+    }
+    return -1
+}
+
+function number gettblsize(FsTbl:table,N) {
+    local TS = 0
+    for(K=0,3) {
+        local V = FsTbl[K,table]
+        if (V["type",number]!=0) { TS += V["total",number] }
+    }   
+    return TS
+}
+
+function number getlasttblsector(FsTbl:table) {
+    local Max = 0
+    for(K=0,3) {
+        local V = FsTbl[K,table]
+        if (V["type",number]!=0 & Max<V["end",number]) { Max = V["end",number] }
+    }   
+    return Max+1      
+}
+
+function array findtblsectors(FsTbl:table,N,Max) {
+    local Min = FS_TBL_SIZE
+    for(K=0,3) {
+        local V = FsTbl[K,table]
+        if (V["type",number]==0) { continue }
+        if (N<K & V["start",number]<Max) {
+            Max = V["start",number]
+            break   
+        }
+        if (N>K & V["end",number]>Min) {
+            Min = V["end",number]   
+        }
+    } 
+    return array(Min,Max)
+}
+
+function number addfs2tbl(HDD:table,FsTbl:table,N,A,T,Sz) {
+    #local HDD = FsTbl["hddinfo",table]
+    local HDD_SIZE = HDD["fs_max_size",number]
+    if (N<0 | N>3 | !FsTbl:count() | Sz>HDD_SIZE | Sz>0xFFFFFF) { return 0 } 
+    #if ((readCell(HDD,N*2) && 0xFFFF) != 0) { return 0 }
+
+    local Ar = findtblsectors(FsTbl,N,HDD["size",number]-1)
+    local St = Ar[1,number]
+    local Ed = Ar[2,number]
+    local Ts = Ed-St
+    if (Sz>Ts) { return 0 } # out of space
+    local O = N*2
+    writeCell(HDD,O,A + (St << 8))
+    writeCell(HDD,O+1, T + (Sz << 8))
+    # update fs tbl
+    local Tmp = FsTbl[N,table]
+    Tmp["active",number] = A
+    Tmp["start",number] = St
+    Tmp["total",number] = Ts
+    Tmp["type",number] = T
+    Tmp["end",number] = St+Sz 
+    return St   
+}
+
+function table readfstbl(HDD:table) {
+    if (readCell(HDD,FS_TBL_SIZE-1)!=0x55AA) { return table() }
+    
+    local FsTbl = table()
+    for (F=0,3) {
+        local O = F*2
+        local Tmp = table()
+        Tmp["active",number] = readCell(HDD,O) && 0xFF
+        Tmp["start",number] = (readCell(HDD,O) >> 8) && 0xFFFFFF
+        Tmp["total",number] = (readCell(HDD,O+1) >> 8) && 0xFFFFFF
+        Tmp["type",number] = readCell(HDD,O+1) && 0xFF
+        Tmp["end",number] = Tmp["start",number]+Tmp["total",number]
+        FsTbl[F,table] = Tmp 
+    }   
+    #FsTbl["hddinfo",table] = HDD
+    return FsTbl
+}
+
+function removefstbl(HDD:table,N) {
+    if (N<0 | N>3 | readCell(HDD,FS_TBL_SIZE-1)!=0x55AA) { return }
+    local O = N*2
+    writeCell(HDD,O,0)
+    writeCell(HDD,O+1,0)   
+}
+
+function activefstbl(HDD:table,N) {
+    for (F=0,3) {
+        local O = F*2
+        local Active = (N==F ? 1 : 0)
+        writeCell(HDD,O,Active + (((readCell(HDD,O) >> 8) && 0xFFFFFF) << 8))
+    }            
+}
+
+}

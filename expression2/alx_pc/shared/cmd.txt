@@ -1,0 +1,26 @@
+@name Simple Command Queue
+
+#[
+	ALX Wiremod E2 PC
+	Created by AlexALX
+	-------------------
+	Simple command interface without queue
+	Not used directly from this file yet
+]#
+
+if (first()|duped()) {
+ 
+function runCmd(Cmd:string,Delay) {
+    #if (DEBUG) { Delay = 1 }
+    CMD = Cmd
+    timer("cmd",Delay)
+}
+
+function runCmd(Cmd:string,Delay,Arg:table) {
+    #if (DEBUG) { Delay = 1 }
+    CMD = Cmd
+    CMDA = Arg
+    timer("cmd",Delay)
+}   
+    
+}

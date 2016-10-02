@@ -1,0 +1,117 @@
+@name ALX Wiremod OS Boot
+@persist
+
+#[
+	ALX Wiremod E2 OS
+	Created by AlexALX
+]#
+
+if (INCLUDE) {
+    
+#include "alx_pc/cpu/_main_"
+   
+function alxos_boot_init(CurFs:table) {
+    cpuClear()
+    CpuData[1,table] = CurFs
+    DsHandler = "alxos_boot_ds"
+    dsSendDirect("fs_listdir",HDD_IO:entity(),table(entity(),"wm1",table(CurFs,CurFs["root_dir_cluster",number],0)))   
+}
+ 
+function alxos_boot_error(Str:string) {
+    dsSendDirect("bootmenu",E2_GPU,Str)   
+}
+
+function alxos_postboot(Step) {
+    local CurFs = CpuData[1,table]
+    if (Step==0) {
+        local ListDir = dsGetTable()
+        CpuData[2,table] = ListDir
+        for(I=0,ListDir:count()-1) {
+            local Entry = ListDir[I,table]
+            local FullName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
+            if (FullName=="boot.ini") {
+                CpuData[3,string] = "boot.ini"
+                dsSendDirect("fs_readfile",HDD_IO:entity(),table(entity(),"wm1",table(CurFs,Entry)))
+                return   
+            }
+        }
+        alxos_boot_error("File boot.ini is missing.")
+    } elseif (Step==1) {
+        local Type = dsGetType()
+        if (Type=="number") {
+            alxos_boot_error("Error reading "+CpuData[3,string]+" file.")
+        } else {
+            local CurFile = CpuData[3,string]
+            if (CurFile=="kernel.sys") {
+                local FileData = dsGetString()
+                if (FileData=="alxos_init") {
+                    ##include "alx_pc/cpu/alxos/_init_"
+                    dsSendDirect("bootmenu",E2_GPU,table("alxos_boot",CpuData[5,string]))
+                } else {
+                    alxos_boot_error("Unsupported kernel.sys file.")
+                }
+                return
+            }
+            local ListDir = CpuData[2,table]
+            local FileData = dsGetString()
+            local Darr = FileData:explode(toChar(10))
+            if (Darr:count()==1) {
+                alxos_boot_error("Error reading boot.ini file.")
+                return
+            }
+            local Name = Darr[1,string]
+            CpuData[5,string] = Name
+            local Dir = Darr[2,string]
+            
+            local Path = Dir:explode("/")
+            if (CurFs["volume_serial",number]==Path[2,string]:toNumber()) {
+                for(I=0,ListDir:count()-1) {
+                    local Entry = ListDir[I,table]
+                    local FullName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
+                    if (FullName==Path[3,string]) {
+                        CpuData["sysdir",table] = Entry
+                        CpuData[3,string] = Path[4,string]
+                        dsSendDirect("fs_listdir",HDD_IO:entity(),table(entity(),"wm1",table(CurFs,Entry["cluster",number],Entry["data_sector",number])))
+                        return
+                    }
+                }    
+                
+                alxos_boot_error("File kernel.sys is missing.")            
+            } else {
+                alxos_boot_error("Boot from non-bootable volume is not supported.")
+            }
+        }
+    } elseif (Step==2) {
+        local SysDir = dsGetTable()
+        CpuData[4,table] = SysDir
+        
+        for(I=0,SysDir:count()-1) {
+            local Entry = SysDir[I,table]
+            local FullName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
+            if (FullName=="kernel.sys") {
+                dsSendDirect("fs_readfile",HDD_IO:entity(),table(entity(),"wm1",table(CurFs,Entry)))
+                return   
+            }
+        }
+        alxos_boot_error("File kernel.sys is missing.")  
+    }
+}
+
+function alxos_boot_ds(Name:string) {
+    if (Name=="fs_listdir") {
+        if (CpuData[3,string]!="") {
+            alxos_postboot(2)
+        } else {
+            alxos_postboot(0)
+        }
+    } elseif (Name=="fs_readfile") {
+        alxos_postboot(1)
+    } elseif (Name=="alxos_init") {
+        INCLUDE = 1
+        #include "alx_pc/cpu/alxos/_init_"
+        INCLUDE = 0
+        alxos_init()
+    }
+}
+
+}

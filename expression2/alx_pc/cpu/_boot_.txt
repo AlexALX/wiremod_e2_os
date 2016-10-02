@@ -1,0 +1,34 @@
+@name Boot CPU handlers
+@persist BOOT_FUNC:table
+
+#[
+	ALX Wiremod E2 PC
+	Created by AlexALX
+	-------------------
+	Boot handler, execute alxos boot menu
+]#
+
+if (INCLUDE) {
+    
+#include "alx_pc/cpu/_main_"
+
+function initboot() {
+    local CurFs = dsGetTable()
+    if (BOOT_FUNC:exists(CurFs["boot_func",string])) {
+        CurFs["boot_func",string](CurFs)
+    } else {
+        dsSendDirect("bootmenu",E2_GPU,"Function "+CurFs["boot_func",string]+" is missing.")
+    }
+}    
+
+# Custom Boot Functions
+
+BOOT_FUNC["alxos_boot",number] = 1
+function alxos_boot(CurFs:table) {
+    INCLUDE = 1
+    #include "alx_pc/cpu/alxos/bootmenu"
+    INCLUDE = 0
+    alxos_boot_init(CurFs)
+}
+    
+}

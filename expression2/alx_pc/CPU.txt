@@ -1,0 +1,125 @@
+@name CPU
+@model models/cheeze/wires/cpu.mdl
+
+#[
+	ALX Wiremod E2 PC
+	Created by AlexALX
+	-------------------
+	E2 CPU, purpose:
+	- init boot loader
+	- Keyboard handler
+	- alxos e2 cpu programs
+]#
+
+if (first()|duped()) {
+    
+#include "alx_pc/cpu/_main_"
+    
+E2_CPU = entity()
+dsSendDirect("reload",BIOS,"cpu")
+ 
+function err(ERR) {
+    dsSendDirect("err",BIOS,ERR)
+    exit()
+}
+
+#[
+function getHddsInfo(Step) {
+    if (Step<HDDS:count()) {
+        Step++
+        CpuData[2,number] = Step
+        local HDD = HDDS[Step,entity]
+        if (HDD:isValid()) {
+            dsSendDirect("hddinfo",HDD,entity())
+        } else {
+            CpuData[Step+2,array] = array()
+            getHddsInfo(Step)
+        }
+    } else {
+        local Info = CpuData:clone()
+        Info:shift()
+        Info:shift()
+        dsSendDirect("hddinfo",CpuData[1,entity],Info)
+    }
+}]#
+
+function ready() {
+    dsSendDirect("ready",E2_GPU,0)
+}
+
+}
+
+if (!BIOS:isValid()) { exit() }
+
+if (dsClk()) {
+    local Name = dsClkName()
+    if (Name=="init") {
+        local Info = dsGetTable()
+        NB = Info[1,string]
+        E2_GPU = Info[3,entity]
+        E2_SPU = Info[4,entity]
+        local KeyboardArr = Info[5,array]
+        Keyboard = (KeyboardArr[2,number] ? KeyboardArr[1,wirelink] : nowirelink()) # bug - empty wirelink crash e2!
+        local HDDIO_Arr = Info[6,array]
+        HDD_IO = (HDDIO_Arr[2,number] ? HDDIO_Arr[1,wirelink] : nowirelink())
+        HDDS = Info[9,table]
+        HDD_MAX = Info[10,number]
+        if (!Info[8,number]) {
+            dsSendDirect(Name,BIOS,"cpu")
+        }
+    } elseif (Name=="fstbl") {
+        CurFs = dsGetTable()
+    } elseif (Name=="keyboard") {
+        local KeyboardUser = dsGetEntity()
+        if (KeyboardUser:isValid()) {
+            runOnKeys(KeyboardUser,1)
+            KeyUser = KeyboardUser
+        } else {
+            runOnKeys(KeyUser,0)
+            KeyUser = noentity()
+        }    
+    } elseif (Name=="SHUTDOWN") {
+        dsSendDirect("SHUTDOWN",BIOS,dsGetNumber())
+    } elseif (Name=="hddinfo") {
+        #[local Type = dsGetType()
+        if (Type=="entity") {
+            CpuData = table()
+            CpuData[1,entity] = dsGetEntity()
+            getHddsInfo(0)  
+        } else {
+            local Info = dsGetArray()
+            local Step = CpuData[2,number]
+            CpuData[Step+2,array] = Info
+            getHddsInfo(Step)
+        }]#
+        #dsSendDirect("gethdds",BIOS,dsGetEntity())
+    } elseif (Name=="ready") {
+        ready()
+    } elseif (Name=="bootmenu") {
+        INCLUDE = 1
+        #include "alx_pc/cpu/_boot_"
+        INCLUDE = 0
+        initboot()
+    } elseif (DsHandler!="") {
+        DsHandler(Name)
+    }
+}
+
+if (keyClk(KeyUser) & Keyboard) {
+    local Key = keyClkPressed()
+    dsSendDirect("keyboard",E2_GPU,array(Key,KeyUser:keyPressed(Key)))
+    exit()
+}
+
+if (clk("cmd")) {
+    if (CMDA:count()) {
+        local ID = CMDA:id()
+        CMD(CMDA)
+        if (CMDA:id()==ID) {
+            CMDA = table()
+        }
+    } else {
+        CMD()
+    }
+    exit()
+}

@@ -1,0 +1,65 @@
+@name Main shared func
+#@inputs NB:string
+@persist SharedTimers:table SharedTimerIndex SharedDS:array SharedDSIndex
+@persist NB:string
+
+#[
+	ALX Wiremod E2 PC
+	Created by AlexALX
+	-------------------
+	Shared functions and variables
+]#
+
+if (first()|duped()) {
+ 
+function registerTimers(Name:string,FName:string) {
+    #SharedTimerIndex++
+    SharedTimers[Name,string] = FName
+}
+
+function registerDS(Name:string) {
+    SharedDSIndex++
+    SharedDS[SharedDSIndex,string] = Name
+}
+
+#[===========================]#
+#	Helper functions
+#[===========================]#
+
+function number str2byte(Str:string) {
+    if (Str=="") { return 0 } 
+    local Str = Str:sub(1,4) 
+    local Ret = 0
+    for(I=1,Str:length()) {
+        local Byte = toByte(Str,I)
+        #if (Byte==-1) { Byte = 0 }
+        Ret += (Byte << 8*(I-1))
+    }
+    return Ret
+}
+
+function string byte2str(Num, Limit) {
+    if (!Limit) { Limit = 4 }
+    local Ret = ""
+    for(K=0,Limit-1) {
+        local Tmp = (Num >> (8*K)) && 0xFF
+		      if (Tmp>0) { Ret += toChar(Tmp) }
+    }
+    return Ret
+}
+
+function string byte2strraw(Num, Limit) {
+    if (!Limit) { Limit = 4 }
+    local Ret = ""
+    for(K=0,Limit-1) {
+        local Tmp = (Num >> (8*K)) && 0xFF
+        local Str = toChar(Tmp)
+        if (Str=="") { Str = NB }
+		      Ret += Str
+    }
+    return Ret
+}
+
+#print(byte2strraw(str2byte("|"+NB+"|"),4))
+
+}

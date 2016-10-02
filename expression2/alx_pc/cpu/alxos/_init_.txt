@@ -1,0 +1,144 @@
+@name ALX OS INIT
+
+#[
+	ALX Wiremod E2 OS
+	Created by AlexALX
+]#
+
+if (INCLUDE) {
+
+#include "alx_pc/cpu/alxos/_main_"
+#include "alx_pc/cpu/alxos/_prog_"
+
+function alxos_init() {
+    alxos_clear()
+    SysFs = CpuData[1,table]
+    SysDir = CpuData["sysdir",table]
+    cpuClear()
+    DsHandler = "alxos_ds"
+    "alxos_readhdds"()     
+}
+
+function alxos_volumes_send(Args:table) {
+    dsSendDirect("fs_readfs",HDD_IO:entity(),Args)        
+}
+
+function alxos_volumes() {
+    local IsProcess = CpuData[1,number]
+    if (IsProcess) {
+        local ValidFs = CpuData[2,table]
+        local CurFs = CpuData[3,number]
+        local CurFS = ValidFs[CurFs+1,table] 
+        local Letter = CpuData[4,number]
+        
+        if (CurFs>0) {
+            local ReadFs = dsGetTable()
+            if (ReadFs["volume_serial",number]==SysFs["volume_serial",number]) {
+                Letter = 67
+            } else {
+                CpuData[4,number] = Letter+1
+            }
+            AllFs[toChar(Letter),table] = ReadFs
+        }
+                  
+        if (ValidFs:count()>CurFs & Letter<90) {
+            CpuData[3,number] = CurFs+1
+            #runCmd("alxos_volumes_send",1,table(entity(),"wm1",table(CurFS["hdd",table],CurFS))) 
+            dsSendDirect("fs_readfs",HDD_IO:entity(),table(entity(),"wm1",table(CurFS["hdd",table],CurFS)))       
+        } else {
+            dsSendDirect("fs_listdir",HDD_IO:entity(),table(entity(),"wm1",table(SysFs,SysDir["cluster",number],SysDir["data_sector",number])))
+        }
+    } else {
+        local ValidFs = table()
+        for (I=1,FsTbls:count()) {
+            local C = FsTbls[I,table]:count()
+            if (!C) { continue }
+            for (F=0,C-1) {
+                local FS = FsTbls[I,table][F,table]
+                if (FS["type",number]==2) {
+                    FS["hdd",table] = HDDS[I,table]
+                    ValidFs:pushTable(FS)
+                }   
+            }
+        }   
+        cpuClear()
+        CpuData[1,number] = 1
+        CpuData[2,table] = ValidFs
+        CpuData[4,number] = 68 # D
+        alxos_volumes()
+    }
+}
+
+function alxos_loadshell() {
+    local Load = CpuData[1,number]
+    if (!Load) {
+        local ListDir = dsGetTable()
+        for(I=0,ListDir:count()-1) {
+            local Entry = ListDir[I,table]
+            local FullName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
+            if (FullName=="explorer.e2e") {
+                CpuData[1,number] = 1
+                dsSendDirect("fs_readfile",HDD_IO:entity(),table(entity(),"wm1",table(SysFs,Entry)))
+                return   
+            }
+        }
+        dsSendDirect("alxos_fail",E2_GPU,"File explorer.e2e not found. Press F1 to reboot.")
+    } else {
+        local Data = dsGetString()
+        if (ALXOS_PROGS:exists(Data)) {
+            Data(table())   
+        } else {
+            dsSendDirect("alxos_fail",E2_GPU,"Function "+Data+" is missing. Press F1 to reboot.")
+        }
+    }       
+}
+
+function alxos_readhdds() {
+    local CurHDD = CpuData[1,number]
+    local Data = CpuData[2,number]
+    if (Data) {
+        FsTbls[CurHDD,table] = dsGetTable()
+        if (HDDS:count()>CurHDD) {
+            local HDD = HDDS[CurHDD+1,table]
+            CpuData[1,number] = CurHDD+1
+            dsSendDirect("readfstbl",HDD_IO:entity(),table(entity(),HDD))  
+        } else {
+            cpuClear()
+            alxos_volumes()
+        }
+    } else {
+        local HDD = HDDS[CurHDD+1,table]  
+        CpuData[1,number] = CurHDD+1  
+        CpuData[2,number] = 1 
+        dsSendDirect("readfstbl",HDD_IO:entity(),table(entity(),HDD))    
+    }
+}
+
+function alxos_execute(Name:string) {
+    if (ALXOS_PROGS:exists(Name)) {
+        Name(table())   
+    } else {
+        dsSendDirect("alxos_fail",E2_GPU,"Function "+Name+" is missing. Press F1 to reboot.")
+    }
+}
+
+function alxos_ds(Name:string) {
+    if (ALXOS_DsH!="") {
+        ALXOS_DsH(Name)
+    } elseif (Name=="readfstbl") {
+        alxos_readhdds()  
+    } elseif (Name=="fs_readfs") {
+        alxos_volumes()
+    } elseif (Name=="fs_listdir") {
+        cpuClear()
+        alxos_loadshell()
+    } elseif (Name=="fs_readfile") {
+        alxos_loadshell()
+    } elseif (Name=="alxos_openfile") {
+        alxos_openfile_ds()
+    } elseif (Name=="alxos_execute") {
+        alxos_execude_ds()
+    }
+}
+
+}

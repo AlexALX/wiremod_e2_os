@@ -1,0 +1,1656 @@
+@name WM1 File System
+@persist WM1_Fats WM1_Rsv
+
+#[
+    Wiremod File System v1
+    Created by AlexALX
+	-------------------
+    Based on FAT fs
+    Specifications:
+	
+    General:
+        Bytes in sector: 4 (32bit)
+        FS id: 2
+        FS str id: WM1
+    WM1 file system:
+        Cluster size: 32 bytes - 256 KB
+        Volume name: 16 chars
+        Max file size: 4GB?
+        Max file name: 12 chars + 3 chars extension, long file names is not supported
+        Support file creation/modify/access time as unix stamp.		
+]#
+
+if (first()|duped()) {
+    
+#include "alx_pc/hdd/_main_"
+#include "alx_pc/shared/cmdqueue"
+
+FS_TYPES[2,string] = "WM1"
+WM1_Fats = 2
+WM1_Rsv = 14
+
+#[===========================]#
+#	WM1 FS helper func
+#[===========================]#
+
+function number wm1_findsectorbycluster(FS:table,C) {
+    return FS["data_sector",number]+((C-1)*FS["sectors_in_cluster",number]) 
+}
+
+#[===========================]#
+#	WM1 FS FAT func
+#[===========================]#
+
+function number wm1_readfatcluster(FS:table,C) {
+    local O = FS["reserved_sectors",number]+(FS["current_fat",number]-1)*FS["sectors_for_fat",number]+floor(C/2)
+    return ((readCell(FS["hddinfo",table],O) >> (C % 2)*16) && 0xFFFF)  
+}
+
+function number wm1_findlastcluster(FS:table,C) {
+    #local Tmp = wm1_readfatcluster(FS,C)
+    #if (!Tmp) { return 0 }
+    cmdRun("wm1_findlastcluster",table(FS,C))
+}
+
+function number cmd_wm1_findlastcluster(CmdData:table) {
+    local FS = CmdData[1,table]
+    local C = CmdData[2,number]
+    while (perf()) {
+        local Tmp = wm1_readfatcluster(FS,C)
+        if (Tmp>0 & Tmp<0xFFFD) {
+            C = Tmp  
+        } else {
+            cmdClearRes()
+            CmdResult[1,number] = C
+            return 0
+        }   
+    }
+    CmdData[2,number] = C
+    return 1
+}
+
+function wm1_findfreecluster(FS:table) {
+    cmdRun("wm1_findfreecluster",table(FS,FS["last_free_cluster",number]))   
+}
+
+function number cmd_wm1_findfreecluster(CmdData:table) {
+    local FS = CmdData[1,table]
+    local C = CmdData[2,number]
+    local O = FS["reserved_sectors",number]
+    local Max = FS["total_clusters",number]
+    while(perf()) {
+        if (C==Max) {
+            cmdClearRes()
+            CmdResult[1,number] = 0
+            return 0 
+        }
+        if (((readCell(FS["hddinfo",table],O+floor(C/2)) >> (C % 2)*16) && 0xFFFF) == 0) { 
+            cmdClearRes()
+            CmdResult[1,number] = C
+            return 0
+        }
+        C++       
+    }
+    CmdData[2,number] = C
+    return 1
+}
+
+function wm1_updatefat(FS:table,C,Val) {
+    if (C==Val | C<2 | C>FS["total_clusters",number]) { print("CLUSTER UPD ERROR "+C) return }
+    cmdRun("wm1_updatefat",table(FS,C,Val,0,0))   
+}
+
+function number cmd_wm1_updatefat(CmdData:table) {
+    local FS = CmdData[1,table]
+    local C = CmdData[2,number]
+    local Val = CmdData[3,number]
+    local CmdRun = CmdData[4,number]
+    local Step = CmdData[5,number]
+    if (Step==0) {
+        if (CmdRun==1) {
+            FS["last_free_cluster",number] = CmdResult[1,number]
+            CmdData[5,number] = 1
+            writeCell(FS["hddinfo",table],FS["reserved_sectors",number]-2,FS["free_clusters",number] + (FS["last_free_cluster",number] << 16))    
+        } else { 
+            # Update free clusters
+            local O = FS["reserved_sectors",number]+(FS["current_fat",number]-1)*FS["sectors_for_fat",number]+floor(C/2)
+            local Cur = (readCell(FS["hddinfo",table],O) >> (C % 2)*16) && 0xFFFF
+            CmdData[6,number] = Cur
+            if (Cur==0|Val==0) {
+                local Tmp = (Val==0? 1 : -1)
+                FS["free_clusters",number] = FS["free_clusters",number]+Tmp
+                if (Val==0&Cur!=0) {
+                    if (FS["last_free_cluster",number]>C) {
+                        FS["last_free_cluster",number] = C   
+                    }    
+                } elseif (Val!=0&Cur==0) {
+                    if (FS["last_free_cluster",number]<=C) {
+                        FS["last_free_cluster",number] = FS["last_free_cluster",number]+1
+                        #FS["last_free_cluster",number] = wm1_findfreecluster(FS)  
+                        CmdData[4,number] = 1
+                        #CmdCallback = table("wm1_updatefat",CmdData)
+                        #CmdDelay = 1
+                        #cmdRun("wm1_updatefat",CmdData)
+                        #CmdAdd2Queue = 1
+                        #CmdDelay = 1000
+                        wm1_findfreecluster(FS)
+                        return 1
+                    }
+                }  
+                CmdData[5,number] = 1
+                CmdData[4,number] = 1 
+                writeCell(FS["hddinfo",table],FS["reserved_sectors",number]-2,FS["free_clusters",number] + (FS["last_free_cluster",number] << 16))    
+            } else {
+                CmdData[4,number] = 1
+                CmdData[5,number] = 1
+            }
+        }
+        return 1
+    } elseif (Step==1) {        
+        # update FATs
+        #for(F=1,FS["fat_tables",number]) {
+        while(perf()) {
+            if (CmdRun>FS["fat_tables",number]) {
+                CmdData[5,number] = 2
+                CmdData[4,number] = 0
+                return 1       
+            }
+            local O = FS["reserved_sectors",number]+(CmdRun-1)*FS["sectors_for_fat",number]+floor(C/2)
+            local Tmp = readCell(FS["hddinfo",table],O) && 0xFFFF
+            local Tmp2 = (readCell(FS["hddinfo",table],O) >> 16) && 0xFFFF
+            if (C % 2) { Tmp2 = Val }
+            else { Tmp = Val }
+            writeCell(FS["hddinfo",table],O,Tmp + (Tmp2 << 16))   
+            CmdRun++
+        }
+        CmdData[4,number] = CmdRun
+        return 1
+    } elseif (Step==2) {
+        local Cur = CmdData[6,number]
+        # erase cluster
+        if (Cur==0&Val!=0) {
+            O = wm1_findsectorbycluster(FS,C)
+            while(perf()) {
+                #for (I=0,FS["secors_in_cluster",number]-1) {
+                if (CmdRun==FS["sectors_in_cluster",number]) {
+                    return 0       
+                }
+                writeCell(FS["hddinfo",table],O+CmdRun,0) 
+                CmdRun++
+            }
+            CmdData[4,number] = CmdRun
+        } else {
+            return 0
+        } 
+        return 1   
+    }
+}
+
+function number wm1_checkFAT(FS:table) {
+    for(I=1,FS["fat_tables",number]) {
+        local O = FS["reserved_sectors",number]+(I-1)*FS["sectors_for_fat",number]
+        if (
+            byte2str((readCell(FS["hddinfo",table],O) && 0xFFFF),2)==FS["media_descriptor",string]
+            &((readCell(FS["hddinfo",table],O) >> 16) && 0xFFFF)==0xFFFF
+        ) {
+            return I   
+        }  
+    }   
+    return 0
+}
+
+#[===========================]#
+#	WM1 FS General func
+#[===========================]#
+
+function string wm1_mkfs_check(Args:array) {
+    local Size = Args[1,number]
+    local CSize = Args[2,number]
+    local Fats = WM1_Fats
+    local Rsv = WM1_Rsv
+    
+    #if (Size>HDD_SIZE-FS_TBL_SIZE) { return "ERR_MAXSIZE" }
+    if (CSize-1>0xFFFF) { return "ERR_MAXCLUSTERSIZE" }
+    if (CSize % 8) { return "ERR_CLUSTERSIZE" }   
+    #if (Size % CSize) { return "ERR_ERRSIZE" }
+    if (Size/CSize<9) { return "ERR_ERRSIZE" }
+    
+    #[
+    local Tmp = (Size - floor(Size/CSize/2) * Fats) - Rsv
+    if (Tmp<0) { return "ERR_MINSIZE" }
+    local FatSz = floor(floor(Tmp/CSize)/2)
+    if (FatSz<0) { return "ERR_MINSIZE2" }
+    local Cst = FatSz*2-1 # total available clusters
+    if (Cst>=0xFFFD) { return "ERR_MAXCLUSTERSCOUNT" }
+    if (Cst<4) { return "ERR_MINSIZE3" } ]#
+    
+    local TSz = Size - Rsv
+    local Tmp = floor(TSz/CSize)
+    if (Tmp<1) { return "ERR_MINSIZE" }
+    local FatSz = floor(Tmp/2)
+    if (FatSz<1) { return "ERR_MINSIZE2" }
+    TSz -= FatSz*Fats
+    #FatSz = floor(TSz/CSize/2)
+    #local Cst = FatSz*2 # total available clusters    
+    local Cst = floor(TSz/CSize)
+    if (Cst<4) { return "ERR_MINSIZE3" }
+    if (Cst>=0xFFFD) { return "ERR_MAXCLUSTERSCOUNT" }
+    
+    return ""
+}
+
+function wm1_mkboot(Args:table) {
+    local HDD = Args[1,table]
+    local FsTbl = Args[2,table] 
+    local Name = Args[3,string]  
+    
+    local St = FsTbl["start",number]    
+    writeCell(HDD,St+1,str2byte(Name:sub(0,4)))
+    writeCell(HDD,St+2,str2byte(Name:sub(5,8)))
+    writeCell(HDD,St+3,str2byte(Name:sub(9,12)))
+}
+
+function number wm1_mkfs(Args:table) {   
+    local HDD = Args[1,table]
+    local FsTbl = Args[2,table]
+    local Index = Args[3,number]
+    local Size = Args[4,number]
+    local CSize = Args[5,number]
+    local Name = Args[6,string]
+     
+    local Fats = WM1_Fats
+    local Rsv = WM1_Rsv
+    if (wm1_mkfs_check(array(Size,CSize))!="") { return 0 }
+    
+    local TSz = Size - Rsv
+    local Tmp = floor(TSz/CSize)
+    local FatSz = floor(Tmp/2)
+    TSz -= FatSz*Fats
+    #FatSz = floor(TSz/CSize/2)
+    #local Cst = FatSz*2 # total available clusters    
+    local Cst = floor(TSz/CSize)
+    local RealSize = Cst*CSize+FatSz*Fats+Rsv # real fs size
+    # fuck this calculations, have no idea how make use it all size
+    
+    # add to fs table
+    local St = addfs2tbl(HDD,FsTbl,Index,0,2,RealSize)
+    if (St==0) { return 0 } #ERR_ADD2TBL
+    
+    local MD = "W1"
+    local Rdc = 2 # root dir cluster
+    
+    writeCell(HDD,St,str2byte("WM1")) 									            # [4 bytes - fs str id]
+    writeCell(HDD,St+1,0)                                  # [4 bytes - boot part1]
+    writeCell(HDD,St+2,0)                                  # [4 bytes - boot part2]
+    writeCell(HDD,St+3,0)                                  # [4 bytes - boot part3]
+    writeCell(HDD,St+4,Rsv + (CSize-1 << 16)) 							      # [2 bytes - reserved sectors] [2 bytes - sectors in cluster]
+    writeCell(HDD,St+5,Fats + (FatSz << 8) + (1 << 24)) 			# [1 byte - FAT tables] [2 bytes - sectors for FAT] [1 byte - physical disk ID]
+    writeCell(HDD,St+6,str2byte(MD) + (Cst << 16))						   # [2 bytes - media descriptor] [2 bytes - total clusters]
+    writeCell(HDD,St+7,randint(0xFFFFFFFF))                # [4 bytes - volume serial number]
+    writeCell(HDD,St+8,str2byte(Name:sub(0,4)))						      # [4 bytes - volume name part1]
+    writeCell(HDD,St+9,str2byte(Name:sub(5,8)))						      # [4 bytes - volume name part2]
+    writeCell(HDD,St+10,str2byte(Name:sub(9,12))) 				     # [4 bytes - volume name part3]
+    writeCell(HDD,St+11,str2byte(Name:sub(13,16)))       		# [4 bytes - volume name part4]
+    writeCell(HDD,St+12,Cst-3 + (3 << 16))								         # [2 bytes - free clusters] [2 bytes - last free cluster]
+    writeCell(HDD,St+13,Rdc + (0x55AA << 16))							      # [2 bytes - cluster of root dir] [2 bytes - end signature]
+    #writeCell(HDD,St+13,Rdc)                               # write only cluster of root dir without end signature yet
+
+    # OPS Fail when create FATs, rewritten
+    local FS = table()
+    #FS["end_sector",number] = St+13 # end signature sector for write later
+    FS["hddinfo",table] = HDD
+    FS["reserved_sectors",number] = Rsv+St
+    FS["fat_tables",number] = Fats
+    FS["sectors_for_fat",number] = FatSz
+    FS["sectors_in_cluster",number] = CSize
+    FS["media_descriptor",string] = MD
+    FS["root_dir_cluster",number] = Rdc
+    FS["data_sector",number] = FS["reserved_sectors",number]+FS["fat_tables",number]*FS["sectors_for_fat",number]
+    local MDNum = str2byte(FS["media_descriptor",string]) + (0xFFFF << 16)
+    
+    # progress
+    CurTask = table()
+    CurTask[1,number] = 1
+    CurTask[2,number] = FS["fat_tables",number]
+    CurTask[3,number] = 0    
+    CurTask[4,number] = FatSz       
+    
+    CmdDelay = 1
+    cmdRun("wm1_mkfs",table(FS,1,0,1,wm1_findsectorbycluster(FS,Rdc),MDNum))
+    return 2
+}
+
+function number cmd_wm1_mkfs(CmdData:table) {   
+    local FS = CmdData[1,table]
+    local MkFats = CmdData[2,number]
+    local KI = CmdData[3,number]
+    local I = CmdData[4,number]
+    local Rdc = FS["root_dir_cluster",number]
+    if (MkFats) {
+        # FATs
+        local FatSz = FS["sectors_for_fat",number]
+        local O = FS["reserved_sectors",number]+KI*FatSz
+        if (I==1) {
+            writeCell(FS["hddinfo",table],O,CmdData[6,number])
+        }
+        # clear FAT
+        while(perf()) {
+            if (I>FatSz) { 
+                # root dir
+                writeCell(FS["hddinfo",table],O+floor(Rdc/2),0xFFFF << (Rdc % 2)*16) 
+                KI++  
+                I = 1
+                break 
+            }
+            writeCell(FS["hddinfo",table],O+I,0) 
+            I++
+        }
+        if (KI==FS["fat_tables",number]) {
+            CmdData[2,number] = 0
+        }
+    } else {
+        local CSize = FS["sectors_in_cluster",number]-1
+        CurTask[4,number] = CSize
+        # clear root dir
+        #local O = wm1_findsectorbycluster(FS,Rdc) # Reduce OPS
+        local O = CmdData[5,number]
+        while(perf()) {
+            if (I>CSize) { break } #C=0,CSize
+            writeCell(FS["hddinfo",table],O+I,0)  
+            I++ 
+        }
+        if (I>CSize & perf()) {
+            # create "." dir
+            writeCell(FS["hddinfo",table],O,str2byte("."))
+            writeCell(FS["hddinfo",table],O+2,Rdc << 16)
+            writeCell(FS["hddinfo",table],O+3,1 << 28)
+            #writeCell(FS["hddinfo",table],FS["end_sector",number],Rdc + (0x55AA << 16)) # write end signature now
+            CurTask:clear()
+            return 0
+        }
+    }
+    # progress info
+    CurTask[1,number] = MkFats
+    CurTask[3,number] = KI
+    CurTask[5,number] = I
+    
+    CmdData[3,number] = KI
+    CmdData[4,number] = I
+    return 1
+}
+
+function table wm1_readfs(HDD:table,FsTbl:table) {
+    if (!FsTbl:count() | !FsTbl["total",number]) { return table() }
+    local FsInfo = table()
+    if (FsTbl["type",number]!=2) { return table() } # not supported FS
+    local O = FsTbl["start",number]
+    if (((readCell(HDD,O+13) >> 16) && 0xFFFF)!=0x55AA) { return table() } # invalid FS
+    FsInfo["hddinfo",table] = HDD
+    FsInfo["boot_func",string] = byte2str(readCell(HDD,O+1),0)+byte2str(readCell(HDD,O+2),0)+byte2str(readCell(HDD,O+3),0)
+    FsInfo["fs_str_id",string] = byte2str(readCell(HDD,O),0)
+    FsInfo["bytes_in_sector",number] = HDD["sector_size",number]
+    FsInfo["reserved_sectors",number] = (readCell(HDD,O+4) && 0xFFFF)+O
+    FsInfo["sectors_in_cluster",number] = ((readCell(HDD,O+4) >> 16) && 0xFFFF)+1
+    FsInfo["fat_tables",number] = readCell(HDD,O+5) && 0xFF
+    FsInfo["sectors_for_fat",number] = (readCell(HDD,O+5) >> 8) && 0xFFFF
+    FsInfo["disk_id",number] = (readCell(HDD,O+5) >> 24) && 0xFF
+    FsInfo["media_descriptor",string] = byte2str(readCell(HDD,O+6) && 0xFFFF,2)
+    FsInfo["total_clusters",number] = (readCell(HDD,O+6) >> 16) && 0xFFFF
+    FsInfo["volume_serial",number] = readCell(HDD,O+7)
+    FsInfo["volume_name",string] = byte2str(readCell(HDD,O+8),0)+byte2str(readCell(HDD,O+9),0)+byte2str(readCell(HDD,O+10),0)+byte2str(readCell(HDD,O+11),0)
+    FsInfo["free_clusters",number] = readCell(HDD,O+12) && 0xFFFF
+    FsInfo["last_free_cluster",number] = (readCell(HDD,O+12) >> 16) && 0xFFFF
+    FsInfo["root_dir_cluster",number] = readCell(HDD,O+13) && 0xFFFF 
+    FsInfo["current_fat",number] = wm1_checkFAT(FsInfo)
+    if (FsInfo["current_fat",number]==0) { return table() } # FAT tables corrupted
+    FsInfo["data_sector",number] = FsInfo["reserved_sectors",number]+FsInfo["fat_tables",number]*FsInfo["sectors_for_fat",number]
+    return FsInfo      
+}
+    
+function wm1_format(FS:table,Fast) {
+    cmdRun("wm1_format",table(FS,Fast,1,1))   
+}   
+
+function number cmd_wm1_format(CmdData:table) {
+    local FS = CmdData[1,table]
+    local Fast = CmdData[2,number]
+    local ClearFat = CmdData[3,number]
+    local I = CmdData[4,number]
+    if (ClearFat) {
+        # clear FATs
+        local Max = FS["sectors_for_fat",number]*FS["fat_tables",number]-1
+        while(perf()) {
+            if(I>Max) { break } # I=1,Max-1
+            local O = I+FS["reserved_sectors",number] 
+            writeCell(FS["hddinfo",table],O,0) 
+            #Debug = I
+            I++ 
+        }
+        if (I>Max) {
+            # create root dir
+            local Rdc = FS["root_dir_cluster",number]
+            for (I=0,FS["fat_tables",number]-1) {
+                local O = FS["reserved_sectors",number]+I*FS["sectors_for_fat",number]
+                writeCell(FS["hddinfo",table],O+floor(Rdc/2),0xFFFF << ((Rdc % 2)*16))  
+            }
+            I = 1
+            CmdData[3,number] = 0
+        }
+    } else {
+        local Max = FS["total_clusters",number]*FS["sectors_in_cluster",number]
+        if (!Fast) {
+            # clear DATA
+            local St = wm1_findsectorbycluster(FS,2)
+            while(perf()) {
+                if (I>Max) { break } # I=1,Max-1
+                writeCell(FS["hddinfo",table],I+St,0)  
+                I++ 
+            }   
+        } else {
+            # clear root dir only
+            local St = wm1_findsectorbycluster(FS,FS["root_dir_cluster",number])
+            local Max2 = FS["sectors_in_cluster",number]-1
+            while(perf()) {
+                if (I-1>=Max2) { I = Max+1 break } # I=0,Max2
+                writeCell(FS["hddinfo",table],I+St,0)   
+                I++
+            }
+        }         
+        if (I>Max) {
+            # create "." dir
+            local Rdc = FS["root_dir_cluster",number]
+            local O = wm1_findsectorbycluster(FS,Rdc)
+            writeCell(FS["hddinfo",table],O,str2byte("."))
+            writeCell(FS["hddinfo",table],O+2,Rdc << 16)
+            writeCell(FS["hddinfo",table],O+3,1 << 28)
+            return 0
+        }
+    } 
+    CmdData[4,number] = I
+    return 1   
+}
+
+#[===========================]#
+#	WM1 FS Dir func
+#[===========================]#
+
+function table wm1_getfileinfo(HDD:table,Of) {
+    local C = (readCell(HDD,Of+2) >> 16) && 0xFFFF
+    if (C==0) { return table() } 
+    local Ret = table()
+    Ret["name",string]=byte2str(readCell(HDD,Of),0)+byte2str(readCell(HDD,Of+1),0)+byte2str(readCell(HDD,Of+2) && 0xFFFF,2)
+    Ret["ext",string]=byte2str(readCell(HDD,Of+3) && 0xFFFFFF,0)
+    Ret["attr",number]=(readCell(HDD,Of+3) >> 24) && 0xFF
+    Ret["time_create",number]=readCell(HDD,Of+4)
+    Ret["time_access",number]=readCell(HDD,Of+5)
+    Ret["time_modify",number]=readCell(HDD,Of+6)
+    Ret["cluster",number]=C
+    Ret["size",number]=readCell(HDD,Of+7)
+    Ret["data_sector",number]=Of  
+    return Ret
+}
+
+function number wm1_getsize(FS:table,C) {
+    local Size = FS["sectors_in_cluster",number]*FS["bytes_in_sector",number]
+    cmdRun("wm1_getsize",table(FS,C,Size,Size))
+}
+
+function number cmd_wm1_getsize(CmdData:table) {
+    local FS = CmdData[1,table]
+    local C = CmdData[2,number]
+    local Size = CmdData[3,number]
+    local Total = CmdData[4,number]
+    while(perf()) {
+        local Tmp = wm1_readfatcluster(FS,C)
+        if (Tmp==0|Tmp>=0xFFFD) {
+            cmdClearRes()
+            CmdResult[1,number] = Total
+            return 0
+        } 
+        if (Tmp>0 & Tmp<0xFFFD) {
+            Total += Size 
+            C = Tmp  
+        }
+    }
+    CmdData[2,number] = C
+    CmdData[4,number] = Total
+    return 1       
+}
+
+function wm1_findfreediroffset(FS:table,Dir) {
+    local Max = FS["sectors_in_cluster",number]/8
+    cmdRun("wm1_findfreediroffset",table(FS,Dir,Max-1,0,0))   
+}
+
+function number cmd_wm1_findfreediroffset(CmdData:table) {
+    local FS = CmdData[1,table]
+    local Dir = CmdData[2,number]
+    local Max = CmdData[3,number]
+    local Step = CmdData[4,number]
+    local CurI = CmdData[5,number]
+    while (perf()) {
+        if (Step==0) {
+            local O = wm1_findsectorbycluster(FS,Dir)
+            if (CurI>Max) { #for(I=CurI,Max) 
+                Step = 1
+                CurI = 0
+                continue
+            }
+            local C = (readCell(FS["hddinfo",table],O+CurI*8+2) >> 16) && 0xFFFF
+            if (C==0) { 
+                cmdClearRes()
+                CmdResult[1,number] = O+CurI*8
+                return 0 
+            }
+            CurI++
+        } else {
+            local Tmp = wm1_readfatcluster(FS,Dir)
+            if (Tmp>0 & Tmp<0xFFFD) {
+                Dir = Tmp 
+                Step = 0
+            } else {
+                cmdClearRes()
+                CmdResult[1,number] = 0
+                return 0
+            }
+        }
+    }
+    CmdData[4,number] = Step
+    CmdData[5,number] = CurI
+    CmdData[2,number] = Dir
+    return 1
+}
+
+function number wm1_direxists(FS:table,Dir) {
+    local Tmp = wm1_readfatcluster(FS,Dir)
+    if (Tmp==0) { return 0 } # not exists, yes we can remove root dir 
+    if (Dir==FS["root_dir_cluster",number]) { return 1 } # root dir always exists if found
+    # read "." folder
+    local O = wm1_findsectorbycluster(FS,Dir)
+    local C = (readCell(FS["hddinfo",table],O+2) >> 16) && 0xFFFF 
+    if (!C | C!=Dir) { return 0 }
+    return 1  
+}
+#[
+function number wm1_findfileindiroffset(FS:table,Dir,File) {
+    local Max = FS["sectors_in_cluster",number]/8
+    local O = wm1_findsectorbycluster(FS,Dir)
+    for (I=0,Max-1) {
+        local C = (readCell(O+I*8+2) >> 16) && 0xFFFF
+        if (C==File) { return O+I*8 }   
+    }   
+    Tmp = wm1_readfatcluster(FS,Dir)
+    if (Tmp>0 & Tmp<0xFFFD) {
+        return wm1_findfileindiroffset(FS,Tmp,File)   
+    }
+    return 0
+} ]#
+
+function wm1_listdir(FS:table,Dir,Sd) {
+    if (Sd>0&Dir!=FS["root_dir_cluster",number]) {
+        writeCell(FS["hddinfo",table],Sd+5,time())   
+    } 
+    #CmdCallback = table("wm1_listdir_CmdCallback",table(FS,Dir))
+    CmdDelay = 1
+    wm1_getsize(FS,Dir)
+    CmdAdd2Queue = 1
+    cmdRun("wm1_listdir_CmdCallback",table(FS,Dir))
+}
+
+function number cmd_wm1_listdir_CmdCallback(CmdData:table) {
+    local FS = CmdData[1,table]
+    local Dir = CmdData[2,number]
+    local Ents = table()
+    local Of = wm1_findsectorbycluster(FS,Dir)
+    local Max = ceil(CmdResult[1,number]/FS["bytes_in_sector",number]/8)
+    local II = 0
+    CmdAdd2Queue = 1
+    #[if (IO_Callback:count()) {
+        CmdCallback = IO_Callback
+        IO_Callback = table()    
+    }]#    
+    cmdRun("wm1_listdir",table(FS,Dir,Ents,Of,Max-1,II,0))
+    return 0
+}
+    
+function number cmd_wm1_listdir(CmdData:table) {
+    local FS = CmdData[1,table]
+    local Dir = CmdData[2,number]
+    local Ents = CmdData[3,table]
+    local Of = CmdData[4,number]
+    local Max = CmdData[5,number]
+    local II = CmdData[6,number]
+    local SI = Ents:count()
+    local I = CmdData[7,number]
+    while(perf(80)) {
+        if (I>Max) { #I=0,Max-1 
+            cmdClearRes()
+            CmdResult = Ents
+            return 0 
+        }
+        if (II==FS["sectors_in_cluster",number]) {
+            II = 0
+            Of = wm1_readfatcluster(FS,Dir)
+            if (Of==0 | Of>0xFFFD) { break }
+            Dir = Of
+            Of = wm1_findsectorbycluster(FS,Dir)
+            CmdData[2,number] = Dir
+        }
+        local O = II+Of
+        local C = (readCell(FS["hddinfo",table],O+2) >> 16) && 0xFFFF
+        II+=8
+        I++
+        if (C==0) { continue }
+        Ents[SI,table] = wm1_getfileinfo(FS["hddinfo",table],O)  
+        SI++ 
+    } 
+    CmdData[4,number] = Of
+    CmdData[6,number] = II
+    CmdData[7,number] = I
+    return 1
+}
+
+function number wm1_mksysdirs(FS:table,Dir,C) {
+    local O = wm1_findsectorbycluster(FS,C)
+    # create "." dir
+    writeCell(FS["hddinfo",table],O,str2byte("."))
+    writeCell(FS["hddinfo",table],O+2,C << 16) 
+    writeCell(FS["hddinfo",table],O+3,1 << 28)
+    # create ".." dir
+    if ((FS["sectors_in_cluster",number]/8)==1) {
+        # special fix when cluster size is 32 bytes 
+        cmdRun("wm1_mksysdirs",table(FS,Dir,C,0))  
+        return 0 
+    } else {
+        O += 8
+        writeCell(FS["hddinfo",table],O,str2byte(".."))
+        writeCell(FS["hddinfo",table],O+2,Dir << 16)
+        writeCell(FS["hddinfo",table],O+3,1 << 28)
+    }
+    return 1
+}
+    
+function number cmd_wm1_mksysdirs(CmdData:table) {
+    local FS = CmdData[1,table]
+    local C = CmdData[3,number]
+    local Step = CmdData[4,number]
+    #print("STEP"+Step)
+    #        printTable(CmdData)
+    if (Step==0) {
+        # special fix when cluster size is 32 bytes 
+        CmdData[4,number] = 1 
+        #CmdCallback = table("wm1_mksysdirs",CmdData)
+        wm1_findfreecluster(FS)
+        return 1
+    } elseif (Step==1) {
+        local C2 = CmdResult[1,number]
+        if (C2==0) { return 0 }
+        CmdData[4,number] = 2 
+        CmdData[3,number] = C2
+        CmdDelay = 1
+        wm1_updatefat(FS,C,C2)
+        CmdAdd2Queue = 1
+        wm1_updatefat(FS,C2,0xFFFF)
+        return 1
+    }
+    local Dir = CmdData[2,number]
+    local O = wm1_findsectorbycluster(FS,C)
+    # create ".." dir
+    writeCell(FS["hddinfo",table],O,str2byte(".."))
+    writeCell(FS["hddinfo",table],O+2,Dir << 16)
+    writeCell(FS["hddinfo",table],O+3,1 << 28)
+    #local Cbak = CmdData[5,table]
+    #cmdRun(Cbak[1,string],Cbak[2,table])
+    return 0
+}
+    
+#[===========================]#
+#	WM1 FS File func
+#[===========================]#   
+
+function number wm1_fileexists(FS:table,Sc,File) {
+    local Tmp = wm1_readfatcluster(FS,File)
+    if (Tmp==0) { return 0 }
+    if (((readCell(FS["hddinfo",table],Sc+2) >> 16) && 0xFFFF)==File) { return 1 }
+    return 0  
+} 
+
+function wm1_removefile(FS:table,C,Sc) {
+    local Tmp = wm1_readfatcluster(FS,C)
+    local Task = 0
+    if (CurTask:count()) { Task = 1 }
+    if (Sc>0) {
+        local Sz = readCell(FS["hddinfo",table],Sc+7)
+        if (!Task) { CurTask[1,number] = ceil(ceil(Sz/FS["bytes_in_sector",number])/FS["sectors_in_cluster",number]) }
+        for (I=0,7) {
+            writeCell(FS["hddinfo",table],Sc+I,0)   
+        }   
+    }
+    #CmdDelay = 1
+    #wm1_getsize(FS,C)    
+    #CmdAdd2Queue = 1
+    cmdRun("wm1_removefile",table(FS,C,0,Task))
+}    
+
+function number cmd_wm1_removefile(CmdData:table) {
+    local FS = CmdData[1,table]
+    local C = CmdData[2,number]
+    local Tot = CmdData[3,number]
+    local Task = CmdData[4,number]
+    #if (Tot==0) { printTable(CmdResult) }
+    #while(perf()) {
+        local Tmp = wm1_readfatcluster(FS,C)
+        if (Tmp==0|Tmp>=0xFFFD) {
+            if (!Task) { CurTask = table() }
+            return 0
+        }
+        if (Tmp>0) { 
+            if (!Task) { 
+                Tot++
+                CurTask[2,number] = Tot
+            }
+            CmdData[2,number] = Tmp
+            CmdData[3,number] = Tot
+            
+            CmdDelay = 1
+            wm1_updatefat(FS,C,0)
+            return 1
+        }
+        #if (Tmp>0 & Tmp<0xFFFD) {
+        #    C = Tmp  
+        #}
+    #}
+    return 1       
+}
+
+function number wm1_rawreadfile(FS:table,C,Sd) {
+    if (C<2) { return 0 } 
+    local Tmp = wm1_readfatcluster(FS,C)
+    if (Tmp==0) { return 0 }
+    local Sz = -1
+    if (Sd>0) {
+        writeCell(FS["hddinfo",table],Sd+5,time())
+        Sz = readCell(FS["hddinfo",table],Sd+7)
+        if (Sz==0) { return -1 }  
+    } else { return 0 } #Sz = wm1_getsize(FS,C) }
+    local Max = FS["sectors_in_cluster",number]
+    local Of = wm1_findsectorbycluster(FS,C)
+    if (Sz>0) {
+        local Ret = array()
+        Max = ceil(Sz/FS["bytes_in_sector",number]) 
+        local II = 0
+        CmdDelay = 1
+        cmdRun("wm1_rawreadfile",table(FS,C,Tmp,Of,Ret,Max,II,1,Sd))
+    }
+    return 1
+}
+
+function number cmd_wm1_findcluster(CmdData:table) {
+    local FS = CmdData[1,table]
+    local C = CmdData[2,number]
+    local Find = CmdData[3,number]
+    local Last = CmdData[4,number]
+    if (Find==0) {
+        cmdClearRes()
+        CmdResult[1,number] = C
+        return 0   
+    }
+    while(perf()) {
+        local Tmp = wm1_readfatcluster(FS,C)
+        if (Tmp==0|Tmp>=0xFFFD) {
+            cmdClearRes()
+            CmdResult[1,number] = -1
+            return 0
+        }
+        if (Tmp>0) { 
+            C = Tmp
+            Last++
+            if (Last==Find) {
+                cmdClearRes()
+                CmdResult[1,number] = C
+                return 0
+            }
+        }
+    }
+    CmdData[2,number] = C
+    CmdData[4,number] = Last
+    return 1
+}
+
+function number wm1_readfile(FS:table,File:table) {
+    return "wm1_readfile"(FS,File,0,0)[number]  
+}
+
+function number wm1_readfile(FS:table,File:table,Start,End) {
+    local C = File["cluster",number]
+    local Sd = File["data_sector",number]
+    if (C<2) { return 0 } 
+    local Tmp = wm1_readfatcluster(FS,C)
+    if (Tmp==0) { return 0 }
+    local Sz = -1
+    if (Sd>0) {
+        writeCell(FS["hddinfo",table],Sd+5,time())
+        Sz = readCell(FS["hddinfo",table],Sd+7)
+        if (Sz==0) { return -1 }  
+    } else { return 0 }
+    if (Sz>0) {
+        if (Start>Sz) {
+            return 0   
+        }
+        CmdDelay = 1
+        CurTask[1,number] = 1
+        if (Start>0) { # fix byte order
+            Start--
+        }
+        local StartC = floor(floor(Start/FS["bytes_in_sector",number])/FS["sectors_in_cluster",number])
+        cmdRun("wm1_findcluster",table(FS,C,StartC,0))    
+        CmdAdd2Queue = 1
+        cmdRun("wm1_readfile",table(FS,File,Start,End,0))    
+        CmdAdd2Queue = 1
+        cmdRun("wm1_readfile_finish",table())        
+        #[
+        local Max = FS["sectors_in_cluster",number]
+        local Of = wm1_findsectorbycluster(FS,C)
+        
+        local Ret = array()
+        Max = ceil(Sz/FS["bytes_in_sector",number]) 
+        local II = 0
+        CmdDelay = 1
+        cmdRun("wm1_rawreadfile",table(FS,C,Tmp,Of,Ret,Max,II,1,Sd))]#
+    }
+    return 1
+} 
+
+function number cmd_wm1_readfile(CmdData:table) {
+    local FS = CmdData[1,table]
+    local File = CmdData[2,table]
+    local Step = CmdData[5,number]
+    if (Step==0) {
+        local Start = CmdResult[1,number]
+        if (Start==-1) {
+            return 0   
+        }
+        CmdData[5,number] = 1
+        CmdData[6,number] = Start
+        local End = CmdData[4,number]
+        if (End==0 | End>File["size",number]) {
+            End = File["size",number]   
+            CmdData[4,number] = End
+        }
+        
+        #local EndC = ceil(ceil(End/FS["bytes_in_sector",number])/FS["sectors_in_cluster",number])
+        
+        CmdData[7,number] = ceil(End/FS["bytes_in_sector",number]) #EndC*FS["sectors_in_cluster",number]
+        
+        CurTask[2,number] = CmdData[7,number]
+        #[if (CmdData[7,number]<0) {
+            CmdResult[1,number] = -1
+            return 0   
+        }
+        
+        #[
+        CmdDelay = 1
+        local EndC = floor(ceil(End/FS["bytes_in_sector",number])/FS["sectors_in_cluster",number])
+        cmdRun("wm1_findcluster",table(FS,Start,EndC))
+        
+    } elseif (Step==1) {
+        local Start = CmdResult[6,number]
+        local End = CmdResult[1,number]
+        if (End==-1) {
+            return 0   
+        }
+        CmdData[7,number] = End
+        CmdData[5,number] = 2]#
+        
+        #local StS = floor(CmdData[3,number]/FS["bytes_in_sector",number])
+        #local StC = floor(StS/FS["sectors_in_cluster",number])
+        #local CalcS = StS-StC*FS["sectors_in_cluster",number]
+        #CalcS = floor(CalcS/FS["bytes_in_sector",number])
+        
+        local StartC = floor(floor(CmdData[3,number]/FS["bytes_in_sector",number])/FS["sectors_in_cluster",number])        
+        local CalcS = floor(CmdData[3,number]/FS["bytes_in_sector",number])
+        CalcS -= StartC*FS["sectors_in_cluster",number]
+        
+        #print(CalcS+" "+StartC)
+        
+        local Of = wm1_findsectorbycluster(FS,Start)
+        CmdData[8,number] = Of
+        CmdData[9,number] = 0
+        CmdData[10,number] = CalcS
+    } elseif (Step==1) {
+        local Of = CmdData[8,number]
+        local I = CmdData[9,number]
+        local II = CmdData[10,number]
+        local Max = CmdData[7,number]
+        local Ret = CmdData[11,string]
+        local C = CmdData[6,number]
+        while(perf()) {
+            if (I>Max) {
+                cmdClearRes()
+                #local StS = floor(floor(CmdData[3,number]/FS["bytes_in_sector",number])/FS["sectors_in_cluster",number])
+                #local CalcS = CmdData[3,number]-StS*(FS["bytes_in_sector",number]*FS["sectors_in_cluster",number])
+                #local End = Max/FS["sectors_in_cluster",number]
+                #local CalcE = End-floor(End/FS["bytes_in_sector",number])
+                #print(CmdData[3,number]+" "+CmdData[4,number])
+                local CalcS = CmdData[3,number]-floor(CmdData[3,number]/FS["bytes_in_sector",number])*FS["bytes_in_sector",number]
+                local CalcE = CalcS+CmdData[4,number]
+                #print((CalcS+1)+" "+CalcE)
+                CmdResult[1,string] = Ret:sub(CalcS+1,CalcE)
+                CurTask = table()
+                return 0
+            }
+            if (II==FS["sectors_in_cluster",number]) {
+                II = 0
+                Of = wm1_readfatcluster(FS,C)
+                if (Of==0 | Of>=0xFFFD) { I = Max+1 continue }
+                C = Of
+                Of = wm1_findsectorbycluster(FS,C)
+            }   
+            local O = II+Of
+            Ret += byte2strraw(readCell(FS["hddinfo",table],O),0)
+            II++
+            I++
+        }
+        CurTask[2,number] = I
+        CmdData[6,number] = C
+        CmdData[8,number] = Of
+        CmdData[9,number] = I
+        CmdData[10,number] = II
+        CmdData[11,string] = Ret
+    }
+    return 1
+}
+
+function number wm1_readfile_old(FS:table,File:table) {
+    local Ret = wm1_rawreadfile(FS,File["cluster",number],File["data_sector",number])
+    if (Ret==0) { return Ret }
+    elseif (Ret==-1) { 
+        CmdDelay = 1
+        cmdClearRes()
+        CmdResult[1,string] = ""
+        cmdRun("wm1_readfile_finish",table()) 
+        return 1 
+    }
+    CmdAdd2Queue = 1
+    cmdRun("wm1_parseData_callback",table(File["size",number]))
+    CmdAdd2Queue = 1
+    cmdRun("wm1_readfile_finish",table())
+    return 1
+}
+
+function number cmd_wm1_parseData_callback(CmdData:table) {
+    local Data = CmdResult[1,array]
+    CmdDelay = 1
+    cmdRun("wm1_parseData",table(Data:count(),Data,"",0,CmdData[1,number]))
+    return 0
+}
+
+function number cmd_wm1_parseData(CmdData:table) {
+    local Max = CmdData[1,number]
+    local HData = CmdData[2,array]
+    local Data = CmdData[3,string]
+    local I = CmdData[4,number]
+    local Sz = CmdData[5,number]
+    while(perf()) {
+        if (I>Max) { 
+            cmdClearRes()
+            CmdResult[1,string] = Data:right(Sz)
+            return 0 
+        }
+        Debug = I
+        Data += byte2str(HData[I,number],0)  
+        I++ 
+    }
+    CmdData[4,number] = I
+    CmdData[3,string] = Data
+    return 1
+}
+
+# complete handler
+function number cmd_wm1_readfile_finish(CmdData:table) {
+    return 0
+}
+
+function number cmd_wm1_rawreadfile(CmdData:table) {
+    local FS = CmdData[1,table]
+    local C = CmdData[2,number]
+    local Tmp = CmdData[3,number]
+    local Of = CmdData[4,number]
+    local Ret = CmdData[5,array]
+    local Max = CmdData[6,number]
+    local II = CmdData[7,number]
+    local I = CmdData[8,number]
+    local SI = Ret:count()+1
+    while(perf()) {
+        if (I>Max) {
+            cmdClearRes()
+            CmdResult[1,array] = Ret
+            CmdResult[2,number] = CmdData[9,number]
+            return 0   
+        }
+        if (II==FS["sectors_in_cluster",number]) {
+            II = 0
+            Of = wm1_readfatcluster(FS,C)
+            if (Of==0 | Of>=0xFFFD) { I = Max+1 continue }
+            C = Of
+            Of = wm1_findsectorbycluster(FS,C)
+        }   
+        local O = II+Of
+        Ret[SI, number] = readCell(FS["hddinfo",table],O)
+        II++
+        SI++ 
+        I++  
+    }
+    CmdData[2,number] = C
+    CmdData[4,number] = Of
+    CmdData[7,number] = II
+    CmdData[8,number] = I
+    return 1
+}
+
+function number wm1_rawwritefile(FS:table,C,Sd,Data:array,Fsz) {
+    if (C<2) { return 0 }
+    #CmdCallback = table("wm1_rawwritefile_CmdCallback",table(FS,C,Sd,Data,Fsz,0))
+    CmdDelay = 1
+    wm1_getsize(FS,C)
+    CmdAdd2Queue = 1
+    cmdRun("wm1_rawwritefile_Callback",table(FS,C,Sd,Data,Fsz,0))
+    return 1
+}
+
+function number wm1_writefile(FS:table,C,Sd,Data:string) {
+    if (C<2) { return 0 }
+    CurTask[1,number] = 1
+    CmdDelay = 1    
+    cmdRun("wm1_writefile",table(FS,C,Sd,0,Data,Data:length()))
+    CmdAdd2Queue = 1
+    cmdRun("wm1_writefile_finish",table())
+    return 1
+}
+
+function number cmd_wm1_writefile(CmdData:table) {
+    local FS = CmdData[1,table]
+    local C = CmdData[2,number]
+    local Sd = CmdData[3,number]
+    local Step = CmdData[4,number]
+    if (Step==0) {
+        CmdData[4,number] = 1
+        CmdDelay = 1
+        wm1_getsize(FS,C)
+    } elseif (Step==1) {
+        local Size = CmdResult[1,number]
+        if (!Size) {
+            cmdClearRes()
+            CurTask = table()
+            CmdResult[1,number] = -1
+            return 0
+        } # not exists
+        local Max = ceil(CmdData[6,number]/FS["bytes_in_sector",number])
+        local Sz = Size/FS["sectors_in_cluster",number]*FS["bytes_in_sector",number]
+        if (ceil(Max/FS["sectors_in_cluster",number])-Sz>FS["free_clusters",number]) {
+            cmdClearRes()
+            CurTask = table()
+            CmdResult[1,number] = -2
+            return 0 
+        } # no space left
+        CmdData[4,number] = 2
+        CmdData[7,number] = Max
+        CurTask[2,number] = Max
+        #CmdCallback = table("wm1_rawwritefile_CmdCallback",Args)
+        wm1_removefile(FS,C,0)
+    } elseif (Step==2) {
+        CmdData[4,number] = 3
+        wm1_updatefat(FS,C,0xFFFF)
+    } elseif (Step==3) {
+        if (Sd>0) {
+            local Size = CmdData[6,number]
+            writeCell(FS["hddinfo",table],Sd+5,time())
+            writeCell(FS["hddinfo",table],Sd+6,time())
+            writeCell(FS["hddinfo",table],Sd+7,Size)   
+        }   
+        local Of = wm1_findsectorbycluster(FS,C)
+        CmdData[8,number] = Of
+        CmdData[4,number] = 4
+        CmdData[9,number] = 1
+        CmdData[10,number] = 0
+    } elseif (Step==4) {
+        local Max = CmdData[7,number]
+        local Of = CmdData[8,number]
+        local I = CmdData[9,number]
+        local II = CmdData[10,number]
+        local Data = CmdData[5,string]
+        while(perf()) {
+            if (I>Max) { #I=1,Max
+                CurTask = table()
+                CmdResult[1,number] = 1
+                return 0 
+            }
+            if (II==FS["sectors_in_cluster",number]) {
+                CmdData[10,number] = 0
+                CmdData[9,number] = I
+                CurTask[3,number] = I
+                CmdData[4,number] = 5                
+                return 1
+            }
+            local O = II+Of
+            writeCell(FS["hddinfo",table],O,str2byte(Data:sub((I-1)*4+1,I*4)))
+            II++
+            I++
+        }
+        CurTask[3,number] = I
+        CmdData[10,number] = II
+        CmdData[9,number] = I
+    } elseif (Step==5) {
+        local SubStep = CmdData[11,number]
+        if (SubStep==0) {
+            CmdData[11,number] = 1
+            wm1_findfreecluster(FS)
+        } else {
+            local Of = CmdResult[1,number]
+            CmdDelay = 1
+            wm1_updatefat(FS,C,Of)
+            CmdAdd2Queue = 1
+            wm1_updatefat(FS,Of,0xFFFF)
+            CmdData[2,number] = Of
+            CmdData[8,number] = wm1_findsectorbycluster(FS,Of) 
+            CmdData[11,number] = 0
+            CmdData[4,number] = 4
+        }
+    }
+    return 1
+}
+
+function number wm1_writefile_old(FS:table,C,Sd,Data:string) {
+    if (C<2) { return 0 }
+    CmdDelay = 1
+    cmdRun("wm1_convData",table(FS,array(),Data,1,Data:length()))
+    CmdAdd2Queue = 1
+    cmdRun("wm1_writefile_callback",table(FS,C,Sd,Data:length()))
+    return 1
+}
+
+function number cmd_wm1_writefile_callback(CmdData:table) {
+    local Data = CmdResult[1,array]    
+    CmdAdd2Queue = 1
+    wm1_rawwritefile(CmdData[1,table],CmdData[2,number],CmdData[3,number],Data,CmdData[4,number])
+    CmdAdd2Queue = 1
+    cmdRun("wm1_writefile_finish",table())
+    return 0
+}
+
+# complete handler
+function number cmd_wm1_writefile_finish(CmdData:table) {
+    return 0
+}
+
+function number cmd_wm1_convData(CmdData:table) {
+    local Arr = CmdData[2,array]
+    local Str = CmdData[3,string]
+    local CurI = CmdData[4,number]
+    local Max = CmdData[5,number]
+    while(perf()) {
+        if (CurI>Max) {
+            cmdClearRes()
+            CmdResult[1,array] = Arr
+            CmdResult[2,number] = Max
+            CmdResult[3,table] = CmdData[1,table]
+            return 0   
+        }
+        Arr:pushNumber(str2byte(Str:sub(CurI,CurI+4)))  
+        CurI += 4
+    }
+    CmdData[4,number] = CurI
+    return 1
+}
+    
+function number cmd_wm1_rawwritefile_Callback(Args:table) {
+    local Write = Args[0,number]
+    if (Write) {
+        return "cmd_wm1_rawwritefile"(Args)[number]
+    }
+    local FS = Args[1,table]
+    local C = Args[2,number]
+    local Sd = Args[3,number]
+    local Data = Args[4,array]
+    local Fsz = Args[5,number]
+    local Step = Args[6,number]
+    if (Step==0) {
+        local Size = CmdResult[1,number]
+        if (!Size) { 
+            cmdClearRes()
+            CmdResult[1,number] = -1
+            return 0
+        } # not exists
+        local Max = Data:count()
+        local Sz = Size/FS["sectors_in_cluster",number]*FS["bytes_in_sector",number]
+        if (ceil(Max/FS["sectors_in_cluster",number])-Sz>FS["free_clusters",number]) {
+            cmdClearRes()
+            CmdResult[1,number] = -2
+            return 0 
+        } # no space left
+        Args[6,number] = 1
+        Args[7,number] = Max
+        #CmdCallback = table("wm1_rawwritefile_CmdCallback",Args)
+        wm1_removefile(FS,C,0)
+        return 1
+    } elseif (Step==1) {
+        Args[6,number] = 2
+        wm1_updatefat(FS,C,0xFFFF)
+        return 1
+    } elseif (Step==2) {
+        local Max = Args[7,number]
+        if (Sd>0) {
+            writeCell(FS["hddinfo",table],Sd+5,time())
+            writeCell(FS["hddinfo",table],Sd+6,time())
+            if (Fsz>0) {
+                writeCell(FS["hddinfo",table],Sd+7,Fsz)    
+            } else {
+                writeCell(FS["hddinfo",table],Sd+7,Max*FS["bytes_in_sector",number])
+            }
+        }   
+        local Of = wm1_findsectorbycluster(FS,C)
+        #CmdDelay = 1
+        #cmdRun("wm1_rawwritefile",table(FS,C,Data,Max,Of,0,1))
+        #Args:clear()
+        Args[0,number] = 1
+        Args[1,table] = FS
+        Args[2,number] = C
+        Args[3,array] = Data
+        Args[4,number] = Max
+        Args[5,number] = Of
+        Args[6,number] = 0
+        Args[7,number] = 1
+        Args[8,number] = 0
+        return 1
+    }
+}
+
+function number cmd_wm1_rawwritefile_helper(CmdData:table) {
+    local FS = CmdData[1,table]
+    local C = CmdData[2,number]
+    local Step = CmdData[8,number]
+    if (Step==0) {
+        CmdData[8,number] = 1
+        wm1_findfreecluster(FS)
+        return 1
+    } elseif (Step==1) {
+        local Of = CmdResult[1,number]
+        CmdDelay = 1
+        wm1_updatefat(FS,C,Of)
+        CmdAdd2Queue = 1
+        wm1_updatefat(FS,Of,0xFFFF)
+        CmdData[2,number] = Of
+        CmdData[5,number] = wm1_findsectorbycluster(FS,Of) 
+        CmdData[8,number] = 2
+        return 1
+    }
+    CmdData[8,number] = 0
+    return 0
+}
+
+function number cmd_wm1_rawwritefile(CmdData:table) {
+    local FS = CmdData[1,table]
+    local C = CmdData[2,number]
+    local Data = CmdData[3,array]
+    local Max = CmdData[4,number]
+    local Of = CmdData[5,number]
+    local II = CmdData[6,number]
+    local I = CmdData[7,number]
+    #[if (I==-1) {
+        wm1_updatefat(FS,C,0xFFFF) 
+        CmdData[7,number] = 0
+        return 1  
+    }]#
+    while(perf()) {
+        if (I>Max) { #I=1,Max
+            return 0 
+        }
+        if (II==FS["sectors_in_cluster",number]) {
+            CmdData[6,number] = 0
+            CmdData[7,number] = I
+            #CmdDelay = 1
+            #print("HEY"+I)
+            cmdRun("wm1_rawwritefile_helper",CmdData)
+            return 1
+        }
+        local O = II+Of
+        writeCell(FS["hddinfo",table],O,Data[I,number])
+        II++
+        I++
+    }
+    CmdData[6,number] = II
+    CmdData[7,number] = I
+    return 1        
+}
+
+function number wm1_mkfile(FS:table,Name:string,Ext:string,Is_Dir,Dir) {
+    local Tmp = wm1_direxists(FS,Dir)
+    if (!Tmp) { return 0 } # dir not exists
+    cmdRun("wm1_mkfile",table(FS,0,0,Name,Ext,Is_Dir,Dir))
+}
+
+function number cmd_wm1_mkfile(CmdData:table) {
+    local FS = CmdData[1,table]
+    local Step = CmdData[2,number]
+    if (Step==0) {
+        CmdData[2,number] = 1
+        #CmdCallback = table("wm1_mkfile",CmdData)
+        #print("FFC")
+        wm1_findfreecluster(FS)
+        return 1
+    } elseif (Step==1) {
+        local C = CmdResult[1,number]
+        local Dir = CmdData[7,number]
+        #printTable(CmdQueue)
+        if (C==0) { 
+            cmdClearRes()
+            CmdResult[1,number] = -1
+            return 0 
+        } # not enough space  
+        CmdData[8,number] = C
+        CmdData[2,number] = 2
+        #CmdCallback = table("wm1_mkfile",CmdData)
+        wm1_findfreediroffset(FS,Dir)
+        return 1
+    } elseif (Step==2) {
+        local O = CmdResult[1,number]
+        local Dir = CmdData[7,number]
+        if (!O) {
+            CmdData[2,number] = 3
+            #CmdCallback = table("wm1_mkfile",CmdData)
+            CmdDelay = 1
+            wm1_findlastcluster(FS,Dir)
+            return 1
+        }
+        CmdData[2,number] = 5
+        CmdData[9,number] = O
+        return 1
+    } elseif (Step==3) {
+        local L = CmdResult[1,number]
+        local C = CmdData[8,number]
+        #print(L+"="+C)
+        #CmdAdd2Queue = 1
+        CmdDelay = 1
+        wm1_updatefat(FS,L,C) # (FS,L,C)
+        CmdAdd2Queue = 1
+        wm1_updatefat(FS,C,0xFFFF)
+        
+        local O = wm1_findsectorbycluster(FS,C)
+        CmdData[2,number] = 4
+        CmdData[9,number] = O
+        #CmdCallback = table("wm1_mkfile",CmdData)
+        CmdAdd2Queue = 1
+        wm1_findfreecluster(FS)
+        return 1
+    } elseif (Step==4) {
+        local C = CmdResult[1,number]
+        if (C==0) {
+            cmdClearRes()
+            CmdResult[1,number] = -1
+            return 0 
+        }  
+        CmdData[8,number] = C
+        CmdData[2,number] = 5
+        return 1
+    } elseif (Step==5) {
+        local Sd = CmdData[3,number]
+        local Name = CmdData[4,string]
+        local Ext = CmdData[5,string]
+        local Is_Dir = CmdData[6,number]
+        local Dir = CmdData[7,number]
+        local C = CmdData[8,number]
+        local O = CmdData[9,number]
+        
+        Name = Name:sub(0,12)
+        writeCell(FS["hddinfo",table],O,str2byte(Name:sub(0,4)))					              # [4 bytes - name part1]
+        writeCell(FS["hddinfo",table],O+1,str2byte(Name:sub(5,8)))                 # [4 bytes - name part2]
+        writeCell(FS["hddinfo",table],O+2,str2byte(Name:sub(9,10)) + (C << 16))		  # [2 bytes - name part3] [2 bytes - first cluster]
+        writeCell(FS["hddinfo",table],O+3,str2byte(Ext:sub(0,3)) + (Is_Dir << 28))	# [3 bytes - file extension] [1 byte - attributes]
+        writeCell(FS["hddinfo",table],O+4,time())											                       # [4 bytes - creation time]
+        writeCell(FS["hddinfo",table],O+5,time())											                       # [4 bytes - last access time]
+        writeCell(FS["hddinfo",table],O+6,time())											                       # [4 bytes - modify time]
+        writeCell(FS["hddinfo",table],O+7,0) 		 										                         # [4 bytes - file size]
+        
+        #[if (Sd>0 & Dir!=FS["root_dir_cluster",number]) {
+            writeCell(FS["hddinfo",table],Sd+5,time())
+            writeCell(FS["hddinfo",table],Sd+6,time())
+        }]#
+
+        CmdData[2,number] = 6
+    
+        # Update FATs
+        #CmdAdd2Queue = 1
+        CmdDelay = 1
+        wm1_updatefat(FS,C,0xFFFF)
+        #CmdAdd2Queue = 1
+        #cmdRun("wm1_mkfile",CmdData)
+        return 1
+    } elseif (Step==6) {
+        local Is_Dir = CmdData[6,number]
+        if (Is_Dir) {
+            local Created = CmdData[10,number]
+            if (Created) { 
+                #CmdResult[0,number] = 1
+                #CmdResult[1,number] = CmdData[8,number]
+                cmdClearRes()
+                CmdResult = wm1_getfileinfo(FS["hddinfo",table],CmdData[9,number])
+                return 0
+            }
+            CmdData[10,number] = 1
+            #local Cback = table("wm1_mkfile",CmdData)
+            local Dir = CmdData[7,number]
+            local C = CmdData[8,number]
+            if (wm1_mksysdirs(FS,Dir,C)) {
+                CmdDelay = 0
+                #CmdResult[0,number] = 1
+                #CmdResult[1,number] = CmdData[8,number]
+                cmdClearRes()
+                CmdResult = wm1_getfileinfo(FS["hddinfo",table],CmdData[9,number])
+                return 0
+            }
+            return 1
+        } else {
+            cmdClearRes()
+            CmdResult[0,number] = 1
+            #CmdResult[1,number] = CmdData[8,number]
+            CmdResult = wm1_getfileinfo(FS["hddinfo",table],CmdData[9,number])
+            return 0
+        }
+    } 
+    return 0
+}
+
+#[# Command Complete handler
+function cmdComplete(CmdComplete:string) {
+    #print(CmdComplete)
+    if (CmdComplete=="wm1_listdir") {
+        #printTable(CmdResult)    
+    } elseif (CmdComplete=="parseHttp") {
+        #wm1_rawwritefile(CurFs,5,28712,CmdResult[1,array],CmdResult[2,number]) 
+    } elseif (CmdComplete=="convData") {
+        local CurFs = CmdResult[3,table]
+        CmdDelay = 1
+        wm1_rawwritefile(CurFs,4,28704,CmdResult[1,array],CmdResult[2,number]) 
+        #local Data = CmdResult[1,array]
+        #cmdRun("convertData",table(Data:count(),Data,"",1,CmdResult[2,number]))
+    } elseif (CmdComplete=="wm1_rawreadfile") {
+        #wm1_rawreadfile(CurFs,5,28712)
+        local Data = CmdResult[1,array]
+        #local FI = "wm1_getfileinfo"(CmdResult[2,number])[table]
+        cmdRun("convertData",table(Data:count(),Data,"",1,CmdResult[2,number]))
+        #local Data = CmdResult[1,array]
+        #printTable(Data)
+        #print(byte2str(Data[1,number],4)+byte2str(Data[2,number],4))
+        #local Str = ""
+        #for(I=1,Data:count()) {
+        #    Str += byte2str(Data[I,number],4)   
+        #}
+        #print(Str)
+    } elseif (CmdComplete=="convertData") {
+        OutStr = CmdResult[1,string]
+        print(OutStr)
+    } elseif (CmdComplete=="wm1_mkfile") {
+        print(CmdResult[1,number])
+    } else {
+        #printTable(CmdResult)
+        #print(CmdComplete)
+    }
+}]#
+
+#dsSendDirect("fsinit",HDD_IO,array(entity(),FS_TYPE,FS_NAME))
+
+#exit()
+
+#Name = "TEST V2"
+#print(Name:sub(5,8))
+
+#mkfstbl()
+#FsTbl = readfstbl()
+#print(wm1_mkfs(FsTbl,FS_MAX_SIZE,8,"TEST V1"))
+
+#CurFs = wm1_readfs(FsTbl,0)
+
+#CurSd = wm1_listdir(CurFs,2,0)
+
+#wm1_mkfile(CurFs,0,"TEST File","",0,2)
+
+#wm1_listdir(CurFs,2,0)
+    
+Mkfs = 0
+RunCmd = "NO"
+    
+}
+
+if (RunCmd=="" | changed(Mkfs) & Mkfs) {
+    RunCmd = "wm1_listdir"
+    if (Mkfs) {
+        #formatDisk()
+        #mkfstbl()
+        #dsSendDirect("mkfstbl",HDD_IO,entity())
+        #FsTbl = readfstbl()
+        #printTable(FsTbl)
+        #local Err = wm1_mkfs(FsTbl,FS_MAX_SIZE,8,"TEST V1")
+        #if (Err!="") { print(Err) }
+    } else {
+        #FsTbl = readfstbl()
+        #[CurFs = wm1_readfs(FsTbl,0)
+        if (!CurFs:count()) {
+            print("FS Corrupt")
+            exit()   
+        }]#
+        
+        #wm1_mkfile(CurFs,0,"TEST File","txt",0,2)
+        #printTable(CurFs)
+        #wm1_listdir(CurFs,2,0) 
+        #wm1_format(CurFs,1)
+        #formatDisk()
+        local CurFs = 0
+        local Fwrite = 0
+        if (Fwrite) {
+            local Str = "Test!!! Hello World! I'm LONG STRING!!!! AHA VERY VERY VERY VEEEEEEEEEERY"
+            Str += Str+Str+Str+Str+Str
+            Str += Str+Str+Str+Str+Str
+            function number cmd_convData(CmdData:table) {
+                local Arr = CmdData[2,array]
+                local Str = CmdData[3,string]
+                local CurI = CmdData[4,number]
+                local Max = CmdData[5,number]
+                while(perf()) {
+                    if (CurI>Max) {
+                        cmdClearRes()
+                        CmdResult[1,array] = Arr
+                        CmdResult[2,number] = Max
+                        CmdResult[3,table] = CmdData[1,table]
+                        return 0   
+                    }
+                    Arr:pushNumber(str2byte(Str:sub(CurI,CurI+4)))  
+                    CurI += 4
+                }
+                CmdData[4,number] = CurI
+                return 1
+            }
+            cmdRun("convData",table(CurFs,array(),Str,1,Str:length()))
+            #print("WTF")
+            #wm1_rawwritefile(CurFs,5,28712,Arr,Str:length()) 
+        }
+        #runOnHTTP(1)
+        #httpRequest("http://localhost:8080/gmod/img/?maxx=16&maxy=16")
+        #wm1_rawreadfile(CurFs,4,28704)
+        
+    }
+    
+    function number cmd_convertData(CmdData:table) {
+        local Max = CmdData[1,number]
+        local HData = CmdData[2,array]
+        local Data = CmdData[3,string]
+        local I = CmdData[4,number]
+        local Sz = CmdData[5,number]
+        while(perf()) {
+            if (I>Max) { 
+                CmdResult[1,string] = Data:right(Sz)
+                return 0 
+            }
+            Debug = I
+            Data += byte2str(HData[I,number],0)  
+            I++ 
+        }
+        CmdData[4,number] = I
+        CmdData[3,string] = Data
+        return 1 
+    }
+    #exit()
+}
+
+if (httpClk()) {
+    #FsTbl = readfstbl()
+    #CurFs = wm1_readfs(FsTbl,0)
+    HData = httpData()  
+    #DArr = HData:explode("")
+
+    function number cmd_parseHttp(CmdData:table) {
+        local Max = CmdData[1,number]
+        local HData = CmdData[2,string]
+        local Data = CmdData[3,array]
+        local I = CmdData[4,number]
+        while(perf()) {
+            if (I>Max) { 
+                CmdResult[1,array] = Data
+                CmdResult[2,number] = CmdData[1,number] 
+                return 0 
+            }
+            Debug = I
+            Data[I,number] = str2byte(HData:sub(I,I+4))  
+            I+=4 
+        }
+        CmdData[4,number] = I
+        return 1
+    }    
+
+    Len = HData:length()
+    #OutStr = HData
+    cmdRun("parseHttp",table(Len,HData,array(),1))    
+}
+
+#[
+if (changed(CmdComplete) & CmdComplete!="") {
+    print(CmdComplete)
+    if (CmdComplete=="wm1_listdir") {
+        printTable(CmdResult)    
+    } elseif (CmdComplete=="parseHttp") {
+        wm1_rawwritefile(CurFs,5,28712,CmdResult[1,array],CmdResult[2,number]) 
+    } elseif (CmdComplete=="wm1_rawreadfile") {
+        #wm1_rawreadfile(CurFs,5,28712)
+        local Data = CmdResult[1,array]
+        local FI = wm1_getfileinfo(CmdResult[2,number])
+        cmdRun("convertData",table(Data:count(),Data,"",1,FI["size",number]))
+    } elseif (CmdComplete=="convertData") {
+        OutStr = CmdResult[1,string]
+    } elseif (CmdComplete=="wm1_mkfile") {
+        #if (CmdResult[0,number]) {
+            print(CmdResult[1,number])
+        #}
+    } else {
+        #printTable(CmdResult)
+        #print(CmdComplete)
+    }
+} ]#

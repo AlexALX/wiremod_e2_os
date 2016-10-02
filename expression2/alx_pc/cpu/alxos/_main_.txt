@@ -1,0 +1,56 @@
+@name ALX Wiremod OS Main func
+@persist SysFs:table SysDir:table FsTbls:table AllFs:table
+@persist ALXOS_PROG_ASOC:table ALXOS_DsH:string
+
+#[
+	ALX Wiremod E2 OS
+	Created by AlexALX
+]#
+
+if (INCLUDE) {
+
+#include "alx_pc/cpu/_main_"
+
+function alxos_clear() {
+    AllFs = table()
+    FsTbls = table()
+    SysFs = table()
+    SysDir = table()
+    ALXOS_DsH = ""
+}
+
+function number alxos_openfile(FInfo:table) {
+    local Func = ALXOS_PROG_ASOC[FInfo["ext",string]:lower(),string]
+    if (Func!="") {
+        Func(FInfo)
+        return 1
+    }
+    return 0
+}
+
+function alxos_openfile_ds() {
+    local Info = dsGetTable()
+    if (!alxos_openfile(Info[2,table])) {
+        dsSendDirect(dsClkName(),Info[1,entity],table(-1))   
+    }    
+}
+
+function alxos_execude_ds() {
+    local Info = dsGetTable()
+    ALXOS_DsH = "alxos_execute_pre"
+    dsSendDirect("fs_readfile",HDD_IO:entity(),table(entity(),"wm1",table(Info[2,table],Info[3,table])))        
+}
+
+function alxos_execute_pre(Name:string) {
+    ALXOS_DsH = ""
+    local Data = dsGetString()
+    "alxos_execute"(Data)
+}
+
+# program associations, for now hardcoded...
+ALXOS_PROG_ASOC["bmp",string] = "alxos_bmp_reader"
+ALXOS_PROG_ASOC["txt",string] = "alxos_txt_reader"
+ALXOS_PROG_ASOC["ini",string] = "alxos_txt_reader"
+ALXOS_PROG_ASOC["e2e",string] = "alxos_txt_reader"
+
+}
