@@ -7,7 +7,7 @@ This is an Wiremod Expression2 OS for Garry's Mod Game.
 Written in in-game Expression2 Language (wiremod addon).  
                                                                      
 This is not an real OS, it cannot work anywhere except this game.  
-Homever it works similar to a real PC (boot sequence etc), but still very much simplified.  
+However it works similar to a real PC (boot sequence etc), but still very much simplified.  
 
 Main features:  
 * PC BIOS, boot emulation.  
