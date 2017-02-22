@@ -15,7 +15,7 @@ function biosheader() {
     EGP:egpBox(LAST_I,vec2(0,0),vec2(512,512))
     EGP:egpColor(LAST_I,0,0,168,255) LAST_I++
     
-    EGP:egpText(LAST_I,"Simple BIOS v1.0 - (c) 2016",vec2(256,5))
+    EGP:egpText(LAST_I,"Simple BIOS v1.1 - (c) 2016-2017",vec2(256,5))
     EGP:egpAlign(LAST_I,1)
     EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
     
@@ -39,10 +39,22 @@ function biosfooter() {
     EGP:egpText(LAST_I,"F8 : Save & Exit",vec2(20,472))
     EGP:egpColor(LAST_I,255,255,255,255) LAST_I++  
     
-    EGP:egpText(LAST_I,toChar(30)+" "+toChar(31)+" : Select Item",vec2(256,452))
+    EGP:egpText(LAST_I,": Move selection",vec2(262,452))
     EGP:egpColor(LAST_I,255,255,255,255) LAST_I++ 
+    
+    local POS = vec2(238,460)
+    EGP:egpTriangle(LAST_I,POS,POS+vec2(-6,6),POS+vec2(6,6))
+    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++
+    
+    local POS = vec2(252,466)
+    EGP:egpTriangle(LAST_I,POS,POS-vec2(-6,6),POS-vec2(6,6))
+    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++
+    
+    EGP:egpText(LAST_I,"ENTER : Select Item",vec2(230,472))
+    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++
+    
     #[
-    EGP:egpText(LAST_I,"Backspace : Go to previus menu",vec2(256,472))
+    EGP:egpText(LAST_I,"Backspace : Go to previous menu",vec2(256,472))
     EGP:egpColor(LAST_I,255,255,255,255) LAST_I++ ]#
 }
 
@@ -91,7 +103,8 @@ function bios_init() {
             
             EGP:egpLine(LAST_I,vec2(25,Y),vec2(150,Y)) LAST_I++ Y+=5
             
-            EGP:egpText(LAST_I,"CPU - "+softQuota()/1000+" Mhz",vec2(30,Y))
+            local Quota = (softQuota()>TickQuota ? TickQuota : softQuota())
+            EGP:egpText(LAST_I,"CPU - "+round(Quota/1000,2)+" Mhz",vec2(30,Y))
             LAST_I++ Y+=20 
             
             EGP:egpText(LAST_I,"GPU - "+ceil(egpMaxObjects()/128)*1024+" KB",vec2(30,Y))
@@ -144,23 +157,28 @@ function bios_init() {
                 LAST_I++ Y+=20
             } else {
                 local CurIndex = BOOT_HDD-1
-                if (!HDDS[BOOT_HDD,table]:count()) {
+                #[if (!HDDS[BOOT_HDD,table]:count()) {
                     CurIndex = 0   
-                } 
+                }]# 
             
                 GpuData[2,number] = LAST_I
                 GpuData[3,number] = CurIndex
                 
-                if (HDDS[CurIndex+1,table]:count()) {
-                    EGP:egpBox(LAST_I,vec2(30,Y+CurIndex*20),vec2(200,20))
+                #if (HDDS:count()) {
+                    EGP:egpBox(LAST_I,vec2(30,Y+CurIndex*20),vec2(300,20))
                     EGP:egpColor(LAST_I,168,0,0,255) LAST_I++
-                }
+                #}
             
                 for(I=1,HDD_MAX) {
                     local Item = HDDS[I,table]
                     if (Item:count()) {
-                        EGP:egpText(LAST_I,"> HDD"+(I-1)+" - Size "+(Item["size",number]*Item["sector_size",number])/1024+" KB",vec2(30,Y))
-                        EGP:egpColor(LAST_I,255,255,0,255)
+                        if (Item["type",number]==1) {
+                            EGP:egpText(LAST_I,"> HDD"+(I-1)+" - "+Item["name",string],vec2(30,Y))
+                            EGP:egpColor(LAST_I,255,255,0,255)
+                        } else {
+                            EGP:egpText(LAST_I,"> HDD"+(I-1)+" - "+Item["name",string]+" - Size "+(Item["size",number]*Item["sector_size",number])/1024+" KB",vec2(30,Y))
+                            EGP:egpColor(LAST_I,255,255,0,255)
+                        }
                         LAST_I++ Y+=20
                     } else {
                         EGP:egpText(LAST_I,"> HDD"+(I-1)+" - Not connected",vec2(30,Y))
@@ -179,6 +197,10 @@ function biospost_key(Key:string,Pressed) {
     if (!Pressed) { return }
     local Step = GpuData[1,number]
     if (Key=="f8") {
+        if (Step==3) {
+            local Index = GpuData[3,number]
+            BOOT_HDD = Index+1
+        }        
         dsSendDirect("SAVE",BIOS,BOOT_HDD)
         return
     }
@@ -220,7 +242,7 @@ function biospost_key(Key:string,Pressed) {
             GpuData[1,number] = 0
             bios_init()
         } elseif (Key=="down" | Key=="up") {
-            local Max = HDDS:count()-1
+            local Max = HDD_MAX-1
             if (Max<1) { return }
             if (Key=="down") {
                 Index = (Index==Max ? 0 : Index+1)

@@ -1,0 +1,918 @@
+@name WCD File System
+@persist WCD_Rsv WCD_NeedMove WCD_MoveData:table WCD_Data:table WCD_WriteBuffer:table WCD_ReadBuffer:table
+
+#[
+    Wiremod CD File System
+    Created by AlexALX
+]#
+
+if (INCLUDE) {
+
+#include "alx_pc/hdd/_main_"
+#include "alx_pc/shared/cmdqueue"
+
+FS_TYPES[3,string] = "WCD"
+WCD_NeedMove = 0
+WCD_WriteBuffer = table()
+WCD_ReadBuffer = table()
+
+WCD_Data = table()
+WCD_Rsv = 14
+
+function number readCellCD(CD:table,Addr) {
+    local RawDisk = CD["wirelink",wirelink]["CurDiskInfo",table]
+    local CurDisk = RawDisk[0,table]
+    if (Addr<0|Addr>=CurDisk["max_addr",number]) {
+        print("CD Read Error "+Addr)
+        return 0
+    }
+    
+    local Sector = floor(Addr/512)
+    local Stack = floor(Sector/CurDisk["sectors_stack",number])
+
+    Addr += CurDisk["first_addr",number]
+    Sector = floor(Addr/512)
+    
+    local Sectors = CurDisk["sectors",number]
+    local SectorS = Sector-Stack*CurDisk["sectors_stack",number]
+    local Track = CD["disk_tracks",array][SectorS,number]
+    
+    local CurSec = RawDisk[1,array][1,number]
+    local CurTrk = RawDisk[1,array][2,number]
+    local CurStk = RawDisk[1,array][3,number]
+    
+    if (CurSec!=CD["disk_sectors",array][SectorS,number] | CurTrk!=Track | CurStk!=Stack) {
+        if (!WCD_NeedMove) {
+            WCD_MoveData = table()
+            WCD_MoveData["sector",number] = CD["disk_sectors",array][SectorS,number]
+            WCD_MoveData["track",number] = Track
+            WCD_MoveData["stack",number] = Stack
+        }
+        WCD_NeedMove = 1
+        return 0
+    }
+
+    local Reader = CD["reader",wirelink]
+    local ReaderUp = CD["reader_up",wirelink]
+    local CurReader = (Stack ? ReaderUp : Reader)
+    local Ind = Addr-(Sector*512)
+
+    return CurReader[512+Ind]
+}
+
+function number writeCellCD(CD:table,Addr,Data) {
+    local RawDisk = CD["wirelink",wirelink]["CurDiskInfo",table]
+    local CurDisk = RawDisk[0,table]
+    
+    if (Addr<0|Addr>=CurDisk["max_addr",number]) {
+        print("CD Write Error "+Addr)        
+        return 0
+    }
+    
+    local Sector = floor(Addr/512)
+    local Stack = floor(Sector/CurDisk["sectors_stack",number])
+
+    Addr += CurDisk["first_addr",number]
+    Sector = floor(Addr/512)
+    
+    local Sectors = CurDisk["sectors",number]
+    local SectorS = Sector-Stack*CurDisk["sectors_stack",number]
+    local Track = CD["disk_tracks",array][SectorS,number]
+    
+    local CurSec = RawDisk[1,array][1,number]
+    local CurTrk = RawDisk[1,array][2,number]
+    local CurStk = RawDisk[1,array][3,number]
+    
+    #print("WRITE",Addr,CurSec,SectorS,CD["disk_sectors",array][SectorS,number])
+    
+    if (CurSec!=CD["disk_sectors",array][SectorS,number] | CurTrk!=Track | CurStk!=Stack) {
+        if (!WCD_NeedMove) {
+            WCD_MoveData = table()
+            WCD_MoveData["sector",number] = CD["disk_sectors",array][SectorS,number]
+            WCD_MoveData["track",number] = Track
+            WCD_MoveData["stack",number] = Stack
+        }
+        WCD_NeedMove = 1
+        return 0
+    }
+    
+    local Reader = CD["reader",wirelink]
+    local ReaderUp = CD["reader_up",wirelink]
+    local CurReader = (Stack ? ReaderUp : Reader)
+    local Ind = Addr-(Sector*512)
+
+    CurReader[512+Ind] = Data
+    return 1
+}
+
+function number cmd_wcd_waitDiskIO(Args:table) {
+    local CD = Args[1,table]
+    local Addr = Args[2,number]
+    local First = Args[3,number]
+    if (!First) {
+        Args[3,number] = 1
+        dsSendDirect("writeDiskIO",CD["ent",entity],table(entity(),"wcd_waitDiskIO_ds",CD,Args))
+    } elseif (First==2) {
+        Args[3,number] = 3
+        dsSendDirect("moveTo",CD["ent",entity],table(entity(),"wcd_waitDiskIO_ds",WCD_MoveData,Args))
+    } elseif (First==4) {
+        WCD_NeedMove = 0
+        return 0
+    }
+    CmdDelay = 1
+    return 1
+}
+
+function wcd_waitDiskIO_ds(Name:string,Args:table) {
+    if (Name=="writeDiskIO") {
+        Args[3,number] = 2
+    } elseif (Name=="moveTo") {
+        Args[3,number] = 4
+    }
+}
+
+function number cmd_wcd_waitDiskReadIO(Args:table) {
+    local CD = Args[1,table]
+    local Addr = Args[2,number]
+    local First = Args[3,number]
+    if (!First) {
+        Args[3,number] = 1
+        dsSendDirect("moveTo",CD["ent",entity],table(entity(),"wcd_waitDiskReadIO_ds",WCD_MoveData,Args))
+    } elseif (First==2) {
+        Args[3,number] = 3
+        dsSendDirect("readDiskIO",CD["ent",entity],table(entity(),"wcd_waitDiskReadIO_ds",CD,Args))
+    } elseif (First==4) {
+        WCD_NeedMove = 0
+        return 0
+    }
+    CmdDelay = 1
+    return 1
+}
+
+function wcd_waitDiskReadIO_ds(Name:string,Args:table) {
+    if (Name=="moveTo") {
+        Args[3,number] = 2
+    } elseif (Name=="readDiskIO") {
+        Args[3,number] = 4
+    }
+}
+
+# always write in increasing order
+function writeBufferCD(ID,Addr,Data) {
+    WCD_WriteBuffer[ID,table]:pushTable(table(Addr,Data))
+}
+
+function number readBufferCD(ID,Addr) {
+    return WCD_ReadBuffer[ID,table][Addr,number]
+}
+
+function formatDiskCD(Args:table) {
+    CmdDelay = 1
+    CurTask[1,number] = Args[3,number]
+    cmdRun("formatdisk",Args)
+}
+
+function number cmd_formatdisk(Args:table) {
+    local Max = Args[3,number]
+    local I = Args[4,number]
+    local CD = Args[2,table]
+    local Wait = Args[5,number]
+    if (Wait) {
+        if (Wait==2) { return 0 }
+        CmdDelay = 1
+        return 1
+    }    
+    while(perf(80)) {
+        if (I>=Max) {
+            Args[5,number] = 1
+            dsSendDirect("writeDiskIO",CD["ent",entity],table(entity(),"formatdisk_finish",CD,Args))
+            CmdDelay = 1
+            return 1
+        }        
+        writeCellCD(CD,I,0)
+        if (WCD_NeedMove) {
+            CmdDelay = 1
+            cmdRun("wcd_waitDiskIO",table(CD,I))
+            break
+        }
+        I += 512
+    }
+    CurTask[2,number] = I
+    Args[4,number] = I
+    return 1
+}
+
+function formatdisk_finish(Name:string,Args:table) {
+    local CD = Args[2,table]
+    Args[5,number] = 2
+    dsSendDirect("clearDiskCommands",CD["ent",entity],1)
+    dsSendDirect("stopdiskrot",CD["ent",entity],1)
+    dsSendDirect(Args[-1,string],Args[1,entity],1)
+    CurTask = table()
+    hddload(0)
+}
+
+#[===========================]#
+#   WCD FS General func
+#[===========================]#
+
+function number wcd_mkfs(Args:table) {
+    local CD = Args[1,table]
+    local Size = Args[2,number]
+    local Name = Args[3,string]
+    local BT = Args[4,number]
+    local DT = Args[5,number]
+    local Boot = Args[6,string]
+    local StructSize = Args[7,number]
+    
+    local Sectors = ceil(Size/4)
+    
+    local St = 0
+    
+    local ID = CD["ent",entity]:id()
+    
+    WCD_NeedMove = 0
+    WCD_WriteBuffer[ID,table] = table()
+    
+    writeBufferCD(ID,St,str2byte("WCD")) 									            # [4 bytes - fs str id]
+    writeBufferCD(ID,St+1,str2byte(Boot:sub(0,4)))            # [4 bytes - boot part1]
+    writeBufferCD(ID,St+2,str2byte(Boot:sub(5,8)))            # [4 bytes - boot part2]
+    writeBufferCD(ID,St+3,str2byte(Boot:sub(9,12)))           # [4 bytes - boot part3]
+    writeBufferCD(ID,St+4,0) 							                          # [4 bytes - reserved for bug check]
+    writeBufferCD(ID,St+5,time()) 			                         # [4 bytes - burn time]
+    writeBufferCD(ID,St+6,BT + (DT << 8) + (Sectors << 16))			# [1 byte - book type] [1 byte - data type] [2 bytes - total sectors]
+    writeBufferCD(ID,St+7,randint(0xFFFFFFFF))                # [4 bytes - volume serial number]
+    writeBufferCD(ID,St+8,str2byte(Name:sub(0,4)))						      # [4 bytes - volume name part1]
+    writeBufferCD(ID,St+9,str2byte(Name:sub(5,8)))						      # [4 bytes - volume name part2]
+    writeBufferCD(ID,St+10,str2byte(Name:sub(9,12))) 				     # [4 bytes - volume name part3]
+    writeBufferCD(ID,St+11,str2byte(Name:sub(13,16)))       		# [4 bytes - volume name part4]
+    writeBufferCD(ID,St+12,StructSize)                        # [2 bytes - struct size] [2 bytes - reserved]
+    writeBufferCD(ID,St+13,WCD_Rsv + (0x55CD << 16))          # [2 bytes - reserved sectors] [2 bytes - end signature]
+    return 1
+}
+
+function table wcd_readfs(Args:table) {
+    local CD = Args[1,table]
+    local FsTbl = Args[2,table]
+    local CDE = CD["ent",entity]
+    local ID = CDE:id()
+    WCD_ReadBuffer[ID,table] = table()
+    WCD_NeedMove = 0
+    dsSendDirect("read_disk",CDE,table("init",HDD_IO,CD,"wcd_readfs_callback"))
+    local Ret = table()
+    Ret["wait",number] = 1
+    return Ret
+}
+
+function table wcd_emptyfs(CD:table,Empty) {
+    local FsInfo = table()
+
+    FsInfo["hddinfo",table] = CD
+    FsInfo["boot_func",string] = ""
+    FsInfo["fs_str_id",string] = "WCD"
+    FsInfo["bytes_in_sector",number] = CD["sector_size",number]
+    FsInfo["sectors_in_cluster",number] = 1
+    FsInfo["reserved_sectors",number] = WCD_Rsv
+    FsInfo["total_sectors",number] = 0
+    FsInfo["volume_serial",number] = 0
+    FsInfo["burn_time",number] = 0
+    local CurDisk = CD["wirelink",wirelink]["CurDiskInfo",table][0,table]
+    FsInfo["book_type",number] = (CurDisk["disc_ent",entity]:getSkin()==3 ? 1 : 0)
+    FsInfo["data_type",number] = 0
+    FsInfo["read_only",number] = 1
+    FsInfo["volume_name",string] = (Empty ? "Empty Disc" : "No Disc")
+    return FsInfo
+}
+
+function table wcd_emptyfs(CD:table) {
+    return wcd_emptyfs(CD,0)
+}
+
+function number wcd_readfs_callback(Args:table) {
+    local First = Args[1,number]
+    if (!First) {
+        WCD_Data[1,entity] = Args[2,entity]
+        #Args[1,number] = 1
+        return 0    
+    }
+    local Ret = Args[2,string]
+    local Tbl = Args[3,table]
+
+    if (Ret=="OK") {
+        local Info = Args[4,table]
+        dsSendDirect("fs_readfs",WCD_Data[1,entity],Info)
+    } else {
+        local Info = wcd_emptyfs(Tbl[3,table])
+        Info["err_msg",string] = Ret
+        dsSendDirect("fs_readfs",WCD_Data[1,entity],Info)
+    }
+    WCD_Data = table()
+    return 0
+}
+
+function table readcdinfo(CD:table) {
+    if (!CD:count()) { return wcd_emptyfs(CD) }
+    local FsInfo = table()
+
+    local O = 0
+    if (((readCellCD(CD,O+13) >> 16) && 0xFFFF)!=0x55CD) { return wcd_emptyfs(CD,1) } # invalid FS
+    FsInfo["hddinfo",table] = CD
+    FsInfo["boot_func",string] = byte2str(readCellCD(CD,O+1),0)+byte2str(readCellCD(CD,O+2),0)+byte2str(readCellCD(CD,O+3),0)
+    FsInfo["fs_str_id",string] = byte2str(readCellCD(CD,O),0)
+    FsInfo["bytes_in_sector",number] = CD["sector_size",number]
+    FsInfo["sectors_in_cluster",number] = 1 # compatibility
+    FsInfo["struct_size",number] = readCellCD(CD,O+12) && 0xFFFF
+    FsInfo["reserved_sectors",number] = (readCellCD(CD,O+13) && 0xFFFF)
+    FsInfo["total_sectors",number] = (readCellCD(CD,O+6) >> 16) && 0xFFFF
+    FsInfo["volume_serial",number] = readCellCD(CD,O+7)
+    FsInfo["burn_time",number] = readCellCD(CD,O+5)
+    FsInfo["book_type",number] = readCellCD(CD,O+6) && 0xFF
+    local CurDisk = CD["wirelink",wirelink]["CurDiskInfo",table][0,table]
+    if (CurDisk["disc_ent",entity]:getSkin()==3 & FsInfo["book_type",number]==0) { FsInfo["book_type",number] = 1 }
+    FsInfo["data_type",number] = (readCellCD(CD,O+6) >> 8) && 0xFF
+    FsInfo["read_only",number] = 1
+    FsInfo["volume_name",string] = byte2str(readCellCD(CD,O+8),0)+byte2str(readCellCD(CD,O+9),0)+byte2str(readCellCD(CD,O+10),0)+byte2str(readCellCD(CD,O+11),0)
+    
+    return FsInfo
+}
+
+#[===========================]#
+#   WCD FS Dir func
+#[===========================]#
+
+function table wcd_getfileinfo(CD:table,Of) {
+    local ID = CD["ent",entity]:id()
+    local C = readBufferCD(ID,Of+7)
+    if (C==0) { return table() }
+    local Ret = table()
+    Ret["name",string]=byte2str(readBufferCD(ID,Of),0)+byte2str(readBufferCD(ID,Of+1),0)+byte2str(readBufferCD(ID,Of+2) && 0xFFFF,2)
+    Ret["ext",string]=byte2str(readBufferCD(ID,Of+3) && 0xFFFFFF,0)
+    Ret["attr",number]=(readBufferCD(ID,Of+3) >> 24) && 0xFF
+    Ret["time_create",number]=readBufferCD(ID,Of+4)
+    Ret["time_modify",number]=readBufferCD(ID,Of+5)
+    Ret["sector",number]=C
+    Ret["cluster",number]=C # compatibility
+    Ret["size",number]=readBufferCD(ID,Of+6)
+    Ret["data_sector",number]=Of  
+    return Ret
+}
+
+function number wcd_getsize(FS:table,File) {
+    local ID = FS["hddinfo",table]["ent",entity]:id()
+    return readBufferCD(ID,File+6)
+}
+
+function wcd_listdir_init(Args:table) {
+    local First = Args[1,number]
+    if (!First) {
+        WCD_Data[1,entity] = Args[2,entity]
+        return  
+    }    
+    local Ret = Args[2,string]
+    local Tbl = Args[3,table]
+    
+    local FS = Tbl[5,table]
+    local ID = Tbl[6,number]
+    local Dir = Tbl[7,number]
+        
+    CmdDelay = 1
+    if (!FS["total_sectors",number]) {
+        cmdRun("wcd_listdir",table(FS,Dir,table(),0,0,0))
+        return   
+    }
+    cmdRun("wcd_read_struct",table(FS,ID,WCD_Rsv,Dir))
+}
+
+function wcd_listdir(Args:table) {
+    local FS = Args[1,table]
+    local Dir = Args[2,number]
+    if (Dir==0) { Dir = WCD_Rsv }
+    local ID = FS["hddinfo",table]["ent",entity]:id()
+    CmdDelay = 1
+    if (!WCD_ReadBuffer[ID,table]:count()) {
+        dsSendDirect("read_disk",FS["hddinfo",table]["ent",entity],
+            table("init",entity(),FS["hddinfo",table],"wcd_listdir_init",FS,ID,Dir)
+        )
+        WCD_ReadBuffer[ID,table] = table()
+        return
+    }
+    local Size = wcd_getsize(FS,Dir)
+    cmdRun("wcd_listdir",table(FS,Dir,table(),ceil(Size/4)/8-1,0,0))
+}
+
+function number cmd_wcd_read_struct(Args:table) {
+    local FS = Args[1,table]
+    local ID = Args[2,number]
+    local I = Args[3,number]
+    local Max = FS["struct_size",number]
+    
+    while(perf(80)) {
+        if (I>Max) {
+            WCD_NeedMove = 0
+            local Dir = Args[4,number]
+            local Size = wcd_getsize(FS,Dir)
+            CmdAdd2Queue = 1
+            cmdRun("wcd_listdir",table(FS,Dir,table(),ceil(Size/4)/8-1,0,0))
+            return 0
+        }
+        local Tmp = readCellCD(FS["hddinfo",table],I)  
+        if (WCD_NeedMove) {
+            CmdDelay = 1
+            cmdRun("wcd_waitDiskReadIO",table(FS["hddinfo",table],I))
+            break    
+        }
+        WCD_ReadBuffer[ID,table][I,number] = Tmp
+        I++
+    }
+    Args[3,number] = I
+    return 1
+}
+
+function number cmd_wcd_listdir(CmdData:table) {
+    local FS = CmdData[1,table]
+    local Of = CmdData[2,number]
+    local Ents = CmdData[3,table]
+    local Max = CmdData[4,number]
+    local SI = Ents:count()
+    local I = CmdData[5,number]
+    local II = CmdData[6,number]
+    local ID = FS["hddinfo",table]["ent",entity]:id()
+    while(perf(80)) {
+        if (I>Max) { #I=0,Max-1 
+            cmdClearRes()
+            CmdResult = Ents
+            return 0
+        }
+        local O = II+Of
+        local C = readBufferCD(ID,O+7)
+        II+=8
+        I++
+        if (C==0) { continue }
+        Ents[SI,table] = wcd_getfileinfo(FS["hddinfo",table],O)  
+        SI++ 
+    } 
+    CmdData[2,number] = Of
+    CmdData[6,number] = II
+    CmdData[5,number] = I
+    return 1
+}
+
+function number wcd_isdir(Entry:table) {
+    return ((Entry["attr",number] >> 4) && 1)       
+}
+
+function number wcd_sysdir(Entry:table) {
+    if (Entry["name",string]=="." | Entry["name",string]=="..") {
+        return 1
+    }
+    return 0
+}
+
+function number wcd_add2dir(Args:table) {
+    local CD = Args[1,table]
+    local Sector = Args[2,number]
+    local Entries = Args[3,table]
+    local Dirs = Args[4,table]
+    local StructSize = Args[5,number]    
+    
+    WCD_Data[1,number] = Sector
+    WCD_Data[2,number] = StructSize
+    WCD_Data[3,number] = Sector
+    
+    CmdDelay = 1
+    cmdRun("wcd_add2dir_struct",table(CD,0,Sector,Dirs,Dirs:count(),1,-1,table(),StructSize,table()))
+    CmdAdd2Queue = 1
+    cmdRun("wcd_add2dir_finish",table(CD))
+}
+
+function wcd_write_struct_ds(Name:string,Args:table) {
+    Args[3,number] = 2
+}
+
+function number cmd_wcd_write_struct(Args:table) {
+    local CD = Args[1,table]
+    local ID = Args[2,number]
+    local First = Args[3,number]
+    if (!First) {
+        Args[4,number] = WCD_WriteBuffer[ID,table]:count()
+        Args[5,number] = 1
+        Args[3,number] = 1
+        
+        local RawDisk = CD["wirelink",wirelink]["CurDiskInfo",table]
+        local CurDisk = RawDisk[0,table]
+        local Track = CurDisk["first_track",number]
+        
+        local Tbl = table()
+        Tbl["sector",number] = 0
+        Tbl["track",number] = Track
+        Tbl["stack",number] = 0
+
+        dsSendDirect("moveTo",CD["ent",entity],table(entity(),"wcd_write_struct_ds",Tbl,Args))
+        return 1
+    } elseif (First==1) {
+        CmdDelay = 1
+        return 1
+    }
+    local I = Args[5,number]
+    local Max = Args[4,number]
+    local Tbl = WCD_WriteBuffer[ID,table]
+    while(perf(80)) {
+        if (I>Max) {
+            break   
+        }
+        local Ent = Tbl[I,table]
+        writeCellCD(CD,Ent[1,number],Ent[2,number])
+        if (WCD_NeedMove) {
+            CmdDelay = 1
+            cmdRun("wcd_waitDiskIO",table(CD,I))
+            break   
+        }    
+        I++    
+    }
+    if (I>Max) {
+        return 0   
+    }
+    CurTask[5,number] = I
+    Args[5,number] = I
+    return 1
+}
+
+function number cmd_wcd_add2dir_struct(Args:table) {
+    local CD = Args[1,table]
+    local Sector = WCD_Data[1,number] #Args[3,number]
+    local Dirs = Args[4,table]
+    local I = Args[2,number]
+    local Max = Args[5,number]
+    local II = Args[6,number]
+    local EMax = Args[7,number]
+    local Struct = Args[8,table]
+    local StructSize = WCD_Data[2,number] #Args[9,number]
+    local StructSector = WCD_Data[3,number]
+    local DirStruct = Args[10,table]
+    while(perf(80)) {
+        if (I>=Max) {
+            break
+        }
+        local Entries = Dirs[I,table]
+        local Entry = Entries[II,table]
+        if (EMax==-1) {   
+            EMax = Entries:count()
+            if (EMax==0) {
+                I++ EMax = -1
+                continue   
+            }
+        }       
+        
+        if (!DirStruct[Entry["dir",number],number]) {
+            DirStruct[Entry["dir",number],number] = StructSector
+        }
+        
+        local Ret = "wcd_internal_mkfile"(CD,Entry,StructSize,StructSector,DirStruct,I,II,Dirs)[number]
+        if (wcd_isdir(Entry)) {
+            StructSector = Ret
+        } else {
+            Struct:pushTable(table(StructSize,Entry))
+            StructSize = Ret
+        }
+        Sector += 8
+        II++
+        if (II>EMax) {
+            EMax = -1
+            II = 1
+            I++
+        }
+    }
+    WCD_Data[1,number] = Sector
+    WCD_Data[2,number] = StructSize
+    WCD_Data[3,number] = StructSector
+    if (I>=Max) {
+        local ID = CD["ent",entity]:id()
+        CmdAdd2Queue = 1
+        cmdRun("wcd_write_struct",table(CD,ID,0))
+        CmdAdd2Queue = 1
+        cmdRun("wcd_add2dir_cont",table(CD,ID,0,Struct,table())) 
+        return 0
+    }
+    Args[7,number] = EMax
+    Args[2,number] = I
+    Args[6,number] = II
+    return 1
+}
+
+function number cmd_wcd_add2dir_cont(Args:table) {
+    local CD = Args[1,table]
+    local ID = Args[2,number]
+    local First = Args[3,number]
+    local Struct = Args[4,table]
+    if (!First) {
+        Args[6,number] = Struct:count()
+        Args[7,number] = 1
+        Args[3,number] = 1
+    }
+    local I = Args[7,number]
+    local Max = Args[6,number]
+    local Written = Args[5,table]
+    while(perf(80)) {
+        if (I>Max) {
+            break
+        }
+        if (Struct[I,table]:count() & !Written[I,number]) {
+            local Arr = Struct[I,table]
+            local WSector = Arr[1,number]
+            local Entry = Arr[2,table]
+            local FS = Entry["fs",table]
+            local Func = FS["fs_str_id",string]:lower()+"_rawreadfile"
+            local Ret = Func(table(FS,Entry["cluster",number],Entry["data_sector",number]))[number]
+            Written[I,number] = 1
+            if (Ret>0) {
+                CmdAdd2Queue = 1
+                CurTask[-1,number] = 1
+                CurTask[3,number] = 1
+                CurTask[4,string] = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
+                cmdRun("wcd_rawwritefile_callback",table(CD,WSector,Entry))
+                break
+            }
+        }
+        I++
+    }
+    if (I>Max) {
+        return 0   
+    }
+    Args[7,number] = I
+    return 1
+}
+
+function number cmd_wcd_add2dir_finish(Args:table) {
+    local CD = Args[1,table]
+    local First = Args[2,number]
+    if (!First) {
+        CmdDelay = 1
+        dsSendDirect("writeDiskIO",CD["ent",entity],table(entity(),"wcd_add2dir_finish",CD,Args))
+        Args[2,number] = 1
+        return 1
+    } elseif (First==2) {
+        dsSendDirect("clearDiskCommands",CD["ent",entity],table(entity(),"wcd_add2dir_finish",CD,Args))
+        dsSendDirect("stopdiskrot",CD["ent",entity],1)
+        Args[2,number] = 3
+    } elseif (First==4) {
+        hddload(0)
+        return 0
+    }
+    CurTask = table()
+    CmdDelay = 1
+    return 1
+}
+
+function wcd_add2dir_finish(Name:string,Args:table) {
+    if (Name=="writeDiskIO") {
+        Args[2,number] = 2   
+    } elseif (Name=="clearDiskCommands") {
+        Args[2,number] = 4
+    }
+}
+
+#[===========================]#
+#   WCD FS File func
+#[===========================]#
+
+function number wcd_internal_mkfile(CD:table,Entry:table,StructSize,StructSector,ParentStruct:table,CurI,CurII,Dirs:table) {
+    local O = ParentStruct[CurI,number]+(CurII-1)*8
+    local Name = Entry["name",string]:sub(0,10)
+    local Ext = Entry["ext",string]
+    local CTime = Entry["time_create",number]
+    local MTime = Entry["time_modify",number]
+    local Is_Dir = wcd_isdir(Entry)
+    local Size = Entry["size",number]
+    local WSector = StructSize
+    local Entries = 0
+    if (Is_Dir) {
+        Entries = Dirs[Entry["dir",number],table]:count()
+        Size = Entries*32
+        WSector = StructSector
+        if (wcd_sysdir(Entry)) {
+            if (CurI!=0) {
+                WSector = ParentStruct[Entry["dir",number],number]
+            }
+        }    
+    }
+
+    local ID = CD["ent",entity]:id()
+
+    writeBufferCD(ID,O,str2byte(Name:sub(0,4)))					              # [4 bytes - name part1]
+    writeBufferCD(ID,O+1,str2byte(Name:sub(5,8)))                 # [4 bytes - name part2]
+    writeBufferCD(ID,O+2,str2byte(Name:sub(9,10)))                # [2 bytes - name part3] [2 bytes - reserved]
+    writeBufferCD(ID,O+3,str2byte(Ext:sub(0,3)) + (Is_Dir << 28))	# [3 bytes - file extension] [1 byte - attributes]
+    writeBufferCD(ID,O+4,CTime)	 										                       # [4 bytes - creation time]
+    writeBufferCD(ID,O+5,MTime) 											                       # [4 bytes - modify time]
+    writeBufferCD(ID,O+6,Size) 		 										                      # [4 bytes - file size]
+    writeBufferCD(ID,O+7,WSector) 		 										                   # [4 bytes - first sector]
+    
+    if (!Is_Dir) {
+        WSector += ceil(Size/4)
+    } elseif (!wcd_sysdir(Entry) | CurI==0) {
+        WSector = StructSector + Entries*8
+    } else {
+        WSector = StructSector
+    }
+    
+    return WSector
+}
+
+function number wcd_rawreadfile(Args:table) {
+    local FS = Args[1,table]
+    local Sector = Args[2,number]
+    local Sd = Args[3,number]
+    local ID = FS["hddinfo",table]["ent",entity]:id()
+    Sz = readBufferCD(ID,Sd+6)
+    if (Sz==0) { return -1 }
+    local Ret = array()
+    local Max = ceil(Sz/FS["bytes_in_sector",number]) 
+    CurTask[1,number] = Max
+    CmdDelay = 1
+    cmdRun("wcd_rawreadfile",table(FS,Sector,Ret,Max,Sd,1))
+    return 1
+}
+
+function number cmd_wcd_rawreadfile(CmdData:table) {
+    local FS = CmdData[1,table]
+    local Sector = CmdData[2,number]
+    local Ret = CmdData[3,array]
+    local Max = CmdData[4,number]
+    local I = CmdData[6,number]
+    local SI = CmdData[7,number]
+    if (!SI) { SI++ }
+    while(perf(80)) {
+        if (I>Max) {
+            cmdClearRes()
+            CmdResult[1,array] = Ret
+            CmdResult[2,number] = CmdData[5,number]
+            if (!CurTask[-1,number]) {
+                CurTask = table()
+            }
+            dsSendDirect("clearDiskCommands",FS["hddinfo",table]["ent",entity],1)
+            return 0
+        }
+        Ret[SI, number] = readCellCD(FS["hddinfo",table],Sector)
+        if (WCD_NeedMove) {
+            CmdDelay = 1
+            cmdRun("wcd_waitDiskReadIO",table(FS["hddinfo",table],Sector))
+            break   
+        }
+        SI++ 
+        Sector++
+        I++
+    }
+    CmdData[2,number] = Sector
+    CmdData[6,number] = I
+    CmdData[7,number] = SI
+    CurTask[2,number] = I
+    return 1
+}
+
+#[
+    local Entry = CmdData[3,table]:clone()
+    Entry:removeTable("fs")
+    fileWrite("test123.txt",jsonEncode(table(Entry,Data)))
+]#
+
+function number cmd_wcd_rawwritefile_callback(CmdData:table) {
+    local FS = CmdData[1,table]
+    local Sector = CmdData[2,number]
+    local Data = CmdResult[1,array]
+    
+    CurTask[3,number] = 2
+    CmdDelay = 1
+    cmdRun("wcd_rawwritefile",table(FS,Sector,1,Data,Data:count()))
+    return 0
+}
+
+function number cmd_wcd_rawwritefile(CmdData:table) {
+    local CD = CmdData[1,table]
+    local Sector = CmdData[2,number]
+    local I = CmdData[3,number]
+    local Data = CmdData[4,array]
+    local Max = CmdData[5,number]
+    while(perf(90)) {
+        if (I>Max) { #I=1,Max
+            if (!CurTask[-1,number]) {
+                CurTask = table()
+            }
+            cmdClearRes()
+            CmdResult[1,number] = 1
+            return 0
+        }
+        writeCellCD(CD,Sector,Data[I,number])
+        #print(WCD_NeedMove,Sector)
+        if (WCD_NeedMove) {
+            CmdDelay = 1
+            cmdRun("wcd_waitDiskIO",table(CD,Sector))
+            break   
+        }        
+        I++
+        Sector++
+    } 
+    CmdData[3,number] = I
+    CmdData[2,number] = Sector
+    CurTask[5,number] = Sector
+    CurTask[2,number] = I
+    return 1        
+}
+
+function number wcd_readfile(Args:table) {
+    local FS = Args[1,table]
+    local File = Args[2,table]
+    local Start = Args[3,number]
+    local End = Args[4,number]
+    local C = File["sector",number]
+    if (C<WCD_Rsv) { return 0 }
+    local Sz = File["size",number]
+    if (Sz>0) {
+        if (Start>Sz) {
+            return 0   
+        }
+        CmdDelay = 1
+        CurTask[1,number] = 1
+        if (Start>0) { # fix byte order
+            Start--
+        }
+        WCD_NeedMove = 0
+        WCD_MoveData = table()
+        CmdDelay = 1
+        cmdRun("wcd_readfile",table(FS,File,Start,End,0))    
+        CmdAdd2Queue = 1
+        cmdRun("wcd_readfile_finish",table())
+    }
+    return 1
+} 
+
+function number cmd_wcd_readfile(CmdData:table) {
+    local FS = CmdData[1,table]
+    local File = CmdData[2,table]
+    local Step = CmdData[5,number]
+    if (Step==0) {
+        local Start = CmdData[3,number]
+        local End = CmdData[4,number]
+        
+        if (End==0 | End>File["size",number]) {
+            End = File["size",number]   
+            CmdData[4,number] = End
+        }
+            
+        CmdData[8,number] = ceil(End/FS["bytes_in_sector",number])
+        CurTask[1,number] = CmdData[8,number]
+
+        local StartC = floor(CmdData[3,number]/FS["bytes_in_sector",number])       
+        StartC += File["sector",number]
+        
+        CmdData[5,number] = 1
+        CmdData[6,number] = StartC
+        CmdData[7,number] = 0
+    } elseif (Step==1) {
+        local Of = CmdData[6,number]
+        local I = CmdData[7,number]
+        local Max = CmdData[8,number]
+        local Ret = CmdData[9,string]
+        
+        while(perf()) {
+            if (I>Max) {
+                cmdClearRes()
+                #print(Ret)
+                local CalcS = CmdData[3,number]-floor(CmdData[3,number]/FS["bytes_in_sector",number])*FS["bytes_in_sector",number]
+                local CalcE = CalcS+CmdData[4,number]
+                CmdResult[1,string] = Ret:sub(CalcS+1,CalcE)
+                CurTask = table()
+                local CD = FS["hddinfo",table]
+                CmdData[5,number] = 2
+                dsSendDirect("clearDiskCommands",CD["ent",entity],table(entity(),"wcd_readfile_finish",CD,CmdData))
+                return 1
+            }
+            local Tmp = readCellCD(FS["hddinfo",table],Of)
+            if (WCD_NeedMove) {
+                CmdDelay = 1
+                cmdRun("wcd_waitDiskReadIO",table(FS["hddinfo",table],Of))
+                break
+            }
+            Ret += byte2strraw(Tmp,0)
+            I++
+            Of++
+        }
+        CmdData[6,number] = Of
+        CurTask[2,number] = I
+        CmdData[7,number] = I
+        CmdData[9,string] = Ret
+    } elseif (Step==3) {
+        return 0
+    }
+    return 1
+}
+
+function wcd_readfile_finish(Name:string,Args:table) {
+    #cmdRun("wcd_readfile_finish",table())
+    Args[5,number] = 3
+}
+
+function number cmd_wcd_readfile_finish(Args:table) {
+    return 0
+}
+
+}

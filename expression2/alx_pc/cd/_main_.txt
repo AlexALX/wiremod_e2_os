@@ -1,0 +1,713 @@
+@name Main cd drive func
+@inputs DriveBase:entity DriveBaseUp:entity Wheel:entity Holder:wirelink Reader:wirelink ReaderUp:wirelink DisableRot SetSpeed
+@outputs HDD:wirelink Started CurDiskInfo:table CurSpeed
+@persist HDD_TYPE HDD_NAME:string HDD_IO:entity
+@persist ReaderEnt:entity ReaderEntUp:entity HolderEnt:entity DelayFix MoveTrack MoveDir CurStack CurReader:wirelink
+@persist NoLaserPos LastPosZ LastPos LastPosUpZ LastPosUp ReaderPos:vector ReaderPosUp:vector ReaderSpeed 
+@persist DiskTypes:table DiskTypesD:array BookTypes:array DataTypes:array DiskTracks:array DiskSectors:array BugTest
+@persist Speed OrigSpeed DiskSpeed DriveData:table LastSpeedY CurDisk:entity Init
+
+if (first()|duped()) {
+    
+#include "alx_pc/shared/_main_"
+#include "alx_pc/shared/cmd"
+    
+runOnTick(1)
+
+Started = 0
+    
+NoLaserPos = -0.2
+ReaderPos = vec(-6,-38,12)
+ReaderPosUp = vec(-6,-43,12)
+DiskSpeed = 400
+ReaderSpeed = 40
+
+LastPos = 0
+LastPosUp = 0
+BugTest = 1
+DelayFix = 0
+
+CurReader = Reader
+ReaderEnt = Reader:entity()
+ReaderEntUp = ReaderUp:entity()
+HolderEnt = Holder:entity()
+#HolderEnt:parentTo(Wheel)
+#StandEnt:parentTo(DriveBase)
+
+HolderEnt:propFreeze(0)
+Wheel:propFreeze(0)
+
+CurDiskInfo = table()
+
+DiskTracks = array()
+DiskSectors = array()
+
+#printTable(DiskSectors)
+
+#local FPS = 66 # reader FPS
+#LaserFPS = floor(LaserFPS/1)*1000
+    
+function calcTracks() {
+    local First = DriveData[1,number]
+    if (!First) {
+        DriveData[1,number] = 1
+        DriveData[2,number] = 1
+        DriveData[3,number] = 0  
+    }
+    local Cur = DriveData[2,number]
+    local LastSector = DriveData[3,number]
+    local Max = 12
+    for(T=Cur,Max) {
+        if (!perf(75)) { break }
+        local Sectors = floor(2*3.1415926*T) + 1
+        for(S=LastSector,Sectors+LastSector) {
+            DiskTracks[S,number] = T
+            DiskSectors[S,number] = S-LastSector
+        }
+        #print(T,Sectors)
+        LastSector += Sectors
+        Cur++
+    }
+    if (Cur<=Max) {
+        DriveData[2,number] = Cur
+        DriveData[3,number] = LastSector
+        runCmd("calcTracks",1)   
+    } else {
+        #printTable(DiskSectors)
+        DriveData = table()
+        "clearBufferBoth"()
+    }
+}
+
+function clearBufferBoth() {
+    for (I = 512, 1023) {
+        Reader[I] = 0
+        ReaderUp[I] = 0
+    }
+}
+
+function clearBuffer() {
+    for (I = 512, 1023) {
+        CurReader[I] = 0
+    }
+}
+
+function clearCommands() {
+    Reader[0] = 0
+    Reader[1] = 0
+    for (I = 9, 14) {
+        Reader[I] = 0
+    }
+    Reader[8] = 0
+    
+    ReaderUp[0] = 0
+    ReaderUp[1] = 0
+    for (I = 9, 14) {
+        ReaderUp[I] = 0
+    }
+    ReaderUp[8] = 0
+    
+    DelayFix = 0
+    stoptimer("doJob")
+    MoveTrack = 0
+    MoveDir = 0
+}
+
+function disableLaser(Num) {
+    if (Num) {
+        LastPosUpZ = NoLaserPos
+    } else {
+        LastPosZ = NoLaserPos
+    }
+}
+
+function disableLaser() {
+    LastPosZ = NoLaserPos
+    LastPosUpZ = NoLaserPos  
+}
+
+function enableLaser(Num) {
+    if (Num) {
+        LastPosUpZ = 0.0
+    } else {
+        LastPosZ = 0.0
+    }
+}
+
+function enableLaser() {
+    LastPosZ = 0.0
+    LastPosUpZ = 0.0
+}
+
+function number isDiskRotating() {
+    return !(LastSpeedY<Speed*0.75) # | LastSpeedY>Speed*2.0)
+}
+
+DiskTypes = table()
+local Info = table()
+Info["type",string] = "CD"
+Info["model",string] = "models/venompapa/wirecd_medium.mdl"
+Info["max_speed",number] = 2400
+Info["density",number] = 16
+Info["raw_sectors",number] = 8
+Info["raw_tracks",number] = 2
+Info["tracks",number] = 2
+Info["first_track",number] = 1
+Info["first_addr",number] = 0
+Info["stacks",number] = 1
+local Sectors = 18
+Info["sectors",number] = Sectors
+Info["sectors_stack",number] = Sectors
+Info["max_addr",number] = Sectors*512
+Info["size",number] = Sectors*512*4 # 36kb
+DiskTypes:pushTable(Info)
+
+local Info = table()
+Info["type",string] = "Mini-CD"
+Info["model",string] = "models/venompapa/wirecd_small.mdl"
+Info["max_speed",number] = 2000
+Info["density",number] = 16
+Info["raw_sectors",number] = 1
+Info["raw_tracks",number] = 1
+Info["tracks",number] = 1
+Info["first_track",number] = 1
+Info["first_addr",number] = 0
+Info["stacks",number] = 1
+local Sectors = 7
+Info["sectors",number] = Sectors
+Info["sectors_stack",number] = Sectors
+Info["max_addr",number] = Sectors*512
+Info["size",number] = Sectors*512*4 # 14kb
+DiskTypes:pushTable(Info)
+
+local Info = table()
+Info["type",string] = "DVD"
+Info["model",string] = "models/venompapa/wirecd_medium.mdl"
+Info["max_speed",number] = 1600
+Info["density",number] = 8
+Info["raw_sectors",number] = 39
+Info["raw_tracks",number] = 4
+Info["tracks",number] = 4
+Info["first_track",number] = 1
+Info["first_addr",number] = 0
+Info["stacks",number] = 1
+local Sectors = 65
+Info["sectors",number] = Sectors
+Info["sectors_stack",number] = Sectors
+Info["max_addr",number] = Sectors*512
+Info["size",number] = Sectors*512*4 #130kb
+DiskTypes:pushTable(Info)
+
+local Info = table()
+Info["type",string] = "Mini-DVD"
+Info["model",string] = "models/venompapa/wirecd_small.mdl"
+Info["max_speed",number] = 1600
+Info["density",number] = 6
+Info["raw_sectors",number] = 20
+Info["raw_tracks",number] = 3
+Info["tracks",number] = 3
+Info["first_track",number] = 1
+Info["first_addr",number] = 0
+Info["stacks",number] = 1
+local Sectors = 22
+Info["sectors",number] = Sectors
+Info["sectors_stack",number] = Sectors
+Info["max_addr",number] = Sectors*512
+Info["size",number] = Sectors*512*4 #44kb
+DiskTypes:pushTable(Info)
+
+local Info = table()
+Info["type",string] = "HD-DVD"
+Info["model",string] = "models/venompapa/wirecd_medium.mdl"
+Info["max_speed",number] = 1200
+Info["density",number] = 4
+Info["raw_sectors",number] = 172
+Info["raw_tracks",number] = 8
+Info["tracks",number] = 7
+Info["first_track",number] = 2
+Info["first_addr",number] = 3584
+Info["stacks",number] = 1
+local Sectors = 223
+Info["sectors",number] = Sectors
+Info["sectors_stack",number] = Sectors
+Info["max_addr",number] = Sectors*512
+Info["size",number] = Sectors*512*4 #446kb
+DiskTypes:pushTable(Info)
+
+local Info = table()
+Info["type",string] = "BD"
+Info["model",string] = "models/venompapa/wirecd_medium.mdl"
+Info["max_speed",number] = 800
+Info["density",number] = 3
+Info["raw_sectors",number] = 330
+Info["raw_tracks",number] = 11
+Info["tracks",number] = 8
+Info["first_track",number] = 3
+Info["first_addr",number] = 10240
+Info["stacks",number] = 1
+local Sectors = 400
+Info["sectors",number] = Sectors
+Info["sectors_stack",number] = Sectors
+Info["max_addr",number] = Sectors*512
+Info["size",number] = Sectors*512*4 #800kb
+DiskTypes:pushTable(Info)
+
+local Info = table()
+Info["type",string] = "Mini-BD"
+Info["model",string] = "models/venompapa/wirecd_small.mdl"
+Info["max_speed",number] = 1000
+Info["density",number] = 3
+Info["raw_sectors",number] = 77
+Info["raw_tracks",number] = 6
+Info["tracks",number] = 4
+Info["first_track",number] = 3
+Info["first_addr",number] = 10240
+Info["stacks",number] = 1
+local Sectors = 115
+Info["sectors",number] = Sectors
+Info["sectors_stack",number] = Sectors
+Info["max_addr",number] = Sectors*512
+Info["size",number] = Sectors*512*4 #230kb
+DiskTypes:pushTable(Info)
+
+local Info = table()
+Info["type",string] = "BDXL"
+Info["model",string] = "models/venompapa/wirecd_medium.mdl"
+Info["max_speed",number] = 500
+Info["density",number] = 2
+Info["raw_sectors",number] = 797
+Info["raw_tracks",number] = 17
+Info["tracks",number] = 12
+Info["first_track",number] = 5
+Info["first_addr",number] = 33280
+Info["stacks",number] = 2
+local Sectors = 862
+Info["sectors",number] = Sectors
+Info["sectors_stack",number] = Sectors/2
+Info["max_addr",number] = Sectors*512
+Info["size",number] = Sectors*512*4 #1724kb
+DiskTypes:pushTable(Info)
+
+local Info = table()
+Info["type",string] = "M-BDXL"
+Info["model",string] = "models/venompapa/wirecd_small.mdl"
+Info["max_speed",number] = 800
+Info["density",number] = 2
+Info["raw_sectors",number] = 222
+Info["raw_tracks",number] = 10
+Info["tracks",number] = 4
+Info["first_track",number] = 5
+Info["first_addr",number] = 33280
+Info["stacks",number] = 2
+local Sectors = 288
+Info["sectors",number] = Sectors
+Info["sectors_stack",number] = Sectors/2
+Info["max_addr",number] = Sectors*512
+Info["size",number] = Sectors*512*4 #576kb
+DiskTypes:pushTable(Info)
+
+DiskTypesD = array()
+for (I=1,DiskTypes:count()) {
+    DiskTypesD[DiskTypes[I,table]["raw_sectors",number],number] = I
+    DiskTypes[I,table]["type_id",number] = I
+}
+
+BookTypes[0,string] = "RW"
+BookTypes[1,string] = "R"
+BookTypes[2,string] = "ROM"
+
+DataTypes[0,string] = "Clear"
+DataTypes[1,string] = "Data"
+DataTypes[2,string] = "Audio"
+
+function sendData() {
+    dsSendDirect("hddinit",HDD_IO,
+        table(wirelink(),HDD_TYPE,HDD_NAME,Reader,ReaderUp,DiskTypes,BookTypes,DataTypes,DiskTracks,DiskSectors)
+    )  
+}
+
+function stopDiskJob() {
+    stopCmd()
+    stoptimer("doJob")
+    stoptimer("timeout")
+    #clearBuffer()
+    clearCommands()
+}
+
+function stopDiskRot() {
+    Speed = 0
+    OrigSpeed = 0
+    Started = 0
+    disableLaser()
+    DriveData = table()
+    stopCmd()
+    MoveTrack = 0
+    MoveDir = 0
+    Init = -1
+    stoptimer("timeout")
+}
+
+function stopDisk() {
+    Speed = 0
+    OrigSpeed = 0
+    Started = 0
+    disableLaser()
+    DriveData = table()
+    stopDiskJob()
+    if (!first()&!duped()) {
+        timer("clearBufferBoth",1)
+        #clearBufferBoth()
+    }
+    CurDisk = noentity()
+    #CurDiskInfo:clear()
+    CurDiskInfo[0,table] = table()
+    CurDiskInfo[1,array] = array()
+    MoveTrack = 0
+    MoveDir = 0
+    Init = 0
+}
+
+# fix for damn ENT:Think delay bug
+# IT TAKES SO MUCH TIME TO UNDERSTAND WHATS WRONG!
+function doJob() {
+    if (DelayFix==0) {
+        DelayFix = 1
+    } elseif (DelayFix==1) {
+        DelayFix = 2
+        CurReader[8] = 1        
+    } elseif (CurReader[8]==0) {
+        DelayFix = 0
+        return
+    }
+    
+    local Track = CurDiskInfo[1,array][2,number]
+    if (CurReader[4]!=Track) {
+        "moveToTrack"(Track)
+    }
+    
+    timer("doJob",1)
+}
+
+function moveToTrack(Track) {
+    local CurTrack = CurReader[4]
+    if (Track>0 & CurTrack!=Track) {
+        #[local FTrack = CurDiskInfo[0,table]["first_track",number] #CurReader[28]        
+        local CTrack = Track-FTrack
+        local Mul = 1+(CTrack-1)*0.041
+        Speed = OrigSpeed*Mul ]#
+        
+        MoveTrack = Track
+        local Pos = (CurStack ? LastPosUp : LastPos)
+        if (CurTrack!=0) { MoveDir = (Track>CurTrack ? 1 : -1) }
+        elseif (Pos<=-34) { MoveDir = -1 }
+        elseif (Pos>0) { MoveDir = 1 }
+        elseif (MoveDir==0) { MoveDir = 1 }
+    }
+}
+
+function moveToStart() {
+    MoveTrack = -1
+    MoveDir = -1
+}
+
+function changeStack() {
+    clearCommands()
+    disableLaser(CurStack)
+    CurStack = !CurStack
+    enableLaser(CurStack)
+    CurReader = (CurStack ? ReaderUp : Reader)   
+}
+
+function lastDiskIO(Sector,Track,Stack) {
+    CurDiskInfo[1,array][1,number] = Sector
+    CurDiskInfo[1,array][2,number] = Track
+    CurDiskInfo[1,array][3,number] = Stack
+}
+
+function readDiskIO(Track,Sector,Stack) {
+    if (CurStack!=Stack) {
+        changeStack()   
+    }
+    if (CurReader[4]!=Track) {
+        moveToTrack(Track)
+    }
+    CurReader[0] = 0
+    CurReader[1] = 1
+    CurReader[13] = Sector
+    CurReader[14] = Track
+    CurReader[12] = 1
+    #Reader[8] = 1
+    lastDiskIO(Sector,Track,Stack)
+    doJob()
+    #Reader[1] = 0
+    #CurDiskInfo["address",number] = Reader[6]
+}
+
+function readDiskIO() {
+    readDiskIO(CurDiskInfo[1,array][2,number],CurDiskInfo[1,array][1,number],CurDiskInfo[1,array][3,number])
+}
+
+function diskInfo() {
+    local Sectors = CurReader[26]
+    local Disk = DiskTypes[DiskTypesD[Sectors,number],table]:clone()
+    Disk["disc_ent",entity] = CurDisk
+    CurDiskInfo[0,table] = Disk
+}
+
+function writeDiskIO(Track,Sector,Stack) {
+    if (CurStack!=Stack) {
+        changeStack()   
+    }
+    if (CurReader[4]!=Track) {
+        moveToTrack(Track)
+    }
+    CurReader[0] = 1
+    CurReader[1] = 0
+    CurReader[13] = Sector
+    CurReader[14] = Track
+    CurReader[12] = 1
+    
+    #Reader[8] = 1
+    lastDiskIO(Sector,Track,Stack)
+    doJob()
+}
+
+function writeDiskIO() {
+    writeDiskIO(CurDiskInfo[1,array][2,number],CurDiskInfo[1,array][1,number],CurDiskInfo[1,array][3,number])
+}
+
+function moveTo(Sector,Track,Stack) {
+    if (CurStack!=Stack) {
+        changeStack()   
+    }
+    if (CurReader[4]!=Track) {
+        moveToTrack(Track)
+    }
+    lastDiskIO(Sector,Track,Stack)
+}
+
+function entity curDisk() {
+    return rangerOffset(ReaderEnt:toWorld(vec(0,0,15)),ReaderEnt:toWorld(vec(0,0,40))):entity()   
+}
+
+function number checkDiskIO(Args:table) {
+    if (DelayFix) {
+        runCmd("checkDiskIO",1,Args)
+        return 1
+    }
+    if (Args[2,string]=="") {
+        Args[2,number] = 1   
+    }
+    dsSendDirect(Args[-1,string],HDD_IO,Args)
+    return 0
+}
+
+function initDisk() {
+    if (DelayFix | MoveTrack) {
+        runCmd("initDisk",1)
+        return
+    }
+    local First = DriveData[-1,number]
+    if (!First) {
+        DriveData[-1,number] = 1
+        DriveData[2,number] = 1
+        DriveData[3,number] = 1
+        enableLaser(0)
+    }
+    local Move = DriveData[2,number]
+    local MoveDir = DriveData[3,number]
+    
+    local Identify = DriveData[5,number]
+    if (Identify) {
+        local CurTrack = CurReader[4]
+        local Disk = DiskTypes[DiskTypesD[CurReader[26],number],table]
+        if (CurTrack!=Disk["first_track",number] | !Disk["first_track",number]) { # | !isDiskRotating()]
+            #[DriveData[3,number] = -1
+            DriveData[4,string] = "ERROR: Can't read disk data."
+            Move = 1
+            MoveDir = -1
+            DriveData[2,number] = Move
+            disableLaser() ]#
+            if (!MoveTrack) {
+                moveToTrack(Disk["first_track",number])
+            }
+            runCmd("initDisk",1)
+            return
+        }
+        local CurSector = CurReader[3]
+        local Send = DriveData[6,number]
+        if (Identify==2) {
+            if (CurSector==4 & !Send) {
+                DriveData[6,number] = 1
+                readDiskIO(Disk["first_track",number],CurSector,0)
+            } elseif (Send) {
+                if (CurSector!=4 & CurSector!=0) {
+                    CurReader[1] = 0
+                } elseif (CurSector==0) {
+                    readDiskIO(Disk["first_track",number],CurSector,0)
+                    DriveData[5,number] = 3
+                }
+            }
+        } elseif (Identify==3) {
+            if (CurSector!=0) {
+                CurReader[1] = 0
+                if (CurReader[516]==0xBF) {
+                    DriveData[3,number] = -1
+                    DriveData[4,string] = "ERROR: Write bug detected."+NL+"Please update your wiremod."
+                    Move = 1
+                    MoveDir = -1
+                    DriveData[2,number] = Move
+                    DriveData[5,number] = 0
+                    disableLaser()
+                    BugTest = 2
+                } else {
+                    BugTest = 0
+                    DriveData[5,number] = 1
+                    DriveData[6,number] = 1
+                }                
+            }
+        } elseif (Send & CurSector!=0) {
+            if (BugTest==1) {
+                DriveData[5,number] = 2
+                DriveData[6,number] = 0
+                CurReader[1] = 0
+                CurReader[516] = 0xBF
+            } else {
+                DriveData[5,number] = 0
+                DriveData[6,number] = 0
+                local Data = DriveData[1,table]
+                Data[1,string] = "OK"
+                diskInfo()
+                dsSendDirect("read_disk",HDD_IO,Data)
+                stopDiskJob()
+                Init = 1
+                return
+            }
+        } elseif (CurSector==0) {
+            if (!Send & !BugTest) {
+                DriveData[6,number] = 1
+                readDiskIO(Disk["first_track",number],CurSector,0)
+            } elseif(BugTest) {
+                if (Send & DriveData[7,number]==0) {
+                    DriveData[7,number] = 1
+                    CurReader[516] = 0
+                    writeDiskIO(Disk["first_track",number],CurSector,0)
+                } elseif (Send & DriveData[7,number]==1) {
+                    DriveData[7,number] = 2
+                    readDiskIO(Disk["first_track",number],CurSector,0)
+                } elseif(!Send) {
+                    DriveData[6,number] = 1
+                    readDiskIO(Disk["first_track",number],CurSector,0)
+                }
+            }
+        }
+    }
+    
+    if (Move) {
+        if (-LastPos>12) {
+            DriveData[3,number] = -1
+            DriveData[4,string] = "ERROR: No disc inserted."
+            disableLaser()
+        } elseif (MoveDir==-1 & -LastPos<=0) {
+            local Data = DriveData[1,table]
+            Data[1,string] = DriveData[4,string]
+            dsSendDirect("read_disk",HDD_IO,Data)
+            stopDisk()
+            return
+        }
+        if (CurReader[4]!=0 & MoveDir==1) {
+            CurDisk = curDisk()
+            if (CurDisk:type()!="gmod_wire_cd_disk" | !CurDisk:model():find("models/venompapa/wirecd_")) {
+                DriveData[3,number] = -1
+                DriveData[4,string] = "ERROR: Incorrect disc inserted."
+                MoveDir = -1
+                disableLaser()
+            } else { 
+                local Density = CurReader[25]
+                local Tracks = CurReader[27]
+                local Sectors = CurReader[26]
+                #print(Density,Tracks,Sectors)
+                if (DiskTypesD[Sectors,number]) {
+                    local Disk = DiskTypes[DiskTypesD[Sectors,number],table]
+                    if (Density==Disk["density",number] & Tracks==Disk["raw_tracks",number] & CurDisk:model()==Disk["model",string]) {
+                        if (CurReader[4]==Disk["first_track",number]) {
+                            Move = 0
+                            DriveData[2,number] = Move
+                            DriveData[5,number] = 1
+                            Speed = Disk["max_speed",number]
+                            OrigSpeed = Speed
+                        }
+                    } else {
+                        DriveData[3,number] = -1
+                        DriveData[4,string] = "ERROR: Incorrect disc geometry."
+                        MoveDir = -1
+                        disableLaser()
+                    }
+                } else {
+                    DriveData[3,number] = -1
+                    DriveData[4,string] = "ERROR: Incorrect disc geometry."
+                    MoveDir = -1
+                    disableLaser()
+                }
+            }
+        }
+    }
+    if (Move) {
+        local PosAdd = -ReaderSpeed*tickInterval()*MoveDir
+        LastPos += PosAdd         
+    }
+    runCmd("initDisk",1)
+}
+
+function readDisk() {
+    if (!Started) {
+        CurStack = 0
+        CurReader = Reader
+        clearCommands()
+        lastDiskIO(0,0,0)
+        Started = 1
+        Speed = DiskSpeed
+        OrigSpeed = Speed
+        runCmd("readDisk",1200,1)
+        if (LastPos!=0) {
+            moveToStart()  
+        }
+        
+        HolderEnt:propFreeze(0)
+        Wheel:propFreeze(0) 
+        
+        #[Wheel:soundPlay(0,0,"ambient/machines/spin_loop.wav")
+        soundPitch(0,0)
+        soundVolume(0,0.2)
+        ]#
+    } else {
+        if (BugTest==2) {
+            local Data = DriveData[1,table]
+            Data[1,string] = "ERROR: Write bug detected."+NL+"Please update your wiremod."
+            dsSendDirect("read_disk",HDD_IO,Data)
+            stopDisk()
+        } elseif (!isDiskRotating() & !DisableRot) {
+            local Data = DriveData[1,table]
+            Data[1,string] = "ERROR: Failed to rotate disk."
+            dsSendDirect("read_disk",HDD_IO,Data)
+            stopDisk()
+        } elseif (Init==1 & CurDisk==curDisk()) {
+            local Data = DriveData[1,table]
+            Data[1,string] = "OK"
+            dsSendDirect("read_disk",HDD_IO,Data)
+        } else {
+            initDisk()
+        }
+    }
+}
+
+stopDisk()
+
+calcTracks()
+
+}
+#[ still not work
+if (dupefinished()) {
+    HolderEnt:propFreeze(0)
+    Wheel:propFreeze(0)   
+} ]#

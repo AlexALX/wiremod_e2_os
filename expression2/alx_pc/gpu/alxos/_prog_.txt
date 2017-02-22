@@ -12,6 +12,14 @@ if (INCLUDE) {
  
 #include "alx_pc/gpu/alxos/_main_"
 
+function alxos_execute(Name:string) {
+    if (ALXOS_PROGS:exists(Name)) {
+        Name()   
+    } else {
+        "alxos_explorer_error"("Function "+Name+" is missing.")
+    }
+}
+
 function alxos_execute(Name:string,Args:table) {
     if (ALXOS_PROGS:exists(Name)) {
         Name(Args)   
@@ -35,5 +43,13 @@ function alxos_bmp_reader(Args:table) {
     INCLUDE = 0
     alxos_bmp_init(Args)
 }   
+
+ALXOS_PROGS["alxos_cd_burner",number] = 1
+function alxos_cd_burner(Args:table) {
+    INCLUDE = 1
+    #include "alx_pc/gpu/alxos/cdburn"
+    INCLUDE = 0
+    alxos_burner_init(Args)
+}
     
 }

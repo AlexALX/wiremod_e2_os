@@ -1,7 +1,7 @@
 @name Main shared func
 #@inputs NB:string
 @persist SharedTimers:table SharedTimerIndex SharedDS:array SharedDSIndex
-@persist NB:string
+@persist NB:string NL:string TickQuota DEBUG INCLUDE
 
 #[
 	ALX Wiremod E2 PC
@@ -11,7 +11,15 @@
 ]#
 
 if (first()|duped()) {
- 
+
+if (TickQuota==0) { TickQuota = maxquota() }
+
+DEBUG = 0
+
+INCLUDE = 0
+
+NL = toChar(10) # new line char
+
 function registerTimers(Name:string,FName:string) {
     #SharedTimerIndex++
     SharedTimers[Name,string] = FName
@@ -59,6 +67,46 @@ function string byte2strraw(Num, Limit) {
     }
     return Ret
 }
+
+function number trailingZeros(N) {
+    if(N==0) { return 32 }
+    local S = 0
+    while (N>0) {
+        local Rest=mod(N,2)
+        if (Rest==0) {
+            S++   
+        } else {
+            break
+        }
+        N=(N-Rest)/2
+    }
+    return S
+}
+
+function number checkPerf(Min) {
+    #local Quota = (softQuota()>TickQuota ? TickQuota-(10000-Min) : softQuota() )
+    #print(opcounter(),minquota(),maxquota())
+    #if (opcounter() > Quota) {
+    if (Min+500>maxquota()) {
+        return 0
+    }
+    return 1
+}
+
+function number checkPerf() {
+    return checkPerf(13500)
+}
+
+function tbl_merge(Tbl:table,Tbl2:table) {
+    foreach(K,V:number=Tbl2) {
+        Tbl[K,number] = V
+    }
+    foreach(K,V:string=Tbl2) {
+        Tbl[K,string] = V
+    }
+}
+
+#trailingZeros(3840)
 
 #print(byte2strraw(str2byte("|"+NB+"|"),4))
 

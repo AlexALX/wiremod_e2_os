@@ -20,7 +20,7 @@
         Support file creation/modify/access time as unix stamp.		
 ]#
 
-if (first()|duped()) {
+if (INCLUDE) {
     
 #include "alx_pc/hdd/_main_"
 #include "alx_pc/shared/cmdqueue"
@@ -257,10 +257,17 @@ function number wm1_mkfs(Args:table) {
     local Size = Args[4,number]
     local CSize = Args[5,number]
     local Name = Args[6,string]
-     
+    local BootFunc = Args[7,string]
+        
     local Fats = WM1_Fats
     local Rsv = WM1_Rsv
     if (wm1_mkfs_check(array(Size,CSize))!="") { return 0 }
+    
+    if (!FsTbl:count()) {
+        mkfstbl(HDD)
+        FsTbl = readfstbl(HDD)
+    }
+    if (Index==-1) { Index = findfreetbl(FsTbl) }
     
     local TSz = Size - Rsv
     local Tmp = floor(TSz/CSize)
@@ -280,9 +287,9 @@ function number wm1_mkfs(Args:table) {
     local Rdc = 2 # root dir cluster
     
     writeCell(HDD,St,str2byte("WM1")) 									            # [4 bytes - fs str id]
-    writeCell(HDD,St+1,0)                                  # [4 bytes - boot part1]
-    writeCell(HDD,St+2,0)                                  # [4 bytes - boot part2]
-    writeCell(HDD,St+3,0)                                  # [4 bytes - boot part3]
+    writeCell(HDD,St+1,str2byte(BootFunc:sub(0,4)))        # [4 bytes - boot part1]
+    writeCell(HDD,St+2,str2byte(BootFunc:sub(5,8)))        # [4 bytes - boot part2]
+    writeCell(HDD,St+3,str2byte(BootFunc:sub(9,12)))       # [4 bytes - boot part3]
     writeCell(HDD,St+4,Rsv + (CSize-1 << 16)) 							      # [2 bytes - reserved sectors] [2 bytes - sectors in cluster]
     writeCell(HDD,St+5,Fats + (FatSz << 8) + (1 << 24)) 			# [1 byte - FAT tables] [2 bytes - sectors for FAT] [1 byte - physical disk ID]
     writeCell(HDD,St+6,str2byte(MD) + (Cst << 16))						   # [2 bytes - media descriptor] [2 bytes - total clusters]
@@ -379,7 +386,9 @@ function number cmd_wm1_mkfs(CmdData:table) {
     return 1
 }
 
-function table wm1_readfs(HDD:table,FsTbl:table) {
+function table wm1_readfs(Args:table) {
+    local HDD = Args[1,table]
+    local FsTbl = Args[2,table]
     if (!FsTbl:count() | !FsTbl["total",number]) { return table() }
     local FsInfo = table()
     if (FsTbl["type",number]!=2) { return table() } # not supported FS
@@ -586,7 +595,11 @@ function number wm1_findfileindiroffset(FS:table,Dir,File) {
     return 0
 } ]#
 
-function wm1_listdir(FS:table,Dir,Sd) {
+function wm1_listdir(Args:table) {
+    local FS = Args[1,table]
+    local Dir = Args[2,number]
+    local Sd = Args[3,number]
+    
     if (Sd>0&Dir!=FS["root_dir_cluster",number]) {
         writeCell(FS["hddinfo",table],Sd+5,time())   
     } 
@@ -715,7 +728,10 @@ function number wm1_fileexists(FS:table,Sc,File) {
     return 0  
 } 
 
-function wm1_removefile(FS:table,C,Sc) {
+function wm1_removefile(Args:table) {
+    local FS = Args[1,table]
+    local C = Args[2,number]
+    local Sc = Args[3,number]
     local Tmp = wm1_readfatcluster(FS,C)
     local Task = 0
     if (CurTask:count()) { Task = 1 }
@@ -763,7 +779,10 @@ function number cmd_wm1_removefile(CmdData:table) {
     return 1       
 }
 
-function number wm1_rawreadfile(FS:table,C,Sd) {
+function number wm1_rawreadfile(Args:table) {
+    local FS = Args[1,table]
+    local C = Args[2,number]
+    local Sd = Args[3,number]
     if (C<2) { return 0 } 
     local Tmp = wm1_readfatcluster(FS,C)
     if (Tmp==0) { return 0 }
@@ -818,10 +837,14 @@ function number cmd_wm1_findcluster(CmdData:table) {
 }
 
 function number wm1_readfile(FS:table,File:table) {
-    return "wm1_readfile"(FS,File,0,0)[number]  
+    return "wm1_readfile"(table(FS,File,0,0))[number]  
 }
 
-function number wm1_readfile(FS:table,File:table,Start,End) {
+function number wm1_readfile(Args:table) {
+    local FS = Args[1,table]
+    local File = Args[2,table]
+    local Start = Args[3,number]
+    local End = Args[4,number]
     local C = File["cluster",number]
     local Sd = File["data_sector",number]
     if (C<2) { return 0 } 
@@ -882,7 +905,7 @@ function number cmd_wm1_readfile(CmdData:table) {
         
         CmdData[7,number] = ceil(End/FS["bytes_in_sector",number]) #EndC*FS["sectors_in_cluster",number]
         
-        CurTask[2,number] = CmdData[7,number]
+        CurTask[1,number] = CmdData[7,number]
         #[if (CmdData[7,number]<0) {
             CmdResult[1,number] = -1
             return 0   
@@ -962,7 +985,7 @@ function number cmd_wm1_readfile(CmdData:table) {
 }
 
 function number wm1_readfile_old(FS:table,File:table) {
-    local Ret = wm1_rawreadfile(FS,File["cluster",number],File["data_sector",number])
+    local Ret = wm1_rawreadfile(table(FS,File["cluster",number],File["data_sector",number]))
     if (Ret==0) { return Ret }
     elseif (Ret==-1) { 
         CmdDelay = 1
@@ -1020,13 +1043,17 @@ function number cmd_wm1_rawreadfile(CmdData:table) {
     local Max = CmdData[6,number]
     local II = CmdData[7,number]
     local I = CmdData[8,number]
-    local SI = Ret:count()+1
+    local SI = CmdData[10,number]
+    if (!SI) { SI++ }
     while(perf()) {
         if (I>Max) {
             cmdClearRes()
             CmdResult[1,array] = Ret
             CmdResult[2,number] = CmdData[9,number]
-            return 0   
+            if (!CurTask[-1,number]) {
+                CurTask = table()   
+            }
+            return 0
         }
         if (II==FS["sectors_in_cluster",number]) {
             II = 0
@@ -1039,26 +1066,38 @@ function number cmd_wm1_rawreadfile(CmdData:table) {
         Ret[SI, number] = readCell(FS["hddinfo",table],O)
         II++
         SI++ 
-        I++  
+        I++
     }
     CmdData[2,number] = C
     CmdData[4,number] = Of
     CmdData[7,number] = II
     CmdData[8,number] = I
+    CurTask[1,number] = Max
+    CurTask[2,number] = I
+    CmdData[10,number] = SI
     return 1
 }
 
-function number wm1_rawwritefile(FS:table,C,Sd,Data:array,Fsz) {
+function number wm1_rawwritefile(Args:table) {
+    local FS = Args[1,table]
+    local C = Args[2,number]
+    local Sd = Args[3,number]
+    local Data = Args[4,array]
+    local Fsz = Args[5,number]    
     if (C<2) { return 0 }
     #CmdCallback = table("wm1_rawwritefile_CmdCallback",table(FS,C,Sd,Data,Fsz,0))
     CmdDelay = 1
     wm1_getsize(FS,C)
     CmdAdd2Queue = 1
-    cmdRun("wm1_rawwritefile_Callback",table(FS,C,Sd,Data,Fsz,0))
+    cmdRun("wm1_rawwritefile",table(FS,C,Sd,Data,Fsz,0))
     return 1
 }
 
-function number wm1_writefile(FS:table,C,Sd,Data:string) {
+function number wm1_writefile(Args:table) {
+    local FS = Args[1,table]
+    local C = Args[2,number]
+    local Sd = Args[3,number]
+    local Data = Args[4,string]
     if (C<2) { return 0 }
     CurTask[1,number] = 1
     CmdDelay = 1    
@@ -1097,7 +1136,7 @@ function number cmd_wm1_writefile(CmdData:table) {
         CmdData[7,number] = Max
         CurTask[2,number] = Max
         #CmdCallback = table("wm1_rawwritefile_CmdCallback",Args)
-        wm1_removefile(FS,C,0)
+        wm1_removefile(table(FS,C,0))
     } elseif (Step==2) {
         CmdData[4,number] = 3
         wm1_updatefat(FS,C,0xFFFF)
@@ -1172,7 +1211,7 @@ function number wm1_writefile_old(FS:table,C,Sd,Data:string) {
 function number cmd_wm1_writefile_callback(CmdData:table) {
     local Data = CmdResult[1,array]    
     CmdAdd2Queue = 1
-    wm1_rawwritefile(CmdData[1,table],CmdData[2,number],CmdData[3,number],Data,CmdData[4,number])
+    wm1_rawwritefile(table(CmdData[1,table],CmdData[2,number],CmdData[3,number],Data,CmdData[4,number]))
     CmdAdd2Queue = 1
     cmdRun("wm1_writefile_finish",table())
     return 0
@@ -1203,10 +1242,10 @@ function number cmd_wm1_convData(CmdData:table) {
     return 1
 }
     
-function number cmd_wm1_rawwritefile_Callback(Args:table) {
+function number cmd_wm1_rawwritefile(Args:table) {
     local Write = Args[0,number]
     if (Write) {
-        return "cmd_wm1_rawwritefile"(Args)[number]
+        return "cmd_wm1_rawwritefile_Callback"(Args)[number]
     }
     local FS = Args[1,table]
     local C = Args[2,number]
@@ -1231,7 +1270,7 @@ function number cmd_wm1_rawwritefile_Callback(Args:table) {
         Args[6,number] = 1
         Args[7,number] = Max
         #CmdCallback = table("wm1_rawwritefile_CmdCallback",Args)
-        wm1_removefile(FS,C,0)
+        wm1_removefile(table(FS,C,0))
         return 1
     } elseif (Step==1) {
         Args[6,number] = 2
@@ -1261,6 +1300,7 @@ function number cmd_wm1_rawwritefile_Callback(Args:table) {
         Args[6,number] = 0
         Args[7,number] = 1
         Args[8,number] = 0
+        CurTask[1,number] = Max
         return 1
     }
 }
@@ -1288,7 +1328,7 @@ function number cmd_wm1_rawwritefile_helper(CmdData:table) {
     return 0
 }
 
-function number cmd_wm1_rawwritefile(CmdData:table) {
+function number cmd_wm1_rawwritefile_Callback(CmdData:table) {
     local FS = CmdData[1,table]
     local C = CmdData[2,number]
     local Data = CmdData[3,array]
@@ -1303,11 +1343,17 @@ function number cmd_wm1_rawwritefile(CmdData:table) {
     }]#
     while(perf()) {
         if (I>Max) { #I=1,Max
+            if (!CurTask[-1,number]) {
+                CurTask = table()
+            }
+            cmdClearRes()
+            CmdResult[1,number] = 1
             return 0 
         }
         if (II==FS["sectors_in_cluster",number]) {
             CmdData[6,number] = 0
             CmdData[7,number] = I
+            CurTask[2,number] = I
             #CmdDelay = 1
             #print("HEY"+I)
             cmdRun("wm1_rawwritefile_helper",CmdData)
@@ -1320,10 +1366,17 @@ function number cmd_wm1_rawwritefile(CmdData:table) {
     }
     CmdData[6,number] = II
     CmdData[7,number] = I
+    CurTask[2,number] = I
     return 1        
 }
 
-function number wm1_mkfile(FS:table,Name:string,Ext:string,Is_Dir,Dir) {
+function number wm1_mkfile(Args:table) {
+    local FS = Args[1,table]
+    local Name = Args[2,string]
+    local Ext = Args[3,string]
+    local Is_Dir = Args[4,number]
+    local Dir = Args[5,number]
+    
     local Tmp = wm1_direxists(FS,Dir)
     if (!Tmp) { return 0 } # dir not exists
     cmdRun("wm1_mkfile",table(FS,0,0,Name,Ext,Is_Dir,Dir))
@@ -1401,7 +1454,7 @@ function number cmd_wm1_mkfile(CmdData:table) {
         local C = CmdData[8,number]
         local O = CmdData[9,number]
         
-        Name = Name:sub(0,12)
+        Name = Name:sub(0,10)
         writeCell(FS["hddinfo",table],O,str2byte(Name:sub(0,4)))					              # [4 bytes - name part1]
         writeCell(FS["hddinfo",table],O+1,str2byte(Name:sub(5,8)))                 # [4 bytes - name part2]
         writeCell(FS["hddinfo",table],O+2,str2byte(Name:sub(9,10)) + (C << 16))		  # [2 bytes - name part3] [2 bytes - first cluster]
@@ -1458,6 +1511,26 @@ function number cmd_wm1_mkfile(CmdData:table) {
         }
     } 
     return 0
+}
+
+function wm1_rename(Args:table) {
+    local FS = Args[1,table]
+    local Entry = Args[2,table]
+    local Name = Args[3,string]:sub(0,10)
+    local Ext = Args[4,string]
+    
+    local O = Entry["data_sector",number]
+    local C = Entry["cluster",number]
+    local Attr = Entry["attr",number]
+    
+    if (O<WM1_Rsv) { return }
+    
+    writeCell(FS["hddinfo",table],O,str2byte(Name:sub(0,4)))					              # [4 bytes - name part1]
+    writeCell(FS["hddinfo",table],O+1,str2byte(Name:sub(5,8)))                 # [4 bytes - name part2]
+    writeCell(FS["hddinfo",table],O+2,str2byte(Name:sub(9,10)) + (C << 16))		  # [2 bytes - name part3] [2 bytes - first cluster]
+    writeCell(FS["hddinfo",table],O+3,str2byte(Ext:sub(0,3)) + (Attr << 24))   # [3 bytes - file extension] [1 byte - attributes]
+    writeCell(FS["hddinfo",table],O+5,time())											                       # [4 bytes - last access time]
+    writeCell(FS["hddinfo",table],O+6,time())											                       # [4 bytes - modify time] 
 }
 
 #[# Command Complete handler

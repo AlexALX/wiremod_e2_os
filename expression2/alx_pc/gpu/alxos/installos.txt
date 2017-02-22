@@ -1,5 +1,5 @@
 @name Install OS GPU
-@persist IOS_FsTbl:table
+@persist IOS_FsTbl:table IO_Tmp:table
 
 #[
 	ALX Wiremod E2 OS
@@ -12,11 +12,12 @@ if (INCLUDE) {
  
 #include "alx_pc/gpu/_main_"
 #include "alx_pc/shared/_main_"
+#include "alx_pc/shared/cmd"
 
 function installheader() {
     EGP:egpBox(LAST_I,vec2(0,0),vec2(512,512))
     EGP:egpColor(LAST_I,0,0,168,255) LAST_I++
-    
+
     EGP:egpText(LAST_I,"ALX Wiremod E2 OS - Setup",vec2(10,20))
     EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
     
@@ -39,9 +40,15 @@ function number installfooter(Str:string) {
 }
 
 function number installos(Args:table) {
-    local Step = Args[1,number]
+    if (!checkPerf(8000)) {
+        IO_Tmp = Args
+        timer("installos",1)   
+        return 1
+    }
+    
+    local Step = Args[1,string]
 
-    if (Step==0) {
+    if (Step=="welcome") {
         
     hddload(0)        
     egpClear()
@@ -68,9 +75,9 @@ function number installos(Args:table) {
     installfooter("ENTER=Continue    F3=Quit")
     
     INSTALL = 1
-    if (DEBUG) { runCmd("installos",1,table(1)) }
+    if (DEBUG) { runCmd("installos",1,table("pre_hdds")) }
     
-    } elseif (Step==1) {
+    } elseif (Step=="pre_hdds") {
     
     egpClear()
     installheader()
@@ -86,20 +93,28 @@ function number installos(Args:table) {
     EGP:egpText(LAST_I,"Use the UP and DOWN ARROW keys to select an item in the list.",vec2(20,Y))
     EGP:egpColor(LAST_I,168,168,168,255) LAST_I++ Y+=30
      
-    EGP:egpText(LAST_I,"* To set up ALX Wiremod E2 OS on the selected item, press ENTER.",vec2(30,Y))
+    EGP:egpText(LAST_I,"* To set up ALX Wiremod E2 OS on the selected item, press ENTER.",vec2(20,Y))
     EGP:egpColor(LAST_I,168,168,168,255) LAST_I++ Y+=18
     
-    EGP:egpText(LAST_I,"* To create a partition in the unpartitioned space, press C.",vec2(30,Y))
+    EGP:egpText(LAST_I,"* To create a partition in the unpartitioned space, press C.",vec2(20,Y))
     EGP:egpColor(LAST_I,168,168,168,255) LAST_I++ Y+=18
     
-    EGP:egpText(LAST_I,"* To delete selected partition, press D.",vec2(30,Y))
+    EGP:egpText(LAST_I,"* To delete selected partition, press D.",vec2(20,Y))
     EGP:egpColor(LAST_I,168,168,168,255) LAST_I++ Y+=18
     
-    EGP:egpText(LAST_I,"* To format selected disk, press F.",vec2(30,Y))
+    EGP:egpText(LAST_I,"* To format selected disk, press F.",vec2(20,Y))
     EGP:egpColor(LAST_I,168,168,168,255) LAST_I++ Y+=30
+
+    GpuData[-1,number] = LAST_I
+    EGP:egpBox(LAST_I,vec2(20,Y),vec2(472,492-Y-20))
+    EGP:egpOrder(LAST_I,1)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
 
     EGP:egpBoxOutline(LAST_I,vec2(20,Y),vec2(472,492-Y-20))
     EGP:egpColor(LAST_I,168,168,168,255) LAST_I++ Y+=5
+    
+    EGP:egpText(LAST_I,"Loading...",vec2(30,Y))
+    EGP:egpColor(LAST_I,168,168,168,255)
     
     LAST_Y = Y
     
@@ -109,37 +124,49 @@ function number installos(Args:table) {
     #installos(table(2))
     return 0
       
-    } elseif (Step==2) {
+    } elseif (Step=="hdds") {
 
     #local Tbl = dsGetTable()
     local FsTbl = dsGetTable() #Tbl[2,table]
     IOS_FsTbl = FsTbl
-    
+    #printTable(FsTbl)
     #HDDInfo = Tbl[1,array]
-    local Y = LAST_Y
+    local Y = 5 #LAST_Y
+    
+    local Parent = GpuData[-1,number]
+    local Size = EGP:egpSize(Parent)
+    local Spos = vec2(Size[1]/2*(-1)+10,Size[2]/2*(-1))
     
     local CurIndex = 1 #GpuData[2,number]
     if (CurIndex==0) { CurIndex = 1 }
     
     GpuData[2,number] = LAST_I
-    EGP:egpBox(LAST_I,vec2(40,Y+20),vec2(432,20))
+    GpuData[-2,number] = Spos[2]
+    GpuData[-3,number] = Spos[2]
+    GpuData[-4,vector2] = EGP:egpPos(Parent)
+    EGP:egpBox(LAST_I,Spos+vec2(10,Y+20),vec2(432,20))
+    EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
     
     local IndexTbl = table()
     local Index = 1
+    local TotalI = 0
     
-    for (I=1,HDDS:count()) {
+    for (I=1,HDD_MAX) {
         local HDDInfo = HDDS[I,table]
+        if (!HDDInfo:count() | HDDInfo["type",number]!=0) { continue }
         local Sz = (HDDInfo["size",number]*HDDInfo["sector_size",number])/1024
-        
-        EGP:egpText(LAST_I,Sz+" KB Disk "+(I-1)+" at Id 0 on bus 0 on atapi [MBR]",vec2(30,Y))
+        TotalI++
+        EGP:egpText(LAST_I,Sz+" KB Disk "+(I-1)+" at Id 0 on bus 0 on atapi [MBR]",Spos+vec2(0,Y))
+        EGP:egpParent(LAST_I,Parent)
+        if (Y>225) { EGP:egpPos(LAST_I,EGP:egpPos(LAST_I)+vec2(-1024,0)) }
         EGP:egpColor(LAST_I,168,168,168,255) LAST_I++ Y+=20
         
-        local HDDIndex = 1        
         if (FsTbl[I,table]:count()) {            
             local FsItemTbl = FsTbl[I,table]
             local SzF = HDDInfo["fs_max_size",number]
             local LastSpace = HDDInfo["fs_tbl_size",number]
+            local II = 1
             for(C=0,FsItemTbl:count()-1) {
                 local Item = FsItemTbl[C,table]
                 if (Item["total",number]>0) {
@@ -147,25 +174,34 @@ function number installos(Args:table) {
                         local Col = vec4(168,168,168,255)
                         if (Index==CurIndex) { 
                             Col = vec4(0,0,168,255) 
-                            local BOXID = GpuData[2,number]
-                            EGP:egpPos(BOXID,vec2(40,Y))
+                            #local BOXID = GpuData[2,number]
+                            #EGP:egpPos(BOXID,vec2(40,Y))
                         }
                         
                         local SzT = Item["start",number]-LastSpace
                         
                         local Sz = SzT*HDDInfo["sector_size",number]
                     
-                        IndexTbl[Index,array] = array(I,LAST_I,Y,Sz,C-1,0,HDDIndex) Index++ HDDIndex++
-                        EGP:egpText(LAST_I,"Unpartitioned space",vec2(60,Y))
+                        if (FsItemTbl[C-1,table]["start",number]!=0) {
+                            Col = vec4(100,100,100,255)   
+                        } else {
+                            IndexTbl[Index,array] = array(I,LAST_I,Spos[2]+Y,Sz,C-1,0) Index++
+                        }
+                        EGP:egpText(LAST_I,"Unpartitioned space",Spos+vec2(30,Y))
+                        EGP:egpParent(LAST_I,Parent)
+                        if (Y>225) { EGP:egpPos(LAST_I,EGP:egpPos(LAST_I)+vec2(-1024,0)) }
                         EGP:egpColor(LAST_I,Col) LAST_I++
                         
                         local SzS = Sz+" Bytes" 
                         if (Sz/1024>1) {
                             SzS = floor(Sz/1024,2)+" KB"
                         }                
-                        EGP:egpText(LAST_I,SzS,vec2(360,Y))
+                        EGP:egpText(LAST_I,SzS,Spos+vec2(330,Y))
+                        EGP:egpParent(LAST_I,Parent)
+                        if (Y>225) { EGP:egpPos(LAST_I,EGP:egpPos(LAST_I)+vec2(-1024,0)) }
                         EGP:egpColor(LAST_I,Col) LAST_I++ Y+=20
                         SzF -= SzT
+                        II++
                     }
                     LastSpace = Item["end",number]
                     SzF -= Item["total",number]
@@ -185,8 +221,10 @@ function number installos(Args:table) {
                     
                     local Sz = Item["total",number]*HDDInfo["sector_size",number]
                     
-                    IndexTbl[Index,array] = array(I,LAST_I,Y,Sz,C,Item["type",number],HDDIndex) Index++ HDDIndex++
-                    EGP:egpText(LAST_I,"Partition"+C+" ["+FName+"]",vec2(60,Y))
+                    IndexTbl[Index,array] = array(I,LAST_I,Spos[2]+Y,Sz,C,Item["type",number]) Index++
+                    EGP:egpText(LAST_I,"Partition"+C+" ["+FName+"]",Spos+vec2(30,Y))
+                    EGP:egpParent(LAST_I,Parent)
+                    if (Y>225) { EGP:egpPos(LAST_I,EGP:egpPos(LAST_I)+vec2(-1024,0)) }
                     EGP:egpColor(LAST_I,Col) LAST_I++
                     
                     local SzS = Sz+" Bytes" 
@@ -194,9 +232,11 @@ function number installos(Args:table) {
                         SzS = floor(Sz/1024,2)+" KB"
                     }
                     
-                    EGP:egpText(LAST_I,SzS,vec2(360,Y))
+                    EGP:egpText(LAST_I,SzS,Spos+vec2(330,Y))
+                    EGP:egpParent(LAST_I,Parent)
+                    if (Y>225) { EGP:egpPos(LAST_I,EGP:egpPos(LAST_I)+vec2(-1024,0)) }
                     EGP:egpColor(LAST_I,Col) LAST_I++ Y+=20
-                    
+                    II++
                 }
             }
             if (SzF>0) {
@@ -205,14 +245,16 @@ function number installos(Args:table) {
                 
                 local Sz = SzF*HDDInfo["sector_size",number]
             
-                if (HDDIndex<5) {
+                if (II<5) {
                     local N = -1
-                    if (HDDIndex>0) { N = HDDIndex-1 }
-                    IndexTbl[Index,array] = array(I,LAST_I,Y,Sz,N,0,HDDIndex) Index++ HDDIndex++
+                    if (II>0) { N = II-1 }
+                    IndexTbl[Index,array] = array(I,LAST_I,Spos[2]+Y,Sz,N,0) Index++
                 } else {
                     Col = vec4(100,100,100,255)
                 }
-                EGP:egpText(LAST_I,"Unpartitioned space",vec2(60,Y))
+                EGP:egpText(LAST_I,"Unpartitioned space",Spos+vec2(30,Y))
+                EGP:egpParent(LAST_I,Parent)
+                if (Y>225) { EGP:egpPos(LAST_I,EGP:egpPos(LAST_I)+vec2(-1024,0)) }
                 EGP:egpColor(LAST_I,Col) LAST_I++
                 
                 if (SzF==HDDInfo["fs_max_size",number]) {
@@ -222,8 +264,11 @@ function number installos(Args:table) {
                 local SzS = Sz+" Bytes" 
                 if (Sz/1024>1) {
                     SzS = floor(Sz/1024,2)+" KB"
-                }                
-                EGP:egpText(LAST_I,SzS,vec2(360,Y))
+                }
+                          
+                EGP:egpText(LAST_I,SzS,Spos+vec2(330,Y))
+                EGP:egpParent(LAST_I,Parent)
+                if (Y>225) { EGP:egpPos(LAST_I,EGP:egpPos(LAST_I)+vec2(-1024,0)) }
                 EGP:egpColor(LAST_I,Col) LAST_I++ Y+=20
             }
         } else {        
@@ -234,26 +279,40 @@ function number installos(Args:table) {
                 Col = vec4(100,100,100,255)
                 Txt = "Disk Error"
             } else {
-                IndexTbl[Index,array] = array(I,LAST_I,Y,HDDInfo["fs_max_size",number]*HDDInfo["sector_size",number],-1,0,HDDIndex) 
-                Index++ HDDIndex++
+                IndexTbl[Index,array] = array(I,LAST_I,Spos[2]+Y,HDDInfo["fs_max_size",number]*HDDInfo["sector_size",number],-1,0) 
+                Index++
             }
                         
             local Sz = HDDInfo["size",number]*HDDInfo["sector_size",number]
             
-            EGP:egpText(LAST_I,Txt,vec2(60,Y))
+            EGP:egpText(LAST_I,Txt,Spos+vec2(30,Y))
+            EGP:egpParent(LAST_I,Parent)
+            if (Y>225) { EGP:egpPos(LAST_I,EGP:egpPos(LAST_I)+vec2(-1024,0)) }
             EGP:egpColor(LAST_I,Col) LAST_I++
             
             local SzS = Sz+" Bytes" 
             if (Sz/1024>1) {
                 SzS = floor(Sz/1024,2)+" KB"
-            }   
-            EGP:egpText(LAST_I,SzS,vec2(360,Y))
+            }        
+            EGP:egpText(LAST_I,SzS,Spos+vec2(330,Y))
+            EGP:egpParent(LAST_I,Parent)
+            if (Y>225) { EGP:egpPos(LAST_I,EGP:egpPos(LAST_I)+vec2(-1024,0)) }
             EGP:egpColor(LAST_I,Col) LAST_I++ Y+=20
         }    
     }
     
+    if (!TotalI) {
+        LAST_I--
+        EGP:egpText(LAST_I,"No hard drives found.",Spos+vec2(0,Y))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,168,168,168,255) LAST_I++ Y+=20
+        
+        FooterStr = "F3=Quit"
+    }
+    
     GpuData[3,table] = IndexTbl
     GpuData[4,number] = CurIndex
+    GpuData[-5,number] = LAST_I-1
     
     if (FooterStr=="") { FooterStr = "C=Create Partition    F=Format Disk    F3=Quit" }
     
@@ -262,14 +321,14 @@ function number installos(Args:table) {
     GpuData[5,number] = LAST_I-1
     
     #if (DEBUG) { runCmd("installos",1,table(3)) }
-    if (DEBUG) { installos(table(9)) } 
+    #if (DEBUG) { installos(table(9)) } 
         
-    } elseif (Step==3) {
+    } elseif (Step=="pre_format") {
     
     local Item = GpuData[3,table][GpuData[4,number],array]
     local Index = Item[1,number]
     local HDDInfo = HDDS[Index,table]
-    
+
     egpClear()
     installheader()
     Y = LAST_Y
@@ -293,38 +352,45 @@ function number installos(Args:table) {
     EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
     
     local Keys = FS_TYPES:keys()
+    local Items = array()
+    local ID = 1
 
     for (I=2,Keys:count()) {
-        local Item = FS_TYPES[Keys[I,number],string]
-        EGP:egpText(LAST_I,"Format the partition using the "+Item+" file system (Quick)",vec2(35,Y))
+        local ItemN = FS_TYPES[Keys[I,number],string]
+        if (ItemN=="WCD") { continue }
+        Items[ID,number] = Keys[I,number] ID++
+        EGP:egpText(LAST_I,"Format the partition using the "+ItemN+" file system (Quick)",vec2(35,Y))
         local Col = vec4(168,168,168,255)
-        if (I==2) { Col = vec4(0,0,168,255) }
+        if (ID==2) { Col = vec4(0,0,168,255) }
         EGP:egpColor(LAST_I,Col) LAST_I++ Y+=20
     }
     
     local FsItem = FS_TYPES[1,string]
+    Items[ID,number] = 1
     EGP:egpText(LAST_I,"Format the partition using the "+FsItem+" file system (Quick)",vec2(35,Y))
     local Col = vec4(168,168,168,255)
-    if (Keys:count()==1) { Col = vec4(0,0,168,255) }
+    if (ID==1) { Col = vec4(0,0,168,255) }
     EGP:egpColor(LAST_I,Col) LAST_I++ Y+=20
     
     GpuData[4,number] = 0
-    GpuData[5,number] = Keys:count()
+    GpuData[5,number] = Items:count()
     GpuData[6,table] = HDDInfo
     GpuData[7,array] = Item
+    GpuData[8,array] = Items
     
     installfooter("ENTER=Continue    F1=Cancel")
     
-    } elseif (Step==4) {
+    } elseif (Step=="format_key") {
         
-        local Key = GpuData[4,number]+2
+        local Key = GpuData[4,number]+1
         local Max = GpuData[5,number]
         if (Key>Max) { Key = 1 }
+        local Items = GpuData[8,array]
         
-        installos(table(5,Key))
+        installos(table("format_opts",Items[Key,number]))
         return 0
         
-    } elseif (Step==5) {
+    } elseif (Step=="format_opts") {
     
     local HDDInfo = GpuData[6,table]
     local IndArr = GpuData[7,array]
@@ -376,7 +442,7 @@ function number installos(Args:table) {
     GpuData[7,array] = array(LAST_I,CurSz:toString())
     EGP:egpText(LAST_I,CurSz+"_",vec2(285,Y))
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++ Y+=30
-    
+
     if (FS==2) {    
         GpuData[6,number] = 3
         
@@ -407,15 +473,15 @@ function number installos(Args:table) {
     
     installfooter("ENTER=Create    F1=Cancel")
     
-    } elseif (Step==6) {
+    } elseif (Step=="format_check") {
         local FS = FS_TYPES[GpuData[2,number],string]
         local Str = FS
         local HDDInfo = GpuData[3,table]
         local D1_V = GpuData[7,array][2,string]:toNumber()/HDDInfo["sector_size",number]
         local D2_V = GpuData[8,array][2,string]:toNumber()/HDDInfo["sector_size",number]
-    
+
         dsSendDirect("fs_mkfs_check",HDD_IO:entity(),table(entity(),Str,array(D1_V,D2_V)))
-    } elseif (Step==7) {
+    } elseif (Step=="format_check_post") {
     
     local FS = GpuData[2,number]
     local Str = FS_TYPES[FS,string]
@@ -494,6 +560,10 @@ function number installos(Args:table) {
             ERR = 1
             EGP:egpText(LAST_I,"ERROR: failed create file system, too small size for this cluster size!",vec2(20,Y))
             EGP:egpColor(LAST_I,168,168,168,255) LAST_I++ Y+=18
+        } elseif (SERR=="ERR_MAXCLUSTERSIZE") {
+            ERR = 1
+            EGP:egpText(LAST_I,"ERROR: hit maximum cluster count, cluster size is too small!",vec2(20,Y))
+            EGP:egpColor(LAST_I,168,168,168,255) LAST_I++ Y+=18
         } elseif (SERR!="") {
             ERR = 1
             EGP:egpText(LAST_I,"ERROR: "+SERR,vec2(20,Y))
@@ -504,7 +574,7 @@ function number installos(Args:table) {
     if (ERR) {
         GpuData[10,number] = LAST_I
         LAST_I = LAST_I_BAK
-        Step = 5
+        Step = "format_opts"
     } else {
         D1_V = floor(D1_V/HDDInfo["sector_size",number])
         D2_V = floor(D2_V/HDDInfo["sector_size",number])
@@ -526,7 +596,7 @@ function number installos(Args:table) {
         #dsSendDirect("") ]#
     }
     
-    } elseif (Step==8) {
+    } elseif (Step=="format") {
         local First = Args[2,number]
         if (!First) {
             #[local Index = GpuData[5,number]
@@ -630,19 +700,19 @@ function number installos(Args:table) {
                 timer("installos_format_progress",50)
             } else {
                 DEBUG = 0
-                installos(table(1))
+                installos(table("pre_hdds"))
             }
             
         }
-    } elseif (Step==9) {
+    } elseif (Step=="install") {
         local First = Args[2,number]
         if (First==0) {
             
             local IndexTbl = GpuData[3,table]
             local Index = GpuData[4,number]
             local Item = IndexTbl[Index,array]
-            local HDD = HDDS[Item[1,number],table]
             
+            local HDD = HDDS[Item[1,number],table]
             egpClear()
             
             GpuData[2,array] = Item 
@@ -697,12 +767,12 @@ function number installos(Args:table) {
             dsSendDirect("readfstbl",HDD_IO:entity(),table(entity(),HDD))
         } elseif (First==1) {
             local FsTbl = dsGetTable()
-            
-            if (!FsTbl:count()) { DEBUG = 0 installos(table(1)) return 0 }
+            if (!FsTbl:count()) { DEBUG = 0 installos(table("pre_hdds")) return 0 }
             
             local Item = GpuData[2,array]            
             local HDD = GpuData[3,table]
-            local CurFs = FsTbl[Item[7,number]-1,table]
+            
+            local CurFs = FsTbl[Item[5,number],table]
             GpuData[8,table] = CurFs    
             
             dsSendDirect("fs_readfs",HDD_IO:entity(),table(entity(),"wm1",table(HDD,CurFs)))
@@ -748,27 +818,28 @@ function number installos(Args:table) {
             local C = Ret["cluster",number]
             local Sd = Ret["data_sector",number]
             
-            local TotalFiles = 6
+            local TotalFiles = 7
             local CurFiles = GpuData[13,number]
                 
             local NL = toChar(10)
             
             if (CurFile=="boot.ini") {
-                if (IsWrite) {
+                if (C>0) {
                     CurFiles++
-                    local Root = CurFs["root_dir_cluster",number]
-                    GpuData[10,string] = "system"
-                    GpuData[11,number] = 0
-                    dsSendDirect("fs_mkfile",HDD_IO:entity(),table(entity(),"wm1",table(CurFs,"system","",1,Root)))
-                } elseif (C>0) {
                     GpuData[11,number] = 1
+                    GpuData[10,string] = "system"
                     local Str = "ALX Wiremod E2 OS"+NL+"/"+CurFs["volume_serial",number]+"/system/kernel.sys"
                     dsSendDirect("fs_writefile",HDD_IO:entity(),table(entity(),"wm1",table(CurFs,C,Sd,Str)))   
                 }
             } elseif (CurFile=="system") {
-                if (C>0) {
+                if (IsWrite) {
+                    local Root = CurFs["root_dir_cluster",number]
+                    GpuData[11,number] = 0
+                    dsSendDirect("fs_mkfile",HDD_IO:entity(),table(entity(),"wm1",table(CurFs,"system","",1,Root)))
+                } elseif (C>0) {
                     CurFiles++
                     GpuData[12,number] = C
+                    GpuData[11,number] = 0
                     GpuData[10,string] = "kernel.sys"
                     dsSendDirect("fs_mkfile",HDD_IO:entity(),table(entity(),"wm1",table(CurFs,"kernel","sys",0,C)))
                 }
@@ -776,29 +847,39 @@ function number installos(Args:table) {
                 if (IsWrite) {
                     CurFiles++
                     local SysDir = GpuData[12,number]
-                    GpuData[10,string] = "explorer.e2e"
                     GpuData[11,number] = 0
-                    dsSendDirect("fs_mkfile",HDD_IO:entity(),table(entity(),"wm1",table(CurFs,"explorer","e2e",0,SysDir)))
+                    GpuData[10,string] = "cdburner.e2e"
+                    dsSendDirect("fs_mkfile",HDD_IO:entity(),table(entity(),"wm1",table(CurFs,"cdburner","e2e",0,SysDir)))
                 } elseif (C>0) {
                     GpuData[11,number] = 1
                     local Str = "alxos_init"
                     dsSendDirect("fs_writefile",HDD_IO:entity(),table(entity(),"wm1",table(CurFs,C,Sd,Str))) 
                 }
-            } elseif (CurFile=="explorer.e2e") {
+            } elseif (CurFile=="cdburner.e2e") {
                 if (IsWrite) {
-                    CurFiles++                    
+                    CurFiles++
+                    local SysDir = GpuData[12,number]
+                    GpuData[11,number] = 0
+                    GpuData[10,string] = "explorer.e2e"
+                    dsSendDirect("fs_mkfile",HDD_IO:entity(),table(entity(),"wm1",table(CurFs,"explorer","e2e",0,SysDir)))
+                } elseif (C>0) {
+                    GpuData[11,number] = 1
+                    local Str = "alxos_cd_burner"
+                    dsSendDirect("fs_writefile",HDD_IO:entity(),table(entity(),"wm1",table(CurFs,C,Sd,Str))) 
+                }
+            } elseif (CurFile=="explorer.e2e") {
+                if (IsWrite) {   
+                    CurFiles++               
                     local Item = GpuData[2,array]
                     local HDD = GpuData[3,table]
                     
-                    GpuData[10,string] = "| Create boot loader"
                     GpuData[11,number] = 0
+                    GpuData[10,string] = "| Create boot loader"
                     
                     local ID = GpuData[7,number]
                     EGP:egpText(ID,"",EGP:egpPos(ID))
-                    
                     GpuData[7,number] = ID-1
-                    
-                    dsSendDirect("activefstbl",HDD_IO:entity(),table(entity(),HDD,Item[7,number]-1))
+                    dsSendDirect("activefstbl",HDD_IO:entity(),table(entity(),HDD,Item[5,number]))
                 } elseif (C>0) {
                     GpuData[11,number] = 1
                     local Str = "alxos_explorer"
@@ -807,15 +888,22 @@ function number installos(Args:table) {
             } elseif (CurFile=="| Create boot loader") {
                 CurFiles++
                 if (IsWrite) {
-                    runCmd("installos",250,table(10))  
+                    runCmd("installos",250,table("reboot"))
                 } else {
-                    GpuData[11,number] = 1        
+                    GpuData[11,number] = 1 
                 
                     local Item = GpuData[2,array]
                     local HDD = GpuData[3,table]
                     local CurFs = GpuData[8,table]
                                     
                     dsSendDirect("fs_mkboot",HDD_IO:entity(),table(entity(),"wm1",table(HDD,CurFs,"alxos_boot")))
+                    for (I=1,HDD_MAX) {
+                        local HDDInfo = HDDS[I,table]
+                        if (HDD==HDDInfo) {
+                            dsSendDirect("setboothdd",BIOS,I)
+                            break
+                        }
+                    }
                 } 
             }
             
@@ -840,7 +928,7 @@ function number installos(Args:table) {
             
             GpuData[13,number] = CurFiles            
         }
-    } elseif (Step==10) {
+    } elseif (Step=="reboot") {
         local First = GpuData[2,number]
         if (!First) {
             hddload(0) # wtf fix 
@@ -905,12 +993,12 @@ function number installos(Args:table) {
         runCmd("install_reboot",1000)
     }
     
-    GpuData[1,number] = Step
+    GpuData[1,string] = Step
     return 0
 }
 
 function install_reboot() {
-    installos(table(10))   
+    installos(table("reboot"))   
 }
 
 function installos_key(Key:string,Pressed) {
@@ -922,42 +1010,43 @@ function installos_key(Key:string,Pressed) {
         KeyHandler = ""
         dsSendDirect("SHUTDOWN",BIOS,0)
     } else {
-        local Step = GpuData[1,number]
-        if (Step==0) {
-            if (Key=="enter") { installos(table(1)) }
-        } elseif (Step==2) {
+        local Step = GpuData[1,string]
+        if (Step=="welcome") {
+            if (Key=="enter") { installos(table("pre_hdds")) }
+        } elseif (Step=="hdds") {
             local IndexTbl = GpuData[3,table]
             local Index = GpuData[4,number]
             local Footer = IndexTbl[Index,array][6,number]
             if (Key=="enter" & Footer==2) {
-                installos(table(9))
+                installos(table("install"))
             } elseif (Key=="c" & !Footer) {  
-                installos(table(3)) 
+                installos(table("pre_format")) 
             } elseif (Key=="d" & Footer) {
                 #installos(table(8))
                 local Item = IndexTbl[Index,array]
                 local HDD = HDDS[Item[1,number],table]
                 dsSendDirect("removefstbl",HDD_IO:entity(),table(HDD,Item[5,number]))
-                installos(table(1,Index))
+                installos(table("pre_hdds",Index))
             } elseif (Key=="f") {
                 local HDD = HDDS[IndexTbl[Index,array][1,number],table]
                 dsSendDirect("formatdisk",HDD_IO:entity(),HDD)
                 #FsTbl = table()
-                installos(table(1))
+                installos(table("pre_hdds"))
             } if (Key=="down" | Key=="up") {
                 local Ind = Index
                 local Max = IndexTbl:count()
                 if (Max<2) { return }
                 if (Key=="down") {
+                    if (Index==Max) { return } # cost of scroll
                     Index = (Index==Max ? 1 : Index+1)
                 } else {
+                    if (Index==1) { return } # cost of scroll
                     Index = (Index==1 ? Max : Index-1)
                 }
                 GpuData[4,number] = Index
                 local BOXID = GpuData[2,number]
                 local Item = IndexTbl[Index,array]
                 local Y = Item[3,number]
-                EGP:egpPos(BOXID,vec2(40,Y))
                 local ID = Item[2,number]
                 EGP:egpColor(ID,0,0,168,255)
                 EGP:egpColor(ID+1,0,0,168,255)
@@ -965,6 +1054,87 @@ function installos_key(Key:string,Pressed) {
                 EGP:egpColor(PID,168,168,168,255)
                 EGP:egpColor(PID+1,168,168,168,255)
                 
+                local LAST_Y = GpuData[-2,number]
+                local Cpos = EGP:egpPos(ID)
+                local Max = GpuData[-5,number]
+                if (Cpos[2]>LAST_Y+240) {
+                    local Parent = GpuData[-1,number]
+                    EGP:egpPos(Parent,EGP:egpPos(Parent)-vec2(0,240))
+                    GpuData[-2,number] = LAST_Y+240
+                    LAST_Y = GpuData[-2,number]
+
+                    for(I=BOXID+1,Max) {
+                        local POS = EGP:egpPos(I)
+                        if (POS[2]<LAST_Y & POS[1]>-512) {
+                            EGP:egpPos(I,EGP:egpPos(I)-vec2(1024,0))
+                        } elseif (POS[1]<-512) {
+                            EGP:egpPos(I,EGP:egpPos(I)+vec2(1024,0))
+                        }
+                    }  
+                } elseif (Cpos[1]<-512) {
+                    local Parent = GpuData[-1,number]
+                    EGP:egpPos(Parent,EGP:egpPos(Parent)+vec2(0,240))
+                    GpuData[-2,number] = LAST_Y-240
+                    LAST_Y = GpuData[-2,number]
+
+                    for(I=BOXID+1,Max) {
+                        local POS = EGP:egpPos(I)
+                        if (POS[2]>LAST_Y & POS[1]<-512) {
+                            EGP:egpPos(I,EGP:egpPos(I)+vec2(1024,0))
+                        } elseif (POS[1]>-512) {
+                            EGP:egpPos(I,EGP:egpPos(I)-vec2(1024,0))
+                        }
+                    }
+                }
+                
+                # FUCK this code, don't want thing how to do it correct            
+                    #[local Parent = GpuData[-1,number]
+                    EGP:egpPos(Parent,EGP:egpPos(Parent)-vec2(0,20))
+                    
+                    for(I=BOXID+1,LAST_I-1) {
+                        local POS = EGP:egpPos(I)
+                        if (POS[2]<LAST_Y+20) {
+                            EGP:egpPos(I,EGP:egpPos(I)-vec2(1024,0))
+                        } else {
+                            break
+                        }
+                    }
+                    
+                    EGP:egpPos(ID,EGP:egpPos(ID)+vec2(1024,0))
+                    EGP:egpPos(ID+1,EGP:egpPos(ID+1)+vec2(1024,0))
+                    GpuData[-2,number] = LAST_Y+20
+                } elseif (Cpos[1]<-512) {
+                    local Parent = GpuData[-1,number]
+                    EGP:egpPos(Parent,EGP:egpPos(Parent)+vec2(0,20))
+                    #[
+                    for(I=BOXID+1,LAST_I-1) {
+                        local POS = EGP:egpPos(I)
+                        if (POS[2]<LAST_Y) {
+                            EGP:egpPos(I,EGP:egpPos(I)-vec2(1024,0))
+                        } else {
+                            break
+                        }
+                    }]
+                    
+                    EGP:egpPos(ID,EGP:egpPos(ID)+vec2(1024,0))
+                    EGP:egpPos(ID+1,EGP:egpPos(ID+1)+vec2(1024,0)) 
+                    GpuData[-2,number] = LAST_Y-20
+                }                
+                #[ elseif (Index==1 & Ind==Max) {
+                    local Parent = GpuData[-1,number]
+                    LAST_Y = GpuData[-3,number]
+                    GpuData[-2,number] = LAST_Y
+                    EGP:egpPos(Parent,GpuData[-4,vector2])
+                    for(I=BOXID+1,LAST_I-1) {
+                        local POS = EGP:egpPos(I)
+                        if (POS[1]<0 & POS[2]<LAST_Y+240) {
+                            EGP:egpPos(I,EGP:egpPos(I)+vec2(1024,0))
+                        } elseif (POS[1]>0 & POS[2]>LAST_Y+240) {
+                            EGP:egpPos(I,EGP:egpPos(I)-vec2(1024,0))
+                        }
+                    }
+                } ]#
+                EGP:egpPos(BOXID,EGP:egpPos(ID)-vec2(20,0))
                 local Footer = Item[6,number]
                 local FooterID = GpuData[5,number]
                 local FooterStr = "C=Create Partition    F=Format Disk    F3=Quit"
@@ -975,9 +1145,9 @@ function installos_key(Key:string,Pressed) {
                 }
                 EGP:egpText(FooterID,FooterStr,EGP:egpPos(FooterID))
             }
-        } elseif (Step==3) {
-            if (Key=="f1") { installos(table(1)) return }
-            elseif (Key=="enter") { installos(table(4)) return }
+        } elseif (Step=="pre_format") {
+            if (Key=="f1") { installos(table("pre_hdds")) return }
+            elseif (Key=="enter") { installos(table("format_key")) return }
             local Index = GpuData[4,number]
             local Max = GpuData[5,number]-1
             if (Key=="down" | Key=="up") {
@@ -994,9 +1164,9 @@ function installos_key(Key:string,Pressed) {
                 EGP:egpColor(ID+Ind+1,168,168,168,255)
                 EGP:egpColor(ID+Index+1,0,0,168,255)
             }
-        } elseif (Step==5) {
-            if (Key=="f1") { installos(table(1)) return }
-            elseif (Key=="enter") { installos(table(6)) return }
+        } elseif (Step=="format_opts") {
+            if (Key=="f1") { installos(table("pre_hdds")) return }
+            elseif (Key=="enter") { installos(table("format_check")) return }
             local Index = GpuData[5,number]
             if (Key=="down" | Key=="up") {
                 local Max = GpuData[6,number]-1
@@ -1039,15 +1209,15 @@ function installos_key(Key:string,Pressed) {
                     #GpuData[Index+2,array] = array(D_I,D_V)
                 }]#
             }
-        } elseif (Step==9) {
+        } elseif (Step=="install") {
             local Abort = GpuData[0,number]
             if (Abort) {
                 if (Key=="f1") {
                     DEBUG = 0
-                    installos(table(1))   
+                    installos(table("pre_hdds"))   
                 }   
             } 
-        } elseif (Step==10) {
+        } elseif (Step=="reboot") {
             if (Key=="enter") {
                 KeyHandler = ""
                 dsSendDirect("REBOOT",BIOS,0)
@@ -1061,36 +1231,46 @@ function installos_ds(Name:string) {
         local FName = Name:sub(4) 
         if (FName=="mkfs_check") {
             local Err = dsGetString()
-            installos(table(7,Err))
+            installos(table("format_check_post",Err))
         } elseif (FName=="mkfs") {
             local Ret = dsGetNumber()
             if (Ret==2) {
-                installos(table(8))
+                installos(table("format"))
             } else {
-                installos(table(1))
+                installos(table("pre_hdds"))
             }
         } elseif(FName=="readfs") {
-            installos(table(9,2))
+            installos(table("install",2))
         } elseif(FName=="listdir") {
-            installos(table(9,3))
+            installos(table("install",3))
         } elseif(FName=="mkfile" | FName=="writefile" | FName=="mkboot") {
-            installos(table(9,4))
+            installos(table("install",4))
         }
     } elseif(Name=="addfs2tbl") {
         #local Tbl = dsGetTable()
         #FsTbl = Tbl[1,table]
-        installos(table(1))
+        installos(table("pre_hdds"))
     } elseif(Name=="hddfstbl") {
-        installos(table(2))
+        installos(table("hdds"))
     } elseif(Name=="readfstbl") {
-        installos(table(9,1))
+        installos(table("install",1))
     } elseif(Name=="activefstbl") {
-        installos(table(9,4))
+        installos(table("install",4))
     }
 }
 
 function installos_format() {
-    installos(table(8,1))
+    local Name = clkName()
+    if (Name=="installos") {
+        if (!checkPerf(8000)) {
+            timer("installos",33)   
+            return
+        }
+        installos(IO_Tmp)
+        IO_Tmp = table()
+    } else {
+        installos(table("format",1))
+    }
 }
 
 registerTimers("installos_format_progress","installos_format")

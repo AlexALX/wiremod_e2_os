@@ -8,7 +8,7 @@
 	Used for debug file system table functions
 ]#
 
-if (first()|duped()) {
+if (INCLUDE) {
 
 #include "alx_pc/hdd/_main_"
 

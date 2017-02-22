@@ -22,7 +22,7 @@ function init() {
     LAST_I = 1
     local X = BIOS_X
     local Sz = BIOS_SZ
-    EGP:egpText(LAST_I,"Simple BIOS v1.0",vec2(X,0))
+    EGP:egpText(LAST_I,"Simple BIOS v1.1",vec2(X,0))
     EGP:egpSize(LAST_I,Sz) LAST_I++
     
     LAST_Y = Sz
@@ -43,19 +43,27 @@ function initpost() {
     BIOS_INIT = 1
     
     local Status = "OK"
-    if (softQuota()<2000) {
+    if (softQuota()<4000 | TickQuota<14000) {
         Status = "Error"
         ERR_C = 1
     } else { Status = "OK" }
-    EGP:egpText(I,"CPU "+softQuota()/1000+" Mhz - "+Status,vec2(X,Y))
+    local Quota = (softQuota()>TickQuota ? TickQuota : softQuota())
+    EGP:egpText(I,"CPU "+round(Quota/1000,2)+" Mhz - "+Status,vec2(X,Y))
     EGP:egpSize(I,Sz) I++ Y+=Sz
     if (ERR_C) { 
         EGP:egpText(I,"ERROR: CPU is too slow.",vec2(X,Y))
         EGP:egpSize(I,Sz) I++ Y+=Sz
-        EGP:egpText(I,"Minimum e2 softquota is 2000 on server.",vec2(X,Y))
-        EGP:egpSize(I,Sz) I++ Y+=Sz
-        EGP:egpText(I,"Current value is "+softQuota()+".",vec2(X,Y))
-        EGP:egpSize(I,Sz) I++ Y+=Sz
+        if (TickQuota<14000) {
+            EGP:egpText(I,"Minimum e2 tickquota is 15000 on server.",vec2(X,Y))
+            EGP:egpSize(I,Sz) I++ Y+=Sz
+            EGP:egpText(I,"Current value is approx "+TickQuota+" (hard or tick).",vec2(X,Y))
+            EGP:egpSize(I,Sz) I++ Y+=Sz
+        } else {
+            EGP:egpText(I,"Minimum e2 softquota is 4000 on server.",vec2(X,Y))
+            EGP:egpSize(I,Sz) I++ Y+=Sz
+            EGP:egpText(I,"Current value is "+softQuota()+".",vec2(X,Y))
+            EGP:egpSize(I,Sz) I++ Y+=Sz
+        }
         err() 
     }
         
@@ -138,8 +146,13 @@ function inithdd() {
         for(I=1,HDD_MAX) {
             local Item = HDDS[I,table]
             if (Item:count()) {
-                EGP:egpText(LAST_I,"HDD"+(I-1)+" - Size "+(Item["size",number]*Item["sector_size",number])/1024+" KB",vec2(X,LAST_Y))
-                EGP:egpSize(LAST_I,Sz) LAST_I++ LAST_Y+=Sz
+                if (Item["type",number]==1) {
+                    EGP:egpText(LAST_I,"HDD"+(I-1)+" - "+Item["name",string],vec2(X,LAST_Y))
+                    EGP:egpSize(LAST_I,Sz) LAST_I++ LAST_Y+=Sz
+                } else {
+                    EGP:egpText(LAST_I,"HDD"+(I-1)+" - "+Item["name",string]+" - Size "+(Item["size",number]*Item["sector_size",number])/1024+" KB",vec2(X,LAST_Y))
+                    EGP:egpSize(LAST_I,Sz) LAST_I++ LAST_Y+=Sz
+                }
             } else {
                 EGP:egpText(LAST_I,"HDD"+(I-1)+" - Not connected",vec2(X,LAST_Y))
                 EGP:egpSize(LAST_I,Sz) LAST_I++ LAST_Y+=Sz
@@ -159,7 +172,7 @@ function inithdd() {
     timer("boot_timer",100)
     runCmd("boot",2000)
     
-    #if (DEBUG) { "bios_key"("delete",1) }
+    if (DEBUG==-1) { "bios_key"("delete",1) }
 }
 
 function bios_key(Key:string,Pressed) {
@@ -173,6 +186,19 @@ function bios_key(Key:string,Pressed) {
     }
 }
 
+function noboot(Msg:string) {
+    EGP:egpText(LAST_I,Msg,vec2(BIOS_X,LAST_Y))
+    EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
+    
+    LAST_Y+=BIOS_SZ
+    #EGP:egpText(LAST_I,"Press ENTER to run Setup program.",vec2(BIOS_X,LAST_Y))
+    #EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
+    EGP:egpText(LAST_I,"Press F1 to reboot.",vec2(BIOS_X,LAST_Y))
+    EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
+    
+    KeyHandler = "bootmenu_key"   
+}
+
 function boot_ds(Name:string) {
     if(Name=="gethdds") {
         DsHandler = ""
@@ -184,14 +210,44 @@ function boot_ds(Name:string) {
         "bootmenu_post"(0)
     } elseif(Name=="bootmenu") {
         "bootmenu_post"(1)
+    } elseif(Name=="read_disk") {
+        local Ret = dsGetTable()
+        if (Ret[1,string]=="OK") {
+            "bootmenu_post_cd"(0)
+        } else {
+            "nobootCD"(Ret[1,string])
+        }
+    } elseif (Name=="boot_func") {
+        INCLUDE = 1
+        #include "alx_pc/gpu/_boot_"
+        INCLUDE = 0
+        local Info = dsGetTable()
+        if (!initboot(Info)) {
+            noboot("Function "+Info[1,string]+" is missing.")   
+        }
     }
+}
+
+function nobootCD(Msg:string) {
+    local Arr = Msg:explode(NL)
+    for (I=1,Arr:count()) {
+        EGP:egpText(LAST_I,Arr[I,string],vec2(BIOS_X,LAST_Y))
+        EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
+    }
+    
+    LAST_Y+=BIOS_SZ
+    EGP:egpText(LAST_I,"Press F1 to reboot.",vec2(BIOS_X,LAST_Y))
+    EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
+    
+    local BootHDD = HDDS[BOOT_HDD,table]
+    
+    dsSendDirect("stopdisk",BootHDD["ent",entity],0)
+    
+    KeyHandler = "bootmenu_key"   
 }
 
 function boot() {
     egpClear()
-    
-    EGP:egpText(LAST_I,"Loading Boot Menu...",vec2(BIOS_X,LAST_Y))
-    EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
     
     local BootHDD = HDDS[BOOT_HDD,table]
     
@@ -204,27 +260,26 @@ function boot() {
         EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
         KeyHandler = "reboot"
     } else {
-        DsHandler = "boot_ds"
-        dsSendDirect("readfstbl",HDD_IO:entity(),table(entity(),BootHDD))
+    
+        if (BootHDD["type",number]==1) {
+            EGP:egpText(LAST_I,BootHDD["name",string]+" initialization, please wait...",vec2(BIOS_X,LAST_Y))
+            EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
+            
+            DsHandler = "boot_ds"
+            dsSendDirect("read_disk",HDD_IO:entity(),table("init",entity(),BootHDD))     
+        } else {
+            EGP:egpText(LAST_I,"Loading boot loader...",vec2(BIOS_X,LAST_Y))
+            EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
+
+            DsHandler = "boot_ds"
+            dsSendDirect("readfstbl",HDD_IO:entity(),table(entity(),BootHDD))
+        }
     }
 }
 
 function reboot(Key:string,Pressed) {
     if (!Pressed) { return }
     reboot()
-}
-
-function noboot(Msg:string) {
-    EGP:egpText(LAST_I,Msg,vec2(BIOS_X,LAST_Y))
-    EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
-    
-    LAST_Y+=BIOS_SZ
-    EGP:egpText(LAST_I,"Press ENTER to run Setup program.",vec2(BIOS_X,LAST_Y))
-    EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
-    EGP:egpText(LAST_I,"Or press F1 to reboot.",vec2(BIOS_X,LAST_Y))
-    EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
-    
-    KeyHandler = "bootmenu_key"   
 }
 
 function bootmenu() {
@@ -242,8 +297,33 @@ function bootmenu() {
     
     noboot("No Bootable Volume")
     
-    if (DEBUG) { runCmd("bootpost",1) }
+    #if (DEBUG) { runCmd("bootpost",1) }
         
+}
+
+function bootmenu_post_cd(Step:number) {
+    if (Step==0) {
+        local CurFs = dsGetTable()[2,table]
+        
+        if (CurFs["boot_func",string]!="") {
+            dsSendDirect("bootmenu",E2_CPU,CurFs)   
+        } else {
+            nobootCD("This disc is not bootable.")
+        }
+    } elseif (Step==1) {
+        local Type = dsGetType()
+        if (Type=="string") {
+            nobootCD(dsGetString())
+        } else {
+            INCLUDE = 1
+            #include "alx_pc/gpu/_boot_"
+            INCLUDE = 0
+            local Info = dsGetTable()
+            if (!initboot(Info)) {
+                noboot("Function "+Info[1,string]+" is missing.")   
+            }
+        }
+    }
 }
 
 function bootmenu_post(Step:number) {
@@ -271,6 +351,7 @@ function bootmenu_post(Step:number) {
     }
 }
 
+#[
 function bootpost() {
     INCLUDE = 1
     #include "alx_pc/gpu/alxos/installos"
@@ -284,14 +365,15 @@ function bootpost() {
     
     KeyHandler = ""
     
-    runCmd("installos",2000,table(0))
-}
+    runCmd("installos",2000,table("welcome"))
+} ]#
 
 function bootmenu_key(Key:string,Pressed) {
     if (!Pressed) { return }
-    if (Key=="enter") {
+    #[if (Key=="enter") {
         bootpost()
-    } elseif (Key=="f1") {
+    } else ]#
+    if (Key=="f1") {
         reboot(Key,Pressed)
     }
 }

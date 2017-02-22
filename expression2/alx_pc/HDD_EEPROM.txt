@@ -1,0 +1,79 @@
+@name HDD EEPROM
+@inputs Bank1:wirelink Bank2:wirelink Bank3:wirelink Bank4:wirelink
+@outputs HDD:wirelink
+@persist HDD_BANK_SIZE HDD_SECTOR_SIZE HDD_SIZE HDD_BANK_MAX HDD_TYPE HDD_NAME:string
+@persist HDD_Banks:array HDD_IO:entity
+@trigger 
+@model models/expression 2/cpu_controller.mdl
+
+#[
+    ALX Wiremod E2 PC
+    Created by AlexALX
+    -------------------
+    HDD Bios - Handle HDD Banks 
+    For Wire HDD EEPROM
+]#
+
+if (first()|duped()) {
+    
+HDD = wirelink()
+HDD_IO = noentity()
+
+local Capacity = 256 # set size from stool capacity field here
+# if my pull request was approved then it will detect this automatically
+# check it here: https://github.com/wiremod/wire/pull/1338
+# WARNING: all banks should have same capacity or it will not work properly!
+# The actual hdd size will be in 4 times higher because of filesystem specs
+# Example: you have 96kb capacity, you need write Capacity = 96
+# and your actual hdd size will be 384kb
+# Keep in mind that max size in multiplayer is 256 (1MB)
+
+HDD_BANK_SIZE = Capacity*1024
+HDD_SECTOR_SIZE = 4
+HDD_BANK_MAX = 4
+
+HDD_TYPE = 0
+HDD_NAME = "Wire EEPROM" # vendor name
+
+function sendData() {
+    local Check = array()
+    HDD_Banks = array()
+    
+    local Capacity = HDD_BANK_SIZE/1024
+    for (I=1,HDD_BANK_MAX) {
+        local WEnt = ioGetInputWirelink("Bank"+I)
+        local Ent = WEnt:entity()
+        local IsNew = WEnt:hasOutput("Capacity")
+        local ID = Ent:id()
+        if (Ent:type()!="gmod_wire_hdd") { continue }
+        if (IsNew) {
+            ID = WEnt["DriveID",number]
+            local Cap = WEnt["Capacity",number]
+            if (Cap<Capacity) { Capacity = Cap }
+        }
+        if (Check[ID,number]) { continue }
+        Check[ID,number] = 1
+        HDD_Banks:pushWirelink(WEnt)
+    }
+    HDD_BANK_SIZE = Capacity*1024
+    
+    HDD_SIZE = HDD_BANK_SIZE*HDD_Banks:count()
+
+    dsSendDirect("hddinit",HDD_IO,table(wirelink(),HDD_TYPE,HDD_NAME,HDD_SIZE,HDD_BANK_SIZE,HDD_SECTOR_SIZE,HDD_Banks))
+}
+
+}
+
+if (dsClk("init") & (HDD_IO==noentity() | dsGetTable()[1,entity]==HDD_IO)) {
+    local Info = dsGetTable()
+    HDD_IO = Info[1,entity]
+    timer("sendData",Info[2,number])
+}
+
+if (dsClk("unlink") & HDD_IO==dsGetEntity()) {
+    HDD_IO = noentity()
+}
+
+if (clk("sendData")) {
+    sendData()   
+}

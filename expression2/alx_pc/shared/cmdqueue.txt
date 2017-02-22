@@ -1,14 +1,14 @@
-@name Command Queue Interface
+@name Command Queue interface
 @persist CurrentCmd:string CmdQueue:table CmdLastQueue 
-@persist CmdResult:table CmdDelay CmdAdd2Queue QueueShift CmdQueueTmp
+@persist CmdResult:table CmdDelay CmdAdd2Queue QueueShift CmdQueueTmp CmdQueueTmpStr:string
 @persist CmdCallback:table CmdCompleteCallback:table CmdNextRun
 
 #[
-	ALX Wiremod E2 PC
-	Created by AlexALX
-	-------------------
-	Command queue interface
-	Used only in File System for now 
+    ALX Wiremod E2 PC
+    Created by AlexALX
+    -------------------
+    Command queue interface
+    Used only in File System for now 
 ]#
 
 if (first()|duped()) {
@@ -35,19 +35,19 @@ function cmdNext() { #  & ops()<softQuota()*0.9
         CmdNextRun = 0
         timer(CurrentCmd,1)  
     }]#
-    if (perf(75)) {
+    if (checkPerf(12000) & !CmdDelay) {
         #stoptimer(CurrentCmd)
         "cmdHandler"()
         #CmdNextRun++
     } else {
         #CmdNextRun = 0
-        timer(CurrentCmd,1)
+        timer(CurrentCmd,(CmdDelay ? CmdDelay : 33))
     }
     #exit()
 }
 
 function cmdEnd(Queue) {
-    if (!perf(90)) {
+    if (!checkPerf(3000)) {
         CmdQueueTmp = Queue
         timer("cmd_End",1)
         return
@@ -78,7 +78,7 @@ function cmdEnd(Queue) {
         "cmdComplete"(CmdComplete)
     }
     if (CmdCallback:count()) {
-        if (!perf(75)) {
+        if (!checkPerf(5000)) {
             CmdDelay = 1
         }
         # fix e2 editor error
@@ -124,6 +124,7 @@ function cmdShutdown() {
     CmdAdd2Queue = 0
     QueueShift = 0
     CmdQueueTmp = 0
+    CmdQueueTmpStr = ""
     stopAllTimers()
 }
 
@@ -168,21 +169,29 @@ function cmdHandler() {
     }   
 }
 
+# Command Complete handler
+function cmdComplete(CmdComplete:string) {
+    #print(CmdComplete)
+    if (!checkPerf(8000)) {
+        CmdQueueTmpStr = CmdComplete
+        timer("cmd_Complete",40)
+        return
+    }
+    if (CmdCompleteCallback:count() & CmdCompleteCallback[1,string]==CmdComplete) {
+        CmdCompleteCallback[2,string](CmdComplete,CmdCompleteCallback[3,table])
+        CmdCompleteCallback = table()
+    }
+}
+
 function cmd_timer(Name:string) {
     if (Name=="") { return }
     if (Name==CurrentCmd) {
         cmdHandler()
     } elseif (Name=="cmd_End") {
         cmdEnd(CmdQueueTmp)
+    } elseif (Name=="cmd_Complete") {
+        cmdComplete(CmdQueueTmpStr)
     }
-}
-
-# Command Complete handler
-function cmdComplete(CmdComplete:string) {
-    if (CmdCompleteCallback:count() & CmdCompleteCallback[1,string]==CmdComplete) {
-        CmdCompleteCallback[2,string](CmdComplete,CmdCompleteCallback[3,table])
-        CmdCompleteCallback = table()
-    } 
 }
 
 #registerTimers("cmd","cmd_timer")

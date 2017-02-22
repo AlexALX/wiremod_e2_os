@@ -26,5 +26,10 @@ ALXOS_PROGS["alxos_bmp_reader",number] = 1
 function alxos_bmp_reader(FInfo:table) {
     dsSendDirect("alxos_runprog",E2_GPU,table("alxos_bmp_reader",FInfo))
 }
+
+ALXOS_PROGS["alxos_cd_burner",number] = 1
+function alxos_cd_burner(FInfo:table) {
+    dsSendDirect("alxos_runprog",E2_GPU,table("alxos_cd_burner"))
+}
     
 }

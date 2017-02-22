@@ -13,6 +13,7 @@
 
 if (first()|duped()) {
     
+#include "alx_pc/shared/_main_"
 #include "alx_pc/cpu/_main_"
     
 E2_CPU = entity()
@@ -64,6 +65,7 @@ if (dsClk()) {
         HDD_IO = (HDDIO_Arr[2,number] ? HDDIO_Arr[1,wirelink] : nowirelink())
         HDDS = Info[9,table]
         HDD_MAX = Info[10,number]
+        TickQuota = Info[12,number]
         if (!Info[8,number]) {
             dsSendDirect(Name,BIOS,"cpu")
         }
@@ -112,14 +114,5 @@ if (keyClk(KeyUser) & Keyboard) {
 }
 
 if (clk("cmd")) {
-    if (CMDA:count()) {
-        local ID = CMDA:id()
-        CMD(CMDA)
-        if (CMDA:id()==ID) {
-            CMDA = table()
-        }
-    } else {
-        CMD()
-    }
-    exit()
+    cmdClk()
 }

@@ -1,0 +1,12 @@
+@name ALX OS SPU INIT
+
+#[
+    ALX Wiremod E2 OS
+    Created by AlexALX
+]#
+
+if (INCLUDE) {
+
+#include "alx_pc/spu/_main_"
+
+}

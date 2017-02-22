@@ -3,8 +3,8 @@
 @outputs E2_GPU:entity
 @persist E2_CPU:entity E2_SPU:entity BIOS:entity HDD_IO:wirelink HDDS:table HDD_MAX 
 @persist BIOS_INIT KeyHandler:string DsHandler:string ChatHandler:string ChatPlayer:entity GpuData:table BOOT_HDD
-@persist LAST_I LAST_Y BIOS_X BIOS_SZ ERR_N ERR_C CMD:string CMDA:table Keyboard:wirelink ShutHandler:string
-@persist FS_TYPES:table DEBUG INCLUDE
+@persist LAST_I LAST_Y BIOS_X BIOS_SZ ERR_N ERR_C Keyboard:wirelink ShutHandler:string
+@persist FS_TYPES:table EgpCleanHandler:string
 
 #[
 	ALX Wiremod E2 PC
@@ -16,9 +16,8 @@
 if (first()|duped()) {
     
 #include "alx_pc/shared/_main_"
-    
-INCLUDE = 0
-    
+#include "alx_pc/shared/cmd"
+
 function number in_array(Arr:array, Value) {
     for (I=1,Arr:count()) {
         if (Arr[I,number]==Value) { return 1 }
@@ -31,25 +30,15 @@ function err() {
     if (ERR_C!=-1) { exit() }
 }
 
-function runCmd(Cmd:string,Delay) {
-    if (DEBUG) { Delay = 1 }
-    CMD = Cmd
-    timer("cmd",Delay)
-}
-
-function runCmd(Cmd:string,Delay,Arg:table) {
-    if (DEBUG) { Delay = 1 }
-    CMD = Cmd
-    CMDA = Arg
-    timer("cmd",Delay)
-}
-
 function egpClear() {
     EGP:egpClear()
     EGP:egpDrawTopLeft(1)
     LAST_I = 1 
     LAST_Y = 0 
     GpuData = table()
+    if (EgpCleanHandler!="") {
+        EgpCleanHandler()
+    }
 }
 
 function dsClear() {

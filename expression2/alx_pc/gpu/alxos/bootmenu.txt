@@ -46,11 +46,25 @@ function alxos_boot_init(Name:string) {
     DsHandler = "alxos_boot_ds"
     
     runCmd("alxos_boot_post",1000)
-            
 }
 
 function alxos_boot_ds(Name:string) {
-    if (Name=="alxos_fail") {
+    if (Name=="alxos_msg") {
+        local Typ = dsGetType()
+        if (Typ=="string") {
+            "alxos_msg"(dsGetString())  
+        } else {
+            local Info = dsGetArray()
+            "alxos_msg"(Info[2,string])
+            "alxos_msgup_stage"(Info[1,string])  
+        } 
+    } elseif (Name=="alxos_msgup") {
+        local Info = dsGetArray()
+        "alxos_msgup_stage"(Info[1,string])
+        if (Info[2,string]!="") {
+            "alxos_msgup"(Info[2,string])
+        }
+    } elseif (Name=="alxos_fail") {
         "alxos_fail"(dsGetString())  
     } elseif (Name=="alxos_runprog") {
         INCLUDE = 1
@@ -68,6 +82,8 @@ function alxos_boot_ds(Name:string) {
 function alxos_boot_run() {
     stoptimer("cmd")
     egpClear()
+    GpuData[1,table] = table()
+    GpuData[2,number] = 0
     dsSendDirect("alxos_init",E2_CPU,0)
 }
 
@@ -78,8 +94,32 @@ function alxos_boot_key(Key:string,Pressed) {
     }
 }
 
+function alxos_msg(Str:string) {
+    local Num = GpuData[2,number]
+    local Arr = Str:explode(NL)
+    for (I=1,Arr:count()) {   
+        GpuData[1,table][Num,array] = array(LAST_I,Arr[I,string])
+        GpuData[2,number] = Num+1
+        EGP:egpText(LAST_I,Arr[I,string],vec2(BIOS_X,LAST_Y))
+        EGP:egpColor(LAST_I,168,168,168,255) LAST_I++ LAST_Y+=20
+    }
+}
+
+function alxos_msgup(Str:string) {
+    local Num = GpuData[2,number]
+    local Item = GpuData[1,table][Num-1,array]
+    EGP:egpSetText(Item[1,number],Item[2,string]+Str)
+}
+
+function alxos_msgup_stage(Str:string) {
+    EGP:egpText(LAST_I,Str,vec2(512-BIOS_X,LAST_Y-20))
+    EGP:egpAlign(LAST_I,2)
+    EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
+}
+
 function alxos_fail(Str:string) {
-    egpClear()
+    #egpClear()
+    GpuData[1,table]:pushArray(array(LAST_I,Str))
     EGP:egpText(LAST_I,Str,vec2(BIOS_X,LAST_Y))
     EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
     KeyHandler = "alxos_fail_key"

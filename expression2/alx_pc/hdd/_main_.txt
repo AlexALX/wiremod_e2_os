@@ -1,7 +1,7 @@
 @name Main hdd func
-@inputs BIOS:entity
+@inputs BIOS:entity HDD_0:wirelink HDD_1:wirelink HDD_2:wirelink HDD_3:wirelink
 @outputs HDD_IO:wirelink CurTask:table
-@persist HDDS:table HDD_MAX FS_Delay DsTbl:table
+@persist HDDS:table HDD_MAX FS_Delay DsTbl:table DsFunc:table
 @persist FS_TYPES:table FS_TBL_SIZE HDD_MAX_ADDR
 
 #[
@@ -16,6 +16,8 @@
 ]#
 
 if (first()|duped()) {
+    
+#include "alx_pc/shared/_main_"
     
 function hddload(Num) {
     dsSendDirect("HDDInd",BIOS,Num) 
@@ -37,6 +39,7 @@ function writeCell(HDD:table,Addr,Data) {
     if (Ind>1) {
         Addr -= (Ind-1)*HDD["bank_size",number]
     }
+
     if (Addr>HDD["bank_size",number]-1|Addr>HDD_MAX_ADDR) { print("HDD Write Error"+Addr+" on Bank "+Ind) }
     Bank[Addr] = Data
 }
@@ -56,6 +59,7 @@ function number readCell(HDD:table,Addr) {
 }
 
 function formatDisk(HDD:table) {
+    if (HDD["type",number]==1) { return }
     for(I=1,HDD["banks",number]) {
         HDD["bank",array][I,wirelink]["Clear",number] = 1   
     }
@@ -143,21 +147,37 @@ function number addfs2tbl(HDD:table,FsTbl:table,N,A,T,Sz) {
 }
 
 function table readfstbl(HDD:table) {
-    if (readCell(HDD,FS_TBL_SIZE-1)!=0x55AA) { return table() }
+    if (!HDD:count()) { return table() }
     
-    local FsTbl = table()
-    for (F=0,3) {
-        local O = F*2
+    local Type = HDD["type",number]
+    
+    if (Type==0) {
+        if (readCell(HDD,FS_TBL_SIZE-1)!=0x55AA) { return table() }
+    
+        local FsTbl = table()
+        for (F=0,3) {
+            local O = F*2
+            local Tmp = table()
+            Tmp["active",number] = readCell(HDD,O) && 0xFF
+            Tmp["start",number] = (readCell(HDD,O) >> 8) && 0xFFFFFF
+            Tmp["total",number] = (readCell(HDD,O+1) >> 8) && 0xFFFFFF
+            Tmp["type",number] = readCell(HDD,O+1) && 0xFF
+            Tmp["type_str",string] = FS_TYPES[Tmp["type",number],string]:lower()
+            Tmp["end",number] = Tmp["start",number]+Tmp["total",number]
+            FsTbl[F,table] = Tmp
+        }   
+        #FsTbl["hddinfo",table] = HDD
+        return FsTbl
+    } elseif (Type==1) {
+        local FsTbl = table()
         local Tmp = table()
-        Tmp["active",number] = readCell(HDD,O) && 0xFF
-        Tmp["start",number] = (readCell(HDD,O) >> 8) && 0xFFFFFF
-        Tmp["total",number] = (readCell(HDD,O+1) >> 8) && 0xFFFFFF
-        Tmp["type",number] = readCell(HDD,O+1) && 0xFF
-        Tmp["end",number] = Tmp["start",number]+Tmp["total",number]
-        FsTbl[F,table] = Tmp 
-    }   
-    #FsTbl["hddinfo",table] = HDD
-    return FsTbl
+        Tmp["type",number] = 3
+        Tmp["type_str",string] = FS_TYPES[3,string]:lower()
+        Tmp["active",number] = 1
+        FsTbl[0,table] = Tmp        
+        return FsTbl
+    }
+    return table()
 }
 
 function removefstbl(HDD:table,N) {
@@ -173,6 +193,11 @@ function activefstbl(HDD:table,N) {
         local Active = (N==F ? 1 : 0)
         writeCell(HDD,O,Active + (((readCell(HDD,O) >> 8) && 0xFFFFFF) << 8))
     }            
+}
+
+# dummy, overwritten in cd/wcd_fs
+function table readcdinfo(CD:table) {
+    return table()
 }
 
 }

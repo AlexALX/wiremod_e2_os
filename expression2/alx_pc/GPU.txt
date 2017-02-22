@@ -13,8 +13,9 @@
 
 if (first()|duped()) {
     
+#include "alx_pc/shared/_main_"
 #include "alx_pc/gpu/_main_"
-    
+
 E2_GPU = entity() # stupid fix for entity loss on reload
 dsSendDirect("reload",BIOS,"gpu")
 
@@ -23,7 +24,7 @@ BIOS_SZ = 24
 
 BOOT_HDD = 1
 
-DEBUG = 0
+EgpCleanHandler = ""
 
 function initGpu() {
     local Info = dsGetTable()
@@ -38,6 +39,7 @@ function initGpu() {
     HDDS = Info[9,table]
     HDD_MAX = Info[10,number]
     FS_TYPES = Info[11,table]
+    TickQuota = Info[12,number]
     if (!Info[8,number]) {
         dsSendDirect("init",BIOS,"gpu")
         egpClear()
@@ -64,7 +66,6 @@ function shutdown() {
 }
 
 }
-
 
 if (!BIOS:isValid()) { exit() }
 
@@ -112,21 +113,11 @@ if (clk(clkName())) {
         if (Name:left(CName:length())==CName) {
                
         }
-    }   ]#
+    }]#
 }
 
 if (clk("cmd")) {
-    if (CMDA:count()) {
-        local ID = CMDA:id()
-        if (!CMD(CMDA)[number]) {
-            if (CMDA:id()==ID) {
-                CMDA = table()
-            }
-        }
-    } else {
-        CMD()
-    }
-    exit()
+    cmdClk()   
 }
 
 if (httpClk()) {

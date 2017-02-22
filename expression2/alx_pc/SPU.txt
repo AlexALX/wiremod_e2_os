@@ -1,0 +1,76 @@
+@name SPU
+@model models/bull/gates/logic.mdl
+
+#[
+    ALX Wiremod E2 PC
+    Created by AlexALX
+    -------------------
+    E2 SPU, purpose:
+    - play sounds
+    - alxos e2 spu programs
+]#
+
+if (first()|duped()) {
+    
+#include "alx_pc/shared/_main_"
+#include "alx_pc/spu/_main_"
+
+E2_SPU = entity()
+dsSendDirect("reload",BIOS,"spu")
+ 
+function shutdown() {
+    if (ShutHandler!="") {
+        ShutHandler()   
+        ShutHandler = ""
+    }
+    stopAllTimers()
+    spuClear()
+    dsSendDirect("SHUTDOWN",E2_CPU,dsGetNumber())
+}
+
+}
+
+if (!BIOS:isValid()) { exit() }
+
+if (dsClk()) {
+    local Name = dsClkName()
+    if (Name=="init") {
+        local Info = dsGetTable()
+        NB = Info[1,string]
+        E2_CPU = Info[2,entity]
+        E2_GPU = Info[3,entity]
+        local KeyboardArr = Info[5,array]
+        Keyboard = (KeyboardArr[2,number] ? KeyboardArr[1,wirelink] : nowirelink()) # bug - empty wirelink crash e2!
+        local HDDIO_Arr = Info[6,array]
+        HDD_IO = (HDDIO_Arr[2,number] ? HDDIO_Arr[1,wirelink] : nowirelink())
+        HDDS = Info[9,table]
+        HDD_MAX = Info[10,number]
+        TickQuota = Info[12,number]
+        if (!Info[8,number]) {
+            dsSendDirect(Name,BIOS,"spu")
+        }
+    } elseif (Name=="playgmsound") {
+        local Info = dsGetTable()
+        playgmsound(Info[1,number],Info[2,number],Info[3,string])
+    } elseif (Name=="stopgmsound") {
+        local Info = dsGetTable()
+        stopgmsound(Info[1,number],Info[2,number])
+    } elseif (Name=="SHUTDOWN") {
+        shutdown()
+    } elseif (Name=="alxos_runprog") {
+        INCLUDE = 1
+        #include "alx_pc/spu/alxos/_main_"
+        #include "alx_pc/spu/alxos/_prog_"
+        INCLUDE = 0
+        local Info = dsGetTable()
+        if (ALXOS_PROGS:exists(Info[1,string])) {
+            Info[1,string](Info[2,table])
+        }
+    } elseif (DsHandler!="") {
+        DsHandler(Name)
+    }
+}
+
+if (clk("cmd")) {
+    cmdClk()
+}

@@ -1,0 +1,32 @@
+@name Main SPU func
+@inputs BIOS:entity Speaker:entity
+@outputs E2_SPU:entity
+@persist E2_GPU:entity E2_CPU:entity HDDS:table HDD_MAX Keyboard:wirelink
+@persist KeyUser:entity SpuData:table HDD_IO:wirelink
+@persist CurFs:table DsHandler:string ShutHandler:string
+
+#[
+    ALX Wiremod E2 PC
+    Created by AlexALX
+    -------------------
+    CPU Main functions/variables + wire inputs/outputs
+]#
+
+if (first()|duped()) {
+    
+#include "alx_pc/shared/_main_"
+#include "alx_pc/shared/cmd"
+    
+function spuClear() {
+    SpuData = table()
+}
+
+function playgmsound(Index,Time,Sound:string) {
+    Speaker:soundPlay(Index,Time,Sound)
+}
+
+function stopgmsound(Index,FadeTime) {
+   soundStop(Index,FadeTime)
+}
+
+}

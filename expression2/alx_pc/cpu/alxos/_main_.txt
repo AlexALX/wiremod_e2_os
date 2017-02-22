@@ -52,5 +52,6 @@ ALXOS_PROG_ASOC["bmp",string] = "alxos_bmp_reader"
 ALXOS_PROG_ASOC["txt",string] = "alxos_txt_reader"
 ALXOS_PROG_ASOC["ini",string] = "alxos_txt_reader"
 ALXOS_PROG_ASOC["e2e",string] = "alxos_txt_reader"
+ALXOS_PROG_ASOC["e2s",string] = "alxos_txt_reader"
 
 }

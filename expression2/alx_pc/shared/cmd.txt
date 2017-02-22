@@ -1,26 +1,66 @@
-@name Simple Command Queue
+@name Simple Command API
+@persist CMD:string CMDArg CMDA:table
 
 #[
-	ALX Wiremod E2 PC
-	Created by AlexALX
-	-------------------
-	Simple command interface without queue
-	Not used directly from this file yet
+    ALX Wiremod E2 PC
+    Created by AlexALX
+    -------------------
+    Simple command API without queue
 ]#
 
 if (first()|duped()) {
  
-function runCmd(Cmd:string,Delay) {
-    #if (DEBUG) { Delay = 1 }
+#include "alx_pc/shared/_main_"
+
+function runCmd(Cmd:string,Delay,NoDebug) {
     CMD = Cmd
     timer("cmd",Delay)
 }
 
-function runCmd(Cmd:string,Delay,Arg:table) {
-    #if (DEBUG) { Delay = 1 }
+function runCmd(Cmd:string,Delay) {
+    if (DEBUG) { Delay = 1 }
+    runCmd(Cmd,Delay,1)
+}
+
+
+function runCmd(Cmd:string,Delay,Arg:table,NoDebug) {
     CMD = Cmd
+    CMDArg = 1
     CMDA = Arg
     timer("cmd",Delay)
-}   
-    
+}
+
+function runCmd(Cmd:string,Delay,Arg:table) {
+    if (DEBUG) { Delay = 1 }
+    runCmd(Cmd,Delay,Arg,1)
+}
+
+function cmdClk() {
+    if (CMD=="") { return }
+    if (CMDArg) {
+        local ID = CMDA:id()
+        if (!CMD(CMDA)[number]) {
+            if (CMDA:id()==ID) {
+                CMDA = table()
+                CMDArg = 0
+            }
+        }
+    } else {
+        CMD()
+    }
+}
+
+function stopCmd() {
+    stoptimer("cmd")
+    CMD = ""
+    CMDArg = 0
+    CMDA = table()
+}
+
+#[ added in CPU/GPU etc
+if (clk("cmd")) {
+    cmdClk()   
+}
+]#
+
 }

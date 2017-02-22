@@ -16,22 +16,30 @@ if (first()|duped()) {
 #include "alx_pc/shared/cmdqueue"
 #include "alx_pc/hdd/_main_"
 
+runOnLast(1)
+
 HDD_IO = wirelink()
 FS_TYPES = table()
 HDDS = table()
-HDD_MAX = 2 # maximum hdds, sorry for now only 2 due to "gui problems" 
+HDD_MAX = 4 # maximum hdds, sorry for now only 2 due to "gui problems" 
 
 FS_Delay = 0
 DsTbl = table()
+DsFunc = table()
 
-#include "alx_pc/hdd/raw_fs"
-#include "alx_pc/hdd/wm1_fs"
+function init_fs() {
+    INCLUDE = 1
+    #include "alx_pc/hdd/raw_fs"
+    #include "alx_pc/hdd/wm1_fs"
+    #include "alx_pc/cd/wcd_fs"
+    #INCLUDE = 0
+}
 
 function number hddGetIndex(Ent:entity) {
-    for(I=1,HDDS:count()) { 
-        if (HDDS[I,table]["ent",entity]==Ent) { return I }
+    for (I=0,HDD_MAX-1) {
+        if (Ent==ioGetInputWirelink("HDD_"+I):entity()) { return I+1 }
     }
-    return HDDS:count()+1   
+    return 0
 }
 
 function hddio_fs(CmdName:string,Args:table) {
@@ -41,212 +49,491 @@ function hddio_fs(CmdName:string,Args:table) {
         dsSendDirect(Name,Ent,CmdResult:clone())  
     } elseif (Name=="fs_mkfile") {
         dsSendDirect(Name,Ent,CmdResult:clone())
-    } elseif (Name=="fs_writefile") {
+    } elseif (Name=="fs_writefile" | Name=="fs_rawwritefile") {
         dsSendDirect(Name,Ent,CmdResult[1,number])
     } elseif (Name=="fs_readfile") {
         dsSendDirect(Name,Ent,CmdResult[1,string])
+    } elseif (Name=="fs_rawreadfile") {
+        dsSendDirect(Name,Ent,CmdResult[1,array])
     } elseif (Name=="fs_removefile") {
+        dsSendDirect(Name,Ent,1)
+    } elseif (Name=="fs_add2dir") {
         dsSendDirect(Name,Ent,1)
     }
     hddload(0)
 }
 
+DsFunc["clear",string] = "hddio_ds_clear"
+function hddio_ds_clear(Name:string) {
+    cmdShutdown()
+    CurTask = table()
+    if (!checkPerf(4000)) {
+        if (!FS_Delay) { DsTbl = table(Name,dsGetEntity(),3000) }
+        CmdDelay = 1
+        FS_Delay = 1
+        timer("hddio_ds",33) 
+        return
+    }
+    local Ent = (FS_Delay ? DsTbl[2,entity] : dsGetEntity())
+    dsSendDirect(Name,Ent,1)
+    for (I=1,HDD_MAX) {
+        local HDD = HDDS[I,table]
+        if (HDD["type",number]!=1) { continue }
+        dsSendDirect("clearDiskCommands",HDD["ent",entity],1)   
+    }
+    DsTbl = table()
+    FS_Delay = 0
+    hddload(0) 
+}
+
+DsFunc["hddinit",string] = "hddio_ds_hddinit"
+function hddio_ds_hddinit(Name:string) {
+    if (!checkPerf(3000)) {
+        if (!FS_Delay) { DsTbl = table(Name,dsGetTable(),2000) }
+        CmdDelay = 1
+        FS_Delay = 1
+        timer("hddio_ds",33) 
+        return
+    }
+    local Tbl = (FS_Delay ? DsTbl[2,table] : dsGetTable())
+    local Ent = Tbl[1,wirelink]:entity()
+    local I = hddGetIndex(Ent)
+    if (I==0) { exit() }
+    local Info = table()
+    Info["wirelink",wirelink] = Tbl[1,wirelink]
+    Info["ent",entity] = Ent
+    local Type = Tbl[2,number]
+    Info["type",number] = Type
+    Info["name",string] = Tbl[3,string]
+    if (Type==1) {
+        Info["reader",wirelink] = Tbl[4,wirelink]
+        Info["reader_up",wirelink] = Tbl[5,wirelink]
+        Info["disk_types",table] = Tbl[6,table]
+        Info["book_types",array] = Tbl[7,array]
+        Info["data_types",array] = Tbl[8,array]
+        Info["disk_tracks",array] = Tbl[9,array]
+        Info["disk_sectors",array] = Tbl[10,array]
+        Info["sector_size",number] = 4
+    } else {
+        Info["size",number] = Tbl[4,number]
+        Info["fs_tbl_size",number] = FS_TBL_SIZE
+        Info["fs_max_size",number] = Tbl[4,number]-FS_TBL_SIZE-1
+        Info["bank_size",number] = Tbl[5,number]
+        Info["sector_size",number] = Tbl[6,number]
+        local Banks = Tbl[7,array]
+        Info["banks",number] = Banks:count()
+        Info["bank",array] = Banks
+    }
+    HDDS[I,table] = Info
+    DsTbl = table()
+    FS_Delay = 0
+}
+
+DsFunc["fs_mkfs_check",string] = "hddio_ds_fs"
+DsFunc["fs_mkfs",string] = "hddio_ds_fs"
+DsFunc["fs_readfs",string] = "hddio_ds_fs"
+DsFunc["fs_listdir",string] = "hddio_ds_fs"
+DsFunc["fs_mkfile",string] = "hddio_ds_fs"
+DsFunc["fs_writefile",string] = "hddio_ds_fs"
+DsFunc["fs_readfile",string] = "hddio_ds_fs"
+DsFunc["fs_rawreadfile",string] = "hddio_ds_fs"
+DsFunc["fs_rawwritefile",string] = "hddio_ds_fs"
+DsFunc["fs_mkboot",string] = "hddio_ds_fs"
+DsFunc["fs_removefile",string] = "hddio_ds_fs"
+DsFunc["fs_add2dir",string] = "hddio_ds_fs"
+DsFunc["fs_rename",string] = "hddio_ds_fs"
+function hddio_ds_fs(Name:string) {
+    if (!checkPerf(11000)) {
+        if (!FS_Delay) { DsTbl = table(Name,dsGetTable(),12000) }
+        CmdDelay = 1
+        FS_Delay = 1
+        timer("hddio_ds",33) 
+        return
+    }
+    
+    local FName = Name:sub(4)
+    local Info = (FS_Delay ? DsTbl[2,table] : dsGetTable())
+    if (FS_Delay) {
+        FS_Delay = 0
+    }        
+    
+    #[local FS = Info[2,string]
+    if (FName=="mkfs_check" & FS=="RAW") {
+        dsSendDirect(Name,Info[1,entity],"")
+    } else {        
+        dsSendDirect(Name,Info[1,entity],0)
+    }]#
+    switch(FName) {
+    case "mkfs_check",
+        local Func = Info[2,string]:lower()+"_"+FName
+        dsSendDirect(Name,Info[1,entity],Func(Info[3,array])[string])
+        hddload(0)
+    break
+    case "mkfs",
+        local Func = Info[2,string]:lower()+"_"+FName
+        local Args = Info[3,table]          
+        local Ret = Func(Args)[number]
+        dsSendDirect(Name,Info[1,entity],Ret)
+        if (!Ret) { hddload(0) }
+    break
+    case "readfs",
+        local Func = Info[2,string]:lower()+"_"+FName
+        local Args = Info[3,table]
+        if (FName!="") {
+            local Ret = Func(Args)[table] 
+            if (!Ret["wait",number]) {
+                dsSendDirect(Name,Info[1,entity],Ret)
+                hddload(0)
+            } else {
+                Func += "_callback"
+                Func(table(0,Info[1,entity]))
+            }
+        } else {
+            dsSendDirect(Name,Info[1,entity],table())
+            hddload(0)
+        }
+    break
+    case "listdir",
+    case "mkfile",
+    case "removefile",
+        local Func = Info[2,string]:lower()+"_"+FName
+        local Args = Info[3,table]
+        CmdCompleteCallback = table(Func,"hddio_fs",table(Name,Info[1,entity]))
+        Func(Args)   
+    break
+    case "writefile",
+        local Func = Info[2,string]:lower()+"_"+FName
+        local Args = Info[3,table]
+        CmdCompleteCallback = table(Func+"_finish","hddio_fs",table(Name,Info[1,entity]))
+        Func(Args)
+    break
+    case "readfile",
+    case "rawreadfile",
+    case "rawwritefile",
+        local Func = Info[2,string]:lower()+"_"+FName
+        local Args = Info[3,table]        
+        CmdCompleteCallback = table(Func+(Name=="readfile" ? "_finish" : ""),"hddio_fs",table(Name,Info[1,entity]))
+        if (!Func(Args)[number]) {
+            dsSendDirect(Name,Info[1,entity],0)
+            hddload(0)
+        }
+    break
+    case "mkboot",
+        local Func = Info[2,string]:lower()+"_"+FName
+        local Args = Info[3,table]
+        Func(Args)
+        dsSendDirect(Name,Info[1,entity],0)
+        hddload(0)
+    break
+    case "add2dir",
+        local Func = Info[2,string]:lower()+"_"+FName
+        local Args = Info[3,table]
+        CmdCompleteCallback = table(Func+"_finish","hddio_fs",table(Name,Info[1,entity]))
+        Func(Args)
+    break
+    case "rename",
+        local Func = Info[2,string]:lower()+"_"+FName
+        local Args = Info[3,table]
+        Func(Args)
+        dsSendDirect(Name,Info[1,entity],0)
+        hddload(0)
+    break
+    }
+    
+    #print(opcounter())
+}
+
+DsFunc["addfs2tbl",string] = "hddio_ds_addfs2tbl"
+function hddio_ds_addfs2tbl(Name:string) {
+    local Tbl = dsGetTable()
+    local Ent = Tbl[1,entity]
+    local HDD = Tbl[2,table]
+    local Info = Tbl[4,array]
+    local FsTbl = readfstbl(HDD)
+    if (!FsTbl:count()) {
+        mkfstbl(HDD)
+        FsTbl = readfstbl(HDD)
+    }
+    local N = Tbl[3,number]
+    if (N==-1) { N = findfreetbl(FsTbl) }
+    local St = addfs2tbl(HDD,FsTbl,N,Info[1,number],Info[2,number],Info[3,number])
+    dsSendDirect(Name,Ent,table(FsTbl,St))
+    hddload(0)
+}
+
+DsFunc["removefstbl",string] = "hddio_ds_removefstbl"
+function hddio_ds_removefstbl(Name:string) {
+    local Tbl = dsGetTable()
+    removefstbl(Tbl[1,table],Tbl[2,number])
+    hddload(0)
+}
+
+DsFunc["formatdisk",string] = "hddio_ds_formatdisk"
+function hddio_ds_formatdisk(Name:string) {
+    formatDisk(dsGetTable())
+    hddload(0)
+}
+
+DsFunc["activefstbl",string] = "hddio_ds_activefstbl"
+function hddio_ds_activefstbl(Name:string) {
+    local Tbl = dsGetTable()
+    activefstbl(Tbl[2,table],Tbl[3,number])
+    dsSendDirect(Name,Tbl[1,entity],0)
+    hddload(0)
+}
+
+DsFunc["readfstbl",string] = "hddio_ds_readfstbl"
+function hddio_ds_readfstbl(Name:string) {
+    if (!checkPerf(7000)) {
+        if (!FS_Delay) { DsTbl = table(Name,dsGetTable(),8000) }
+        CmdDelay = 1
+        FS_Delay = 1
+        timer("hddio_ds",33) 
+        return
+    }
+    local Tbl = (FS_Delay ? DsTbl[2,table] : dsGetTable())
+    dsSendDirect(Name,Tbl[1,entity],readfstbl(Tbl[2,table]))
+    hddload(0)
+    if (FS_Delay) {
+        DsTbl = table()
+        FS_Delay = 0
+    }
+}
+
+DsFunc["format_cd_disk",string] = "hddio_ds_format_cd_disk"
+function hddio_ds_format_cd_disk(Name:string) {
+    local Info = dsGetTable()
+    Info[-1,string] = Name
+    formatDiskCD(Info)
+}
+
+DsFunc["read_disk",string] = "hddio_ds_read_disk"
+function hddio_ds_read_disk(Name:string) {
+    local Tbl = dsGetTable()
+    local Ret = Tbl[1,string]
+    local Callback = Tbl[4,string]
+    if (Ret=="init" | Ret=="reinit") {
+        if (Ret=="reinit") {
+            local ID = Tbl[3,table]["ent",entity]:id()
+            WCD_ReadBuffer[ID,table] = table() 
+            Tbl[-1,number] = 1   
+        }
+        Tbl[-2,entity] = entity()
+        dsSendDirect(Name,Tbl[3,table]["ent",entity],Tbl)
+    } elseif(Ret=="OK") {
+        local Drive = Tbl[3,table]
+        local Info = readcdinfo(Drive)
+        local FS = Tbl[5,table]
+        if (FS:count()) {
+            tbl_merge(FS,Info) 
+            local ID = FS["hddinfo",table]["ent",entity]:id()
+            WCD_WriteBuffer[ID,table] = table()
+        }
+        if (Callback!="") {
+            Callback(table(1,Ret,Tbl,Info))
+        } else {
+            dsSendDirect(Name,Tbl[2,entity],table(Ret,Info))
+        }
+        hddload(0)
+    } else {
+        local FS = Tbl[5,table]
+        if (FS:count()) {
+            local Drive = Tbl[3,table]
+            local Info = readcdinfo(table())
+            tbl_merge(FS,Info)
+            local ID = FS["hddinfo",table]["ent",entity]:id()
+            WCD_WriteBuffer[ID,table] = table()
+        }    
+        if (Callback!="") {
+            Callback(table(1,Ret,Tbl))
+        } else {
+            dsSendDirect(Name,Tbl[2,entity],table(Ret))
+        }
+        hddload(0)
+    }
+}
+
+DsFunc["writeDiskIO",string] = "hddio_ds_diskIO"
+DsFunc["readDiskIO",string] = "hddio_ds_diskIO"
+DsFunc["clearDiskBuffer",string] = "hddio_ds_diskIO"
+DsFunc["clearDiskCommands",string] = "hddio_ds_diskIO"
+function hddio_ds_diskIO(Name:string) {
+    if (!checkPerf(5000)) {
+        if (!FS_Delay) { DsTbl = table(Name,dsGetTable(),6000) }
+        CmdDelay = 1
+        FS_Delay = 1
+        timer("hddio_ds",33) 
+        return
+    }
+    local Info = (FS_Delay ? DsTbl[2,table] : dsGetTable())
+    if (Info[2,string]!="") {
+        Info[2,string](Name,Info[4,table])
+    } elseif (Info[2,number]) {
+        dsSendDirect(Name,Info[1,entity],1)
+        hddload(0)
+    } else {
+        dsSendDirect(Name,Info[3,table]["ent",entity],Info)
+    }
+    FS_Delay = 0
+}
+
+DsFunc["moveTo",string] = "hddio_ds_diskMove"
+function hddio_ds_diskMove(Name:string) {
+    local Info = dsGetTable()
+    if (Info[2,string]!="") {
+        Info[2,string](Name,Info[4,table])
+    }
+}
+
+DsFunc["init",string] = "hddio_ds_init"
+function hddio_ds_init(Name:string) {
+    #[local Tbl = dsGetTable()
+    local HDD = HDDS[Tbl[2,number],table]
+    dsSendDirect(Name,Tbl[1,entity],HDD)]#
+    local Info = dsGetTable()
+    NB = Info[1,string]
+    TickQuota = Info[4,number]
+    if (Info[3,number]==0) {
+        HDDS = table()
+        for (I=0,HDD_MAX-1) {
+            dsSendDirect("init",ioGetInputWirelink("HDD_"+I):entity(),table(entity(),I*50))
+        }
+        timer("init_io",220)
+    } else {
+        hddload(0)
+    }
+    #dsSendDirect(Name,dsGetEntity(),table(HDDS,HDD_MAX,FS_TYPES))
+}
+
+DsFunc["hddfstbl",string] = "hddio_ds_hddfstbl"
+function hddio_ds_hddfstbl(Name:string) {
+    local Start = (FS_Delay ? DsTbl[4,number] : 1)
+    local FsTbl = (FS_Delay ? DsTbl[5,table] : table())
+    for (I=Start,HDD_MAX) {
+        if (!checkPerf(6000)) { break }
+        if (!HDDS[I,table]:count()) { Start++ continue }
+        FsTbl[I,table] = readfstbl(HDDS[I,table])
+        Start++
+    }
+    if (Start<=HDD_MAX) {
+        if (!FS_Delay) { DsTbl = table(Name,dsGetEntity(),7000,Start,FsTbl) }
+        else { DsTbl[4,number] = Start }
+        FS_Delay = 1
+        CmdDelay = 1
+        timer("hddio_ds",33) 
+        return
+    }    
+    
+    local Ent = (FS_Delay ? DsTbl[2,entity] : dsGetEntity())
+    if (FS_Delay) { FS_Delay = 0 }
+    
+    dsSendDirect(Name,Ent,FsTbl)
+    hddload(0)
+}
+
+DsFunc["SHUTDOWN",string] = "hddio_ds_shutdown"
+function hddio_ds_shutdown(Name:string) {
+    if (FS_Delay!=2) {
+        cmdShutdown()
+        CurTask = table()
+    }
+    # moved to BIOS due to crash
+    #[for (I=1,HDD_MAX) {
+        dsSendDirect("SHUTDOWN",HDDS[I,table]["ent",entity],entity())
+    }]#
+    if (!perf()) {
+        FS_Delay = 2
+        DsTbl = table(Name,dsGetNumber(),8000)
+        timer("hddio_ds",75)
+        return
+    }
+    local Num = (FS_Delay==2 ? DsTbl[2,number] : dsGetNumber())
+    dsSendDirect("SHUTDOWN",BIOS,Num)
+    FS_Delay = 0
+    DsTbl = table()
+    hddload(0)
+}
+
 function hddio_ds() {
+    # damn not sure how to fix this better
+    #print(Quota,opcounter(),minquota())
+    if (FS_Delay==1 & !checkPerf(DsTbl[3,number])) {
+        #local Dly = ceil(opcounter()/softQuota())*33
+        #print(Dly, perf(), perf(70), perf(80), perf(90), perf(100))
+        timer("hddio_ds",40)
+        return
+    }
     "hddio_ds"(DsTbl[1,string])   
 }
 
 function hddio_ds(Name:string) {
-    #Name = Name:sub(6)
-    if (Name!="hddinit") { hddload(1) }
-    if (Name=="clear") {
-        cmdShutdown()
-        CurTask = table() 
-        dsSendDirect(Name,dsGetEntity(),1)
-        hddload(0)   
-    } elseif (Name=="hddinit") {
-        local Tbl = dsGetTable()
-        local I = hddGetIndex(Tbl[1,entity])
-        if (HDD_MAX>0 & I>HDD_MAX) { exit() }
-        local Info = table()
-        Info["ent",entity] = Tbl[1,entity]
-        Info["size",number] = Tbl[2,number]
-        Info["fs_tbl_size",number] = FS_TBL_SIZE
-        Info["fs_max_size",number] = Tbl[2,number]-FS_TBL_SIZE-1
-        Info["bank_size",number] = Tbl[3,number]
-        Info["sector_size",number] = Tbl[4,number]
-        local Banks = Tbl[5,array]
-        Info["banks",number] = Banks:count()
-        Info["bank",array] = Banks
-        HDDS[I,table] = Info
-    } elseif (Name:left(3)=="fs_") {
-        if (!perf()) {
-            if (!FS_Delay) { DsTbl = table(Name,dsGetTable()) }
-            CmdDelay = 1
-            FS_Delay = 1
-            timer("hddio_ds",1) 
-            return
-        }
-    
-        local FName = Name:sub(4)
-        local Info = (FS_Delay ? DsTbl[2,table] : dsGetTable())
-        if (FS_Delay) {
-            FS_Delay = 0
-        }        
-        
-        #[local FS = Info[2,string]
-        if (FName=="mkfs_check" & FS=="RAW") {
-            dsSendDirect(Name,Info[1,entity],"")
-        } else {        
-            dsSendDirect(Name,Info[1,entity],0)
-        }]#
-        if (FName=="mkfs_check") {
-            local Func = Info[2,string]:lower()+"_"+FName
-            dsSendDirect(Name,Info[1,entity],Func(Info[3,array])[string])
-            hddload(0)
-        } elseif (FName=="mkfs") {
-            local Func = Info[2,string]:lower()+"_"+FName
-            local Args = Info[3,table]
-            if (!Args[2,table]:count()) {
-                local HDD = Args[1,table]
-                mkfstbl(HDD)
-                Args[2,table] = readfstbl(HDD)
-            }
-            local N = Args[3,number]
-            if (N==-1) { Args[3,number] = findfreetbl(Args[2,table]) }
-            
-            local Ret = Func(Args)[number]
-            dsSendDirect(Name,Info[1,entity],Ret)
-            if (!Ret) { hddload(0) }
-        } elseif (FName=="readfs") {
-            local Func = Info[2,string]:lower()+"_"+FName
-            local Args = Info[3,table]
-            local Ret = Func(Args[1,table],Args[2,table])[table] 
-            dsSendDirect(Name,Info[1,entity],Ret)
-            hddload(0)
-        } elseif (FName=="listdir") {
-            local Func = Info[2,string]:lower()+"_"+FName
-            local Args = Info[3,table]
-            CmdCompleteCallback = table(Func,"hddio_fs",table(Name,Info[1,entity]))
-            Func(Args[1,table],Args[2,number],Args[3,number])       
-        } elseif (FName=="mkfile") {
-            local Func = Info[2,string]:lower()+"_"+FName
-            local Args = Info[3,table]
-            CmdCompleteCallback = table(Func,"hddio_fs",table(Name,Info[1,entity]))
-            Func(Args[1,table],Args[2,string],Args[3,string],Args[4,number],Args[5,number])
-        } elseif (FName=="writefile") {
-            local Func = Info[2,string]:lower()+"_"+FName
-            local Args = Info[3,table]
-            CmdCompleteCallback = table(Func+"_finish","hddio_fs",table(Name,Info[1,entity]))
-            Func(Args[1,table],Args[2,number],Args[3,number],Args[4,string])
-        } elseif (FName=="readfile") {
-            local Func = Info[2,string]:lower()+"_"+FName
-            local Args = Info[3,table]
-            CmdCompleteCallback = table(Func+"_finish","hddio_fs",table(Name,Info[1,entity]))
-            if (!Func(Args[1,table],Args[2,table],Args[3,number],Args[4,number])[number]) {
-                dsSendDirect(Name,Info[1,entity],0)
-                hddload(0)   
-            }
-        } elseif (FName=="mkboot") {
-            local Func = Info[2,string]:lower()+"_"+FName
-            local Args = Info[3,table]
-            Func(Args)
-            dsSendDirect(Name,Info[1,entity],0)
-            hddload(0)
-        } elseif (FName=="removefile") {
-            local Func = Info[2,string]:lower()+"_"+FName
-            local Args = Info[3,table]
-            CmdCompleteCallback = table(Func,"hddio_fs",table(Name,Info[1,entity]))
-            Func(Args[1,table],Args[2,number],Args[3,number])
-        }
-    } elseif (Name=="addfs2tbl") {
-        local Tbl = dsGetTable()
-        local Ent = Tbl[1,entity]
-        local HDD = Tbl[2,table]
-        local Info = Tbl[4,array]
-        local FsTbl = readfstbl(HDD)
-        if (!FsTbl:count()) {
-            mkfstbl(HDD)
-            FsTbl = readfstbl(HDD)
-        }
-        local N = Tbl[3,number]
-        if (N==-1) { N = findfreetbl(FsTbl) }
-        local St = addfs2tbl(HDD,FsTbl,N,Info[1,number],Info[2,number],Info[3,number])
-        dsSendDirect(Name,Ent,table(FsTbl,St))
-        hddload(0)
-    } elseif (Name=="removefstbl") {
-        local Tbl = dsGetTable()
-        removefstbl(Tbl[1,table],Tbl[2,number])
-        hddload(0)
-    } elseif (Name=="formatdisk") {
-        formatDisk(dsGetTable())
-        hddload(0)
-    } elseif (Name=="activefstbl") {
-        local Tbl = dsGetTable()
-        activefstbl(Tbl[2,table],Tbl[3,number])
-        dsSendDirect(Name,Tbl[1,entity],0)
-        hddload(0)
-    } elseif (Name=="readfstbl") {
-        local Tbl = dsGetTable()
-        dsSendDirect(Name,Tbl[1,entity],readfstbl(Tbl[2,table]))
-        hddload(0)
-    } elseif (Name=="init") {
-        #[local Tbl = dsGetTable()
-        local HDD = HDDS[Tbl[2,number],table]
-        dsSendDirect(Name,Tbl[1,entity],HDD)]#
-        local Info = dsGetTable()
-        NB = Info[1,string]
-        if (Info[3,number]==0) {
-            HDDS = table()
-            dsSend("reload","HDD_IO",entity())
-            timer("init_io",50)
-        } else {
-            hddload(0)
-        }
-        #dsSendDirect(Name,dsGetEntity(),table(HDDS,HDD_MAX,FS_TYPES))
-    } elseif (Name=="hddfstbl") {
-        local FsTbl = table()
-        for(I=1,HDDS:count()) {
-            FsTbl[I,table] = readfstbl(HDDS[I,table])
-            #[for(C=0,FsTbl[I,table]:count()-1) {
-                printTable(wm1_readfs(HDDS[I,table],FsTbl[I,table][C,table]))
-            }]#
-        }
-        #printTable(FsTbl)
-        dsSendDirect(Name,dsGetEntity(),FsTbl)
-        hddload(0)
-    } elseif (Name=="SHUTDOWN") {
-        cmdShutdown()
-        CurTask = table()
-        dsSendDirect("SHUTDOWN",BIOS,dsGetNumber())
-        hddload(0)
+    local Func = DsFunc[Name,string]
+    if (Func!="") {
+        if (Name!="hddinit") { hddload(1) }
+        Func(Name)
     }
-    exit()    
+    exit()
 }
 
-dsSend("reload","HDD_IO",entity())
+#dsSend("reload","HDD_IO",entity())
 
-timer("reload",50)
+#timer("reload",50)
+
+#dsSendDirect("reload",BIOS,"hdd")
 
 #registerDS("hddio")
 
+timer("init_fs",1)
+
+}
+
+if (clk("init_fs")) {
+    if (!INCLUDE) {
+        init_fs()
+    }
+    if (opcounter()<1000) {
+        INCLUDE = 0
+        dsSendDirect("reload",BIOS,"hdd")
+    } else {
+        timer("init_fs",1)
+    }
+    exit()
+}
+
+if (last()) {
+    for (I=0,HDD_MAX-1) {
+        dsSendDirect("unlink",ioGetInputWirelink("HDD_"+I+1):entity(),entity())
+    }
 }
 
 if (!BIOS:isValid()) { exit() }
 
 if (dsClk()) {
     hddio_ds(dsClkName())
+    exit()
 }
 
 if (clk(clkName())) {
     local Name = clkName()
-    if (Name:left(4)=="cmd_") {
-        cmd_timer(Name)   
+    if (Name=="hddio_ds") {
+        hddio_ds()
+    } elseif (Name:left(4)=="cmd_") {
+        cmd_timer(Name)
     } elseif (Name=="init_io") {
         dsSendDirect("hddinfo",BIOS,table(HDDS,HDD_MAX,FS_TYPES))
         hddload(0)
-    } elseif (Name=="hddio_ds") {
-        hddio_ds()
     } elseif (Name=="reload") {
         dsSendDirect("reload",BIOS,"hdd")
+    }
+    exit()
+}
+
+if (inputClk()) {
+    local Name = inputClkName()
+    if (Name:left(4)=="HDD_") {
+        local ID = Name:right(1)+1
+        local Info = HDDS[ID,table]
+        dsSendDirect("unlink",Info["ent",entity],entity())
+        HDDS[ID,table] = table()
     }
 }

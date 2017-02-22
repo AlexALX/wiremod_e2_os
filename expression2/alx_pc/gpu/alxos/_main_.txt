@@ -1,5 +1,5 @@
 @name ALX Wiremod OS Main func
-@persist NL:string HTTP_Handler:string
+@persist HTTP_Handler:string DialogData:table
 
 #[
 	ALX Wiremod E2 OS
@@ -12,19 +12,387 @@ if (INCLUDE) {
 
 #include "alx_pc/gpu/_main_"
 
+function alxos_init() {
+    EgpCleanHandler = "alxos_OnEgpClear"   
+}
+
+function alxos_OnEgpClear() {
+    DialogData = table()   
+}
+
 function alxos_clear() {
     HTTP_Handler = ""
     ChatHandler = ""
+    DialogData = table()
+    EgpCleanHandler = ""
 }
 
-NL = toChar(10) # new line char
-
-function string alxos_nicesize(Sz) {
+function string alxos_nicesize(Sz,Dec) {
     local SzS = Sz+" Bytes"
     if (Sz/1024>1) {
-        SzS = floor(Sz/1024,2)+" KB"
+        SzS = floor(Sz/1024,Dec)+" KB"
     }
     return SzS
+}
+
+function string alxos_nicesize(Sz) {
+    return alxos_nicesize(Sz,2)
+}
+
+function number alxos_wm1_isdir(Entry:table) {
+    return ((Entry["attr",number] >> 4) && 1)       
+}
+
+function string alxos_wm1_date(Time) {
+    local Date = date(Time)
+    return Date["day",number]+"/"+Date["month",number]+"/"+Date["year",number]
+}
+
+function string alxos_wm1_time(Time) {
+    local Date = date(Time)
+    return format("%02d",Date["hour",number])+":"+format("%02d",Date["min",number])+":"+format("%02d",Date["sec",number])
+}
+
+# Dialog/Menu API
+
+function alxos_menu_key(Key:string,Close:string) {
+    if (Key=="f8") {
+        Close()
+        return
+    }
+    local Index = DialogData[-4,number]
+    if (Key=="down" | Key=="up") { 
+        local Max = DialogData[-5,number]
+        if (Max<2) { return }
+        local Ind = Index
+        if (Key=="down") {
+            Index = (Index==Max ? 1 : Index+1)
+        } else {
+            Index = (Index==1 ? Max : Index-1)
+        }
+        DialogData[-4,number] = Index
+        local BoxID = DialogData[-2,number]
+        local Info = DialogData[-3,table][Index,table]            
+        EGP:egpPos(BoxID,Info[5,vector2])
+    } elseif (Key=="enter") {
+        local Info = DialogData[-3,table][Index,table]
+        Info[3,string](Info)          
+    } else {
+        local Keys = DialogData[-6,table]
+        if (Keys[Key,string]!="") {
+            local Info = DialogData[-3,table][Index,table]
+            Keys[Key,string](Info)
+        }
+    }
+}
+
+function number alxos_dialog_key(Key:string) {
+    local Index = DialogData[-5,number]
+    local Type = DialogData[-2,string]
+    if ((Type=="yesno" | Type=="okcancel" | Type=="text") & (Key=="left" | Key=="right")) {
+        local Max = 2
+        local Ind = Index
+        if (Key=="right") {
+            Index = (Index==Max ? 1 : Index+1)
+        } else {
+            Index = (Index==1 ? Max : Index-1)
+        }
+        DialogData[-5,number] = Index
+        local CurID = DialogData[-4,table][Index,number]     
+        local PrevID = DialogData[-4,table][Ind,number]  
+        EGP:egpColor(PrevID,168,168,168,255)
+        EGP:egpColor(CurID,0,168,0,255)
+        return 1
+    } elseif (Key=="enter" | Key=="f8") {
+        if ((Type=="yesno" | Type=="okcancel" | Type=="text") & Key=="f8") { DialogData[5,number] = 2 }
+        local Callback = DialogData[-3,string]
+        if (Callback!="") { Callback() }
+        return 1
+    } elseif (Type=="text") {
+        local ITbl = DialogData[10,table]
+        local Index = DialogData[11,number]
+        if (Key=="down" | Key=="up" | Key=="tab") { 
+            local Max = DialogData[12,number]-1
+            if (Max<1) { return 1 }
+            local Ind = Index
+            if (Key!="up") {
+                Index = (Index==Max ? 0 : Index+1)
+            } else {
+                Index = (Index==0 ? Max : Index-1)
+            }
+            DialogData[11,number] = Index
+            local CurID = ITbl[Index,table]
+            local PrevID = ITbl[Ind,table]
+            EGP:egpText(CurID[1,number],CurID[2,string]+"_",EGP:egpPos(CurID[1,number]))
+            EGP:egpText(PrevID[1,number],PrevID[2,string],EGP:egpPos(PrevID[1,number]))
+        } else {
+            local D_I = ITbl[Index,table][1,number]
+            local D_V = ITbl[Index,table][2,string]
+            if (Key=="backspace") {
+                D_V = D_V:sub(0,D_V:length()-1)
+                EGP:egpText(D_I,D_V+"_",EGP:egpPos(D_I))
+                ITbl[Index,table][2,string] = D_V
+            } else {
+                local KMem = Keyboard["Memory",number] # handle capital/small without writting own code
+                local Char = toChar((KMem>=128 ? KMem-80 : KMem))
+                
+                local RE = ITbl[Index,table][3,string]
+                local MC = ITbl[Index,table][4,number]
+                
+                if (Char:findRE(RE) & KMem<=122) {
+                    D_V = (D_V+Char):left(MC)
+                    EGP:egpText(D_I,D_V+"_",EGP:egpPos(D_I))
+                    ITbl[Index,table][2,string] = D_V
+                }
+            }
+        }
+    }
+    return 0
+}
+
+function alxos_closemenu() {
+    local Parent = DialogData[-1,number]
+    for(I=Parent,Parent+5) {
+        EGP:egpRemove(I)   
+    }   
+    local Rm = DialogData[-3,table]
+    for(I=1,Rm:count()) {
+        EGP:egpRemove(Rm[I,table][4,number])
+    }
+    LAST_I = Parent
+    DialogData = table()
+}
+
+function alxos_closedialog() {
+    local Parent = DialogData[-1,number]
+    for(I=Parent,Parent+5) {
+        EGP:egpRemove(I)
+    }   
+    local Rm = DialogData[-10,table]
+    for(I=1,Rm:count()) {
+        EGP:egpRemove(Rm[I,number])
+    }
+    LAST_I = Parent
+    DialogData = table()
+}
+
+function alxos_menubg(Title:string,Width,Height,Col:table) {
+    local Parent = LAST_I
+    
+    local ReDraw = DialogData[-101,number]
+    if (ReDraw) {
+        local Parent = DialogData[-1,number]
+
+        EGP:egpSize(Parent,vec2(Width,Height))
+        EGP:egpPos(Parent,vec2(256-(Width/2),256-(Height/2)))
+        
+        EGP:egpSize(Parent+1,vec2(Width-16,Height-16))
+        EGP:egpPos(Parent+1,vec2((256+8)-(Width/2),(256+8)-(Height/2)))
+        EGP:egpSize(Parent+2,vec2(Width-22,Height-22))
+        EGP:egpPos(Parent+2,vec2((256+11)-(Width/2),(256+11)-(Height/2)))
+        
+        local Sz = Title:length()*12
+        EGP:egpPos(Parent+3,vec2(0-Sz/2,0-Height/2))
+        EGP:egpSize(Parent+3,vec2(Sz,22))
+        
+        EGP:egpText(Parent+4,Title,vec2(0,0-Height/2))
+        
+        return   
+    }
+    EGP:egpBox(LAST_I,vec2(256-(Width/2),256-(Height/2)),vec2(Width,Height))
+    EGP:egpColor(LAST_I,Col[1,vector4]) LAST_I++
+    
+    EGP:egpBoxOutline(LAST_I,vec2((256+8)-(Width/2),(256+8)-(Height/2)),vec2(Width-16,Height-16))
+    EGP:egpColor(LAST_I,Col[2,vector4]) LAST_I++
+    
+    EGP:egpBoxOutline(LAST_I,vec2((256+11)-(Width/2),(256+11)-(Height/2)),vec2(Width-22,Height-22))
+    EGP:egpColor(LAST_I,Col[2,vector4]) LAST_I++
+    
+    local Sz = Title:length()*12
+    EGP:egpBox(LAST_I,vec2(0-Sz/2,0-Height/2),vec2(Sz,22))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,Col[1,vector4]) LAST_I++
+    
+    EGP:egpText(LAST_I,Title,vec2(0,0-Height/2))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,Col[2,vector4]) LAST_I++
+    
+    DialogData[-1,number] = Parent
+    DialogData[-101,number] = 1
+}
+
+function alxos_menubg(Title:string,Width,Height) {
+    alxos_menubg(Title,Width,Height,table(vec4(0,168,168,255),vec4(255,255,255,255)))
+}
+
+function alxos_menu(Title:string,MenuTree:table,Width,Keys:table) {
+    local ReDraw = DialogData[-101,number]
+    local Height = MenuTree:count()*20+40
+    alxos_menubg(Title,Width,Height)
+    
+    local Parent = DialogData[-1,number]
+    local LAST_Y = 20-Height/2
+    local LeftPos = 20-Width/2
+
+    if (ReDraw) {
+        local Tbl = DialogData[-3,table]
+        for(I=1,Tbl:count()) {
+            EGP:egpRemove(Tbl[I,table][4,number])   
+        }
+        
+        local BoxID = DialogData[-2,number]
+        EGP:egpSize(BoxID,vec2(Width-32,20))
+        EGP:egpPos(BoxID,vec2(LeftPos-4,LAST_Y))        
+    } else {    
+        DialogData[-2,number] = LAST_I
+        EGP:egpBox(LAST_I,vec2(LeftPos-4,LAST_Y),vec2(Width-32,20))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    }
+    
+    for(I=1,MenuTree:count()) {
+        MenuTree[I,table][6,table] = MenuTree[I,table][4,table]
+        MenuTree[I,table][4,number] = LAST_I
+        MenuTree[I,table][5,vector2] = vec2(LeftPos-4,LAST_Y)
+        
+        EGP:egpText(LAST_I,MenuTree[I,table][2,string],vec2(LeftPos,LAST_Y))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,vec4(255,255,255,255)) LAST_I++ LAST_Y+=20
+    }
+
+    DialogData[-3,table] = MenuTree
+    DialogData[-4,number] = 1
+    DialogData[-5,number] = MenuTree:count()
+    DialogData[-6,table] = Keys
+    
+}
+
+function alxos_menu(Title:string,MenuTree:table,Width) {
+    alxos_menu(Title,MenuTree,Width,table())
+}
+
+function number alxos_dialog(Title:string,Width,Height,Type:string,Callback:string) {
+    alxos_menubg(Title,Width,Height,table(vec4(168,168,168,255),vec4(0,0,0,255)))
+    
+    local Parent = DialogData[-1,number]
+    
+    local ReDraw = DialogData[-101,number]
+    if (ReDraw) {
+        local Entities = DialogData[-4,table]
+        for(I=1,Entities:count()) {
+            EGP:egpRemove(Entities[I,number])   
+            EGP:egpRemove(Entities[I,number]+1) 
+        }
+        Entities = DialogData[-10,table]
+        for(I=1,Entities:count()) {
+            EGP:egpRemove(Entities[I,number])   
+        }
+    }
+    
+    DialogData[-2,string] = Type
+    DialogData[-3,string] = Callback
+    
+    local EntID = table()
+    DialogData[-10,table] = EntID
+    
+    if (Type=="yesno") {
+        local Entries = table()
+        
+        local Sz = 40
+        Entries[1,number] = LAST_I   
+        EntID:pushNumber(LAST_I)   
+        EGP:egpBox(LAST_I,vec2((Sz/2)-100,(Height/2)-22),vec2(Sz,20))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
+        
+        EntID:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Yes",EGP:egpPos(LAST_I-1)+vec2(5,0))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+        
+        local Sz = 30
+        Entries[2,number] = LAST_I
+        EntID:pushNumber(LAST_I)
+        EGP:egpBox(LAST_I,vec2((Sz/2)+48,(Height/2)-22),vec2(Sz,20))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,168,0,255) LAST_I++
+        
+        EntID:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"No",EGP:egpPos(LAST_I-1)+vec2(5,0))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+
+        DialogData[-5,number] = 2
+        DialogData[-4,table] = Entries
+
+    } elseif (Type=="okcancel" | Type=="text") {
+        local Entries = table()
+        
+        local Sz = 30
+        Entries[1,number] = LAST_I   
+        EntID:pushNumber(LAST_I)   
+        EGP:egpBox(LAST_I,vec2((Sz/2)-100,(Height/2)-22),vec2(Sz,20))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
+        
+        EntID:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"OK",EGP:egpPos(LAST_I-1)+vec2(5,0))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+        
+        local Sz = 60
+        Entries[2,number] = LAST_I
+        EntID:pushNumber(LAST_I)
+        EGP:egpBox(LAST_I,vec2((Sz/2)+20,(Height/2)-22),vec2(Sz,20))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,168,0,255) LAST_I++
+        
+        EntID:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Cancel",EGP:egpPos(LAST_I-1)+vec2(5,0))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+
+        DialogData[-5,number] = 2
+        DialogData[-4,table] = Entries
+
+    } elseif (Type=="ok") {
+        local Sz = 30
+        EntID:pushNumber(LAST_I)
+        EGP:egpBox(LAST_I,vec2(0-(Sz/2),(Height/2)-22),vec2(Sz,20))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,168,0,255) LAST_I++
+        
+        EntID:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"OK",EGP:egpPos(LAST_I-1)+vec2(5,0))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+        
+    } elseif (Type=="progress") {
+        local LAST_Y = Height/2-40
+        local LeftPos = 20-Width/2
+        
+        EntID:pushNumber(LAST_I)
+        EGP:egpBox(LAST_I,vec2(LeftPos,LAST_Y),vec2(Width-40,20))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,125,125,125,255) LAST_I++
+
+        DialogData[-5,number] = LAST_I
+        DialogData[-6,number] = Width-40
+        EntID:pushNumber(LAST_I)
+        EGP:egpBox(LAST_I,vec2(LeftPos,LAST_Y),vec2(1,20))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+        
+        DialogData[-4,number] = LAST_I
+        EntID:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"0%",vec2(0,LAST_Y))
+        EGP:egpAlign(LAST_I,1)
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,200,200,200,255) LAST_I++
+    }
+    
+    return Parent
 }
 
 }

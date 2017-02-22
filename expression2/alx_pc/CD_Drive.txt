@@ -1,0 +1,233 @@
+@name CD Drive
+@model models/jaanus/wiretool/wiretool_controlchip.mdl
+
+if (first()|duped()) {
+    
+#[
+    CD Drive Firmware
+    Created by AlexALX
+]#
+
+#include "alx_pc/shared/_main_" 
+#include "alx_pc/cd/_main_"   
+
+HDD = wirelink()
+HDD_IO = noentity()
+HDD_TYPE = 1
+HDD_NAME = "Wire BD-RE Drive" # vendor name
+
+exit()
+
+}
+
+if (tickClk()) {
+    local CurSpeedY = -Wheel:angVel()[2]
+    CurSpeed = CurSpeedY/100
+    if (Started) {
+        LastSpeedY = CurSpeedY
+        #RealSpeed = -1*(Wheel:angVel():yaw()/100)
+        #Wheel:applyAngForce((ang(0,-Speed,0)-Wheel:angVel()*ang(0,1,0))*Wheel:mass()*10)
+        if (!DisableRot & CurSpeedY < Speed) {
+            local Mass = (CurDisk:mass()>0 ? CurDisk:mass() : curDisk():mass())
+            Mass += Wheel:mass()
+            Mass += HolderEnt:mass()
+            local AddSpeed = (Speed-CurSpeedY)*Mass
+            Wheel:applyAngForce(ang(0,-AddSpeed,0))
+        }
+    } elseif (LastPos<0 | LastPosUp<0) {
+        LastPos += ReaderSpeed*tickInterval()
+        LastPos = clamp(LastPos,-34,0)
+        LastPosUp += ReaderSpeed*tickInterval()
+        LastPosUp = clamp(LastPosUp,-34,0)
+    }
+    
+    if (MoveTrack) {
+        local CurTrack = CurReader[4]
+        local PosAdd = -ReaderSpeed*tickInterval()*MoveDir
+        if (CurTrack!=MoveTrack) {
+            if (CurStack) {
+                LastPosUp += PosAdd   
+            } else {
+                LastPos += PosAdd    
+            }
+        } elseif (CurTrack==MoveTrack) {
+            MoveTrack = 0
+            MoveDir = 0
+        }
+        local CheckPos = 0
+        if (CurStack) {
+            LastPosUp = clamp(LastPosUp,-34,0)
+            CheckPos = LastPosUp
+        } else {
+            LastPos = clamp(LastPos,-34,0)
+            CheckPos = LastPos
+        }
+        if (CheckPos==0 | CheckPos==-34) {
+            if (MoveTrack==-1 & CheckPos==0) {
+                MoveTrack = 0
+            }
+            #Started = 0
+            #stopDisk()
+            MoveDir *= -1
+        }
+    }
+    
+    ReaderEnt:setPos(DriveBase:toWorld(ReaderPos+vec(0,-LastPos,LastPosZ)))
+    ReaderEnt:setAng(DriveBase:angles())
+    ReaderEnt:propFreeze(1)
+    
+    ReaderEntUp:setPos(DriveBaseUp:toWorld(ReaderPosUp+vec(0,-LastPosUp,LastPosUpZ)))
+    ReaderEntUp:setAng(DriveBaseUp:angles())
+    ReaderEntUp:propFreeze(1)
+    
+    #soundPitch(0,CurSpeedY/7)
+    
+    #StandEnt:propFreeze(DriveBase:isFrozen()) 
+    exit()
+}
+
+if (clk("doJob")) {
+    doJob()
+}
+
+if (clk("cmd")) {
+    cmdClk()
+    exit()  
+}
+
+if (clk("sendData")) {
+    sendData()   
+}
+
+if (clk("clearBufferBoth")) {
+    clearBufferBoth()   
+}
+
+if (clk("timeout")) {
+    if (DelayFix | MoveTrack | CMD=="initDisk") {
+        timer("timeout",10000)     
+    } else {
+        stopDiskRot()
+    }
+}
+
+if (inputClk()) {
+    local Name = inputClkName()
+    if (Name=="Holder" | Name=="Wheel") {
+        HolderEnt = Holder:entity()
+        #HolderEnt:parentTo(Wheel)
+        HolderEnt:propFreeze(0)
+        Wheel:propFreeze(0)
+    } elseif (Name=="SetSpeed") {
+        if (SetSpeed>0) {
+            Speed = SetSpeed*100
+        } else {
+            local Sp = CurDiskInfo[0,table]["max_speed",number]
+            if (Sp==0) { Sp = DiskSpeed }
+            Speed = Sp
+        }
+        OrigSpeed = Speed
+    } elseif (Name=="Reader") {
+        ReaderEnt = Reader:entity()
+        if (!CurStack) {
+            CurReader = Reader   
+        }
+    } elseif (Name=="ReaderUp") {
+        ReaderEntUp = ReaderUp:entity()
+        if (CurStack) {
+            CurReader = ReaderUp  
+        }
+    }#[ elseif (Name=="DriveBase" | Name=="StandEnt") {
+        #StandEnt:parentTo(DriveBase)
+    }]#
+}
+
+if (dsClk()) {
+    #stoptimer("timeout")
+    #timer("timeout",3000)
+    local Name = dsClkName()
+    
+    #[if (Name!="read_disk" & Name!="init" & Name!="unlink") {
+        Started = 1
+    }]#
+    
+    switch(Name) {
+    case "init",
+        if (HDD_IO==noentity() | dsGetTable()[1,entity]==HDD_IO) {
+            local Info = dsGetTable()
+            HDD_IO = Info[1,entity]
+            timer("sendData",Info[2,number])
+        }
+    break
+    case "unlink",
+        if (HDD_IO==dsGetEntity()) {
+            HDD_IO = noentity()
+        }
+    break
+    case "read_disk",
+        local Info = dsGetTable()
+        if (Info[5,number] | Info[-1,number]) {
+            stopDisk()
+        }
+        if (Info[-2,entity]) {
+            HDD_IO = Info[-2,entity]   
+        }
+        DriveData = table(Info)
+        readDisk()
+    break
+    case "readDiskIO",
+        local Data = dsGetTable()
+        #DriveData = table(Data[1,entity],Name)
+        local Callback = Data[2,string]
+        if (Callback!="") {
+            readDiskIO()
+        } else {
+            readDiskIO(Data[5,number],Data[4,number],Data[6,number])
+        }
+        Data[-1,string] = Name
+        runCmd("checkDiskIO",1,Data)
+    break
+    case "writeDiskIO",
+        local Data = dsGetTable()
+        #DriveData = table(Data[1,entity],Name)
+        local Callback = Data[2,string]
+        if (Callback!="") {
+            writeDiskIO()
+        } else {
+            writeDiskIO(Data[5,number],Data[4,number],Data[6,number])
+        }
+        Data[-1,string] = Name
+        runCmd("checkDiskIO",1,Data)
+    break
+    case "clearDiskBuffer",
+        clearBuffer()
+        local Info = dsGetTable()
+        Info[2,number] = 1
+        dsSendDirect(Name,HDD_IO,Info)
+    break
+    case "clearDiskCommands",
+        stopDiskJob()
+        local Type = dsGetType()
+        if (Type=="table") {
+            local Info = dsGetTable()
+            if (Info[2,string]=="") {
+                Info[2,number] = 1
+            }
+            dsSendDirect(Name,HDD_IO,Info)
+        }
+    break
+    case "SHUTDOWN",
+    case "stopdisk",
+        stopDisk()
+    break    
+    case "moveTo",
+        local Data = dsGetTable()
+        local Info = Data[3,table]
+        moveTo(Info["sector",number],Info["track",number],Info["stack",number])
+        dsSendDirect(Name,HDD_IO,Data)
+    break
+    case "stopdiskrot",
+        stopDiskRot()
+    break
+    }
+}

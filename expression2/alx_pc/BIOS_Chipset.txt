@@ -1,9 +1,9 @@
 @name BIOS / Chipset
-@inputs ROM:wirelink Speaker:entity E2_CPU:entity E2_GPU:entity E2_SPU:entity HDD_IO:wirelink
+@inputs ROM:wirelink Speaker:entity E2_CPU:entity E2_GPU:entity E2_SPU:entity HDD_IO:wirelink NoFanSound
 @inputs Keyboard:wirelink KeyboardUser:entity NullByte:string Power Reset
 @outputs BIOS:entity PowerInd HDDInd
 @persist INIT POST ERR_N ERR_I HDDS:table HDD_MAX FS_TYPES:table Shutdown ShutStep ShutMax Block SndBl
-@persist Reboot Reload HardReset BOOT_HDD NB:string
+@persist Reboot Reload HardReset BOOT_HDD
 @trigger 
 @model models/jaanus/wiretool/wiretool_controlchip.mdl
 
@@ -24,9 +24,12 @@
     1 long 2 short - GPU EGP limits error
     2 long - Keyboard error
     1 very long - Null Byte error
+    2 short - bad sound card
 ]#
 
 if (first()|duped()) {
+
+#include "alx_pc/shared/_main_"
     
 ERR_N = 0
 ERR_I = 0
@@ -72,6 +75,11 @@ function err() {
         ERR_I++
     } elseif (ERR_N==5) {
         Speaker:soundPlay(0,2,"synth/square_440.wav")
+    } elseif (ERR_N==6) {
+        if (ERR_I==2) { exit() }
+        Speaker:soundPlay(0,0.5,"synth/square_440.wav")
+        timer("err",750)
+        ERR_I++
     } elseif (ERR_N==-1) {
         Speaker:soundPlay(12,0.25,"synth/square_440.wav")
     }
@@ -144,6 +152,9 @@ function shutdownpost(Name:string,SDown) {
         } ]#
     #} elseif (SDown>=ShutMax) {
     } elseif (SDown==4) {
+        for (I=1,HDD_MAX) {
+            dsSendDirect("SHUTDOWN",HDDS[I,table]["ent",entity],entity())
+        }
         if (HDD_IO) {
             HDDInd = 1
             dsSendDirect(Name,HDD_IO:entity(),SDown)
@@ -168,10 +179,11 @@ function shutdownpost(Name:string,SDown) {
 
 function init_send(ID:string) {
     if (ID=="hdd") {
-        dsSendDirect("init",HDD_IO:entity(),table(NB,entity(),Reload))
+        dsSendDirect("init",HDD_IO:entity(),table(NB,entity(),Reload,TickQuota))
     } else {
         local Ent = (ID=="cpu" ? E2_CPU : E2_GPU)
-        dsSendDirect("init",Ent,table(NB,E2_CPU,E2_GPU,E2_SPU,array(Keyboard,->Keyboard),array(HDD_IO,->HDD_IO),BOOT_HDD,Reload,HDDS,HDD_MAX,FS_TYPES))
+        local Ent = (ID=="spu" ? E2_SPU : Ent)
+        dsSendDirect("init",Ent,table(NB,E2_CPU,E2_GPU,E2_SPU,array(Keyboard,->Keyboard),array(HDD_IO,->HDD_IO),BOOT_HDD,Reload,HDDS,HDD_MAX,FS_TYPES,TickQuota))
     }
 }
     
@@ -180,7 +192,9 @@ function init() {
     if (INIT) {
         shutdown()
     } else {
-        if (!SndBl) {
+        TickQuota = maxquota()
+    
+        if (!SndBl & !NoFanSound) {
             soundStop(99)
             soundPlay(99,0,"ambient/machines/air_conditioner_cycle.wav")
             soundPitch(99,150)
@@ -206,17 +220,19 @@ function init() {
             timer("err",2500)
             exit()
         }
+        HDDS = table()
         NB = NullByte
-        BOOT_HDD = (ROM[0] & 0xF)+1
-        POST = 1
+        BOOT_HDD = ROM[0]+1 
+        POST = 0
         Reload = 0
-        init_send("cpu")
-        timer("postinit",100)
+        init_send("hdd")
+        timer("postinit",250)
     }
 }
 
 function ready() {
     INIT = 2
+    POST = 4
     if (!Reload) {
         dsSendDirect("ready",E2_CPU,1)
     }
@@ -229,12 +245,28 @@ if (dsClk()) {
     if (Name=="init") {
         stoptimer("postinit")
         local ID = dsGetString()
-        if (POST==1) {
+        if (POST==0) {
+            init_send("cpu")
+            timer("postinit",100)
+        } elseif (POST==1) {
+            if (ID!="cpu") { timer("postinit",1) exit() }
             init_send("gpu")
             timer("postinit",100)
         } elseif (POST==2) {
-            init_send("hdd")
-            timer("postinit",100)
+            if (ID!="gpu") { timer("postinit",1) exit() }
+            if (E2_SPU:isValid()) {
+                init_send("spu")
+                timer("postinit",100)
+            } else {
+                stoptimer("postinit")
+                ready()
+                exit()
+            }
+        } elseif (POST==3) {
+            if (ID!="spu") { timer("postinit",1) exit() }
+            stoptimer("postinit")
+            ready()
+            exit()
         }
         POST++
     } elseif (Name=="HDDInd") {
@@ -242,18 +274,25 @@ if (dsClk()) {
     } elseif (Name=="gethdds") {
         dsSendDirect(Name,dsGetEntity(),table(HDDS,HDD_MAX,FS_TYPES))
     } elseif (Name=="hddinfo") {
-        stoptimer("postinit")
+        #stoptimer("postinit")
         local Tbl = dsGetTable()
         HDDS = Tbl[1,table]
         HDD_MAX = Tbl[2,number]
         FS_TYPES = Tbl[3,table]
-        ready()
+        #ready()
+        init_send("cpu")
+        POST++
+        timer("postinit",100)
     } elseif (Name=="reload") {
         if (!INIT) { exit() }
         local ID = dsGetString()
         Reload = 1
         init_send(ID)
         Reload = 0
+        if (DEBUG) {
+            Reboot = 1
+            shutdown()
+        }
     } elseif (Name=="SHUTDOWN") {
         local End = dsGetNumber()
         if (End>0) {
@@ -270,13 +309,16 @@ if (dsClk()) {
     } elseif (Name=="SAVE") {
         if (Shutdown) { exit() }
         BOOT_HDD = dsGetNumber()
-        ROM[0] = (BOOT_HDD-1) & 0xF
+        ROM[0] = BOOT_HDD-1
         Reboot = 1
         shutdown()
     } elseif (Name=="err") {
         ERR_N = dsGetNumber()
         INIT = 2
         err()
+    } elseif (Name=="setboothdd") {
+        BOOT_HDD = dsGetNumber()
+        ROM[0] = BOOT_HDD-1
     }
     exit()
 }
@@ -289,9 +331,16 @@ if (clk("init")) {
 }
 
 if (clk("postinit")) {
+    if (POST==0) {
+        init_send("cpu")
+        timer("postinit",100)
+        POST++
+        exit() 
+    }
     ERR_N = POST
     if (POST==2) { ERR_N = 3 }
-    if (POST==3) {
+    if (POST==3) { ERR_N = 6 }
+    if (POST==4) {
         ready()
         exit()
     }
