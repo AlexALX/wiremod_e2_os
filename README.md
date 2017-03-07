@@ -2,6 +2,7 @@ ALX Wiremod E2 PC & OS
 =========================  
 [![image](http://i.imgur.com/JKsvgmS.jpg)](http://imgur.com/a/Bils2/)  
 More screenshots: http://imgur.com/a/Bils2/
+Video: https://www.youtube.com/watch?v=98HriO_Dc68
 
 This is an Wiremod Expression2 OS for Garry's Mod Game.  
 Written in in-game Expression2 Language (wiremod addon).  
