@@ -26,7 +26,8 @@ function nicesize($bytes) {
 	return $bytes;
 }
 
-function alxos_convert($File,$FName) {	global $dir;
+function alxos_convert($File,$FName) {
+	global $dir;
 	$F = file_get_contents($File);
     if ($F!="") {
 		$JSON = json_decode($F,true);
@@ -52,9 +53,11 @@ function alxos_convert($File,$FName) {	global $dir;
 	}
 }
 
-if (isset($_GET["dw"]))  {    $quoted = sprintf('"%s"', addcslashes(basename($_GET['f']), '"\\'));
+if (isset($_GET["dw"]))  {
+    $quoted = sprintf('"%s"', addcslashes(basename($_GET['f']), '"\\'));
     $file = preg_replace("/^[^A-Za-z0-9_. -]+$/","",$_GET['dw'])."_conv.txt";
-    if (!file_exists($dir.$file) ) {    	die("File not exists!");
+    if (!file_exists($dir.$file) ) {
+    	die("File not exists!");
     }
 	$size   = filesize($dir.$file);
 	header('Content-Description: File Transfer');
@@ -76,7 +79,9 @@ if (isset($_GET["dw"]))  {    $quoted = sprintf('"%s"', addcslashes(basename($_
 </head>
 <body>
 <form method='post' enctype='multipart/form-data'>Upload file: <input type='file' name='file'> <input type='submit' name='upload' value='OK'></form>
-<?php if (isset($_POST["upload"])) {	if (isset($_FILES["file"])) {		alxos_convert($_FILES["file"]["tmp_name"],$_FILES["file"]["name"]);
+<?php if (isset($_POST["upload"])) {
+	if (isset($_FILES["file"])) {
+		alxos_convert($_FILES["file"]["tmp_name"],$_FILES["file"]["name"]);
 	}
 } ?>
 </body>
