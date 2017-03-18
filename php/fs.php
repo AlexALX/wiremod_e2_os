@@ -17,14 +17,19 @@ define("HDD_SECTOR_SIZE",4);
 
 $table = array();
 
-function readTable() {	global $cfile;	$tbl = array();
-	if (file_exists($cfile)) {		$tmp = json_decode(file_get_contents($cfile),true);
+function readTable() {
+	global $cfile;
+	$tbl = array();
+	if (file_exists($cfile)) {
+		$tmp = json_decode(file_get_contents($cfile),true);
 		if ($tmp) $tbl = $tmp;
-	}	return $tbl;
+	}
+	return $tbl;
 }
 
 function writeTable($tbl) {
-	global $cfile;	file_put_contents($cfile,json_encode($tbl));
+	global $cfile;
+	file_put_contents($cfile,json_encode($tbl));
 }
 
 function writeCell($addr,$val,$debug=false) {
@@ -35,8 +40,10 @@ function writeCell($addr,$val,$debug=false) {
 	if ($debug) echo $addr."=".$val." ".(isset($table[$addr])?$table[$addr]:0)."||";
 }
 
-function readCell($addr) {	global $table;
-	if ($addr<0||$addr>=HDD_SIZE) { /*print_r(debug_backtrace());*/ echo "ERROR READ $addr "; return 0; } // out of hdd size	return (isset($table[$addr]) ? $table[$addr] : 0);
+function readCell($addr) {
+	global $table;
+	if ($addr<0||$addr>=HDD_SIZE) { /*print_r(debug_backtrace());*/ echo "ERROR READ $addr "; return 0; } // out of hdd size
+	return (isset($table[$addr]) ? $table[$addr] : 0);
 }
 
 /*===========================/
@@ -50,21 +57,25 @@ function redirect($url) {
 	die();
 }
 
-function str2byte($str) {	if ($str=="") return 0;
+function str2byte($str) {
+	if ($str=="") return 0;
 	$str = substr($str,0,4);
 	/*if (strlen($str)<4) {
 		$str .= str_repeat(" ",4-strlen($str));
 	}*/
 	$str = str_split($str);
 	$ret = 0;
-	foreach($str as $k=>$v) {    	$ret += (ord($v) << (8*$k));
+	foreach($str as $k=>$v) {
+    	$ret += (ord($v) << (8*$k));
 	}
 	return $ret;
 }
 
-function byte2str($num,$limit) {	$ret = "";
+function byte2str($num,$limit) {
+	$ret = "";
 	if (!$limit) $limit = 4;
-	for($k=0;$k<$limit;$k++) {		$tmp = ($num >> (8*$k)) & 0xFF;
+	for($k=0;$k<$limit;$k++) {
+		$tmp = ($num >> (8*$k)) & 0xFF;
 		if ($tmp>0) $ret .= chr($tmp);
 	}
 	return $ret;
@@ -88,25 +99,34 @@ define("FS_TBL_SIZE",9);
 define("FS_MAX_SIZE",HDD_SIZE-FS_TBL_SIZE-1);
 
 function mkfstbl() {
-	for ($n=0;$n<4;$n++) {		$o = $n*2;		writeCell($o,0);
+	for ($n=0;$n<4;$n++) {
+		$o = $n*2;
+		writeCell($o,0);
 		writeCell($o+1,0);
 	}
 	writeCell(FS_TBL_SIZE-1,0x55AA);
 }
 
-function findfreetbl($fstbl) {	foreach($fstbl as $k=>$v) {		if ($v['type']==0) return $k;
+function findfreetbl($fstbl) {
+	foreach($fstbl as $k=>$v) {
+		if ($v['type']==0) return $k;
 	}
 	return -1;
 }
 
 function gettblsize($fstbl,$n) {
-	$ts = 0;	foreach($fstbl as $k=>$v) {		if ($v['type']!=0) {			$ts += $v['total'];
+	$ts = 0;
+	foreach($fstbl as $k=>$v) {
+		if ($v['type']!=0) {
+			$ts += $v['total'];
 		}
 	}
 	return $ts;
 }
 
-function getlasttblsector($fstbl) {	$max = 0;	foreach($fstbl as $k=>$v) {
+function getlasttblsector($fstbl) {
+	$max = 0;
+	foreach($fstbl as $k=>$v) {
 		if ($v['type']!=0 && $max<$v['end']) {
 			 $max = $v['end'];
 		}
@@ -116,12 +136,15 @@ function getlasttblsector($fstbl) {	$max = 0;	foreach($fstbl as $k=>$v) {
 
 function findtblsectors($fstbl,$n) {
 	$min = FS_TBL_SIZE;
-	$max = HDD_SIZE-1;	foreach($fstbl as $k=>$v) {
+	$max = HDD_SIZE-1;
+	foreach($fstbl as $k=>$v) {
 		if ($v['type']==0) continue;
 		if ($n<$k && $v['start']<$max) {
 			$max = $v['start'];
 			break;
-		}		if ($n>$k && $v['end']>$min) {			$min = $v['end'];
+		}
+		if ($n>$k && $v['end']>$min) {
+			$min = $v['end'];
 		}
 	}
 	return array($min,$max);
@@ -163,7 +186,8 @@ function readfstbl() {
 	return $fstbl;
 }
 
-function movefstbl($fstbl,$n,$up) {	if ($n<0 || $n>3 || !count($fstbl)) return;
+function movefstbl($fstbl,$n,$up) {
+	if ($n<0 || $n>3 || !count($fstbl)) return;
 	if ($up) $up = 1; else $up = -1;
 	$new_n = $n+$up;
 	if ($new_n<0 || $new_n>3) return;
@@ -201,7 +225,8 @@ function movefstbl($fstbl,$n,$up) {	if ($n<0 || $n>3 || !count($fstbl)) return;
 	writeCell($o+1,$fstbl[$n]['type'] + ($sz << 8));
 }
 
-function removefstbl($n) {	if ($n<0 || $n>3 || readCell(FS_TBL_SIZE-1)!=0x55AA) return;
+function removefstbl($n) {
+	if ($n<0 || $n>3 || readCell(FS_TBL_SIZE-1)!=0x55AA) return;
 	$o = $n*2;
 	writeCell($o,0);
 	writeCell($o+1,0);
@@ -211,7 +236,8 @@ function removefstbl($n) {	if ($n<0 || $n>3 || readCell(FS_TBL_SIZE-1)!=0x55AA)
 	WM1 FS helper func
 /===========================*/
 
-function WM1_findsectorbycluster($fi,$c) {	return $fi['reserved_sectors']+$fi['fat_tables']*$fi['sectors_for_fat']+(($c-1)*$fi['sectors_in_cluster']);
+function WM1_findsectorbycluster($fi,$c) {
+	return $fi['reserved_sectors']+$fi['fat_tables']*$fi['sectors_for_fat']+(($c-1)*$fi['sectors_in_cluster']);
 }
 
 /*===========================/
@@ -251,7 +277,8 @@ function WM1_updatefat(&$fi,$c,$val) {
 		$fi['free_clusters'] = $fi['free_clusters']+$tmp;
 		//writeCell($fi['reserved_sectors']-2,$fi['free_clusters'] + ($fi['last_free_cluster'] << 16));
 		if ($val==0&&$cur!=0) {
-			if ($fi['last_free_cluster']>$c) {				$fi['last_free_cluster'] = $c;
+			if ($fi['last_free_cluster']>$c) {
+				$fi['last_free_cluster'] = $c;
 				//writeCell($fi['reserved_sectors']-2,$fi['free_clusters'] + ($fi['last_free_cluster'] << 16));
 			}
 		} elseif($val!=0&&$cur==0) {
@@ -459,7 +486,8 @@ function WM1_findfreediroffset($fi,$dir) {
 	return 0;
 }
 
-function WM1_direxists($fi,$dir) {	$tmp = WM1_readfatcluster($fi,$dir);
+function WM1_direxists($fi,$dir) {
+	$tmp = WM1_readfatcluster($fi,$dir);
 	if ($tmp==0) return false; // not exists, yes we can remove root dir
 	if ($dir==$fi['root_dir_cluster']) return true; // root dir always exists if found
 	// read "." folder
@@ -469,7 +497,8 @@ function WM1_direxists($fi,$dir) {	$tmp = WM1_readfatcluster($fi,$dir);
 	return true;
 }
 
-function WM1_findfileindiroffset($fi,$dir,$file) {	$max = $fi['sectors_in_cluster']/8;
+function WM1_findfileindiroffset($fi,$dir,$file) {
+	$max = $fi['sectors_in_cluster']/8;
 	$o = WM1_findsectorbycluster($fi,$dir);
 	for ($i=0;$i<$max;$i++) {
 		$c = (readCell($o+$i*8+2) >> 16) & 0xFFFF;
@@ -521,7 +550,8 @@ function WM1_mksysdirs(&$fi,$dir,$c) {
 	writeCell($o+2,$c << 16);
 	writeCell($o+3,(1 << 28));
 	// create ".." dir
-	if (($fi['sectors_in_cluster']/8)==1) {		// special fix when cluster size is 32 bytes
+	if (($fi['sectors_in_cluster']/8)==1) {
+		// special fix when cluster size is 32 bytes
 		$o = WM1_findfreediroffset($fi,$c);
 		if (!$o) {
 			$l = WM1_findlastcluster($fi,$c);
@@ -550,14 +580,17 @@ function WM1_fileexists($fi,$sc,$file) {
 	return false;
 }
 
-function WM1_removefile(&$fi,$c,$sc) {	$tmp = WM1_readfatcluster($fi,$c);
+function WM1_removefile(&$fi,$c,$sc) {
+	$tmp = WM1_readfatcluster($fi,$c);
 	if ($tmp==0) return 0;
 	/*$max = $fi['sectors_in_cluster'];
 	$o = WM1_findsectorbycluster($fi,$c);
 	for ($i=0;$i<$max;$i++) {
 		writeCell($o+$i,0);
 	}*/
-	if ($sc>0) {		for ($i=0;$i<8;$i++) {			writeCell($sc+$i,0);
+	if ($sc>0) {
+		for ($i=0;$i<8;$i++) {
+			writeCell($sc+$i,0);
 		}
 	}
 	if ($tmp>0 && $tmp<0xFFFD) {
@@ -566,7 +599,8 @@ function WM1_removefile(&$fi,$c,$sc) {	$tmp = WM1_readfatcluster($fi,$c);
 	WM1_updatefat($fi,$c,0);
 }
 
-function WM1_rawwritefile(&$fi,$c,$sd,$data,$fsz) {	if ($c<=2) return 1;
+function WM1_rawwritefile(&$fi,$c,$sd,$data,$fsz) {
+	if ($c<=2) return 1;
 	$size = WM1_getsize($fi,$c);
 	if (!$size) return 2; // not exists, size=0
 	$max = count($data);
@@ -577,15 +611,18 @@ function WM1_rawwritefile(&$fi,$c,$sd,$data,$fsz) {	if ($c<=2) return 1;
 	if ($sd>0) {
 		writeCell($sd+5,time());
 		writeCell($sd+6,time());
-		if ($fsz>0) {			writeCell($sd+7,$fsz);
+		if ($fsz>0) {
+			writeCell($sd+7,$fsz);
 		} else {
 			writeCell($sd+7,$max*$fi['bytes_in_sector']);  //ceil($max/$fi['sectors_in_cluster'])*$fi['sectors_in_cluster']
 		}
 	}
 	$of = WM1_findsectorbycluster($fi,$c);
 	$ii = 0;
-	for ($i=0;$i<$max;$i++) {		if ($ii==$fi['sectors_in_cluster']) {
-			$ii = 0;			$of = WM1_findfreecluster($fi);
+	for ($i=0;$i<$max;$i++) {
+		if ($ii==$fi['sectors_in_cluster']) {
+			$ii = 0;
+			$of = WM1_findfreecluster($fi);
 			WM1_updatefat($fi,$c,$of);
 			WM1_updatefat($fi,$of,0xFFFF);
 			$c = $of;
@@ -598,11 +635,13 @@ function WM1_rawwritefile(&$fi,$c,$sd,$data,$fsz) {	if ($c<=2) return 1;
 	return 0;
 }
 
-function WM1_rawreadfile($fi,$c,$sd) {	if ($c<2) return array();
+function WM1_rawreadfile($fi,$c,$sd) {
+	if ($c<2) return array();
 	$tmp = WM1_readfatcluster($fi,$c);
 	if ($tmp==0) return array(); // not exists
 	$sz = -1;
-	if ($sd>0) {		writeCell($sd+5,time());
+	if ($sd>0) {
+		writeCell($sd+5,time());
 		$sz = readCell($sd+7);
 		if ($sz==0) return array();
 	} else $sz = WM1_getsize($fi,$c);
@@ -610,7 +649,8 @@ function WM1_rawreadfile($fi,$c,$sd) {	if ($c<2) return array();
 	$max = $fi['sectors_in_cluster'];
 	$of = WM1_findsectorbycluster($fi,$c);
 	/*if ($sz<0) {
-		for ($i=0;$i<$max;$i++) {			$ret[] = readCell($of+$i);
+		for ($i=0;$i<$max;$i++) {
+			$ret[] = readCell($of+$i);
 		}
 		if ($tmp>0 && $tmp<0xFFFD) {
 			// array_merge too slow
@@ -637,7 +677,8 @@ function WM1_rawreadfile($fi,$c,$sd) {	if ($c<2) return array();
 	return $ret;
 }
 
-function WM1_getfileinfo($of) {	$c = (readCell($of+2) >> 16) & 0xFFFF;
+function WM1_getfileinfo($of) {
+	$c = (readCell($of+2) >> 16) & 0xFFFF;
 	if ($c==0) return array();
 	return array(
 		"name"=>byte2str(readCell($of),0).byte2str(readCell($of+1),0).byte2str(readCell($of+2) & 0xFFFF,2),
@@ -680,7 +721,8 @@ function WM1_mkfile(&$fi,$sd,$name,$ext,$is_dir,$dir) {
 	// Update FATs
 	WM1_updatefat($fi,$c,0xFFFF);
 
-	if ($dir!=$fi['root_dir_cluster']) {		writeCell($sd+5,time());
+	if ($dir!=$fi['root_dir_cluster']) {
+		writeCell($sd+5,time());
 		writeCell($sd+6,time());
 	}
 

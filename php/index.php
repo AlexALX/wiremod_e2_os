@@ -155,7 +155,8 @@ $lang = array(
 
 $curlang = "en";
 
-function get_msg($key) {	global $curlang,$lang;
+function get_msg($key) {
+	global $curlang,$lang;
 	return $lang[$curlang][$key];
 }
 
@@ -164,10 +165,12 @@ $needw = false;
 
 $fstbl = readfstbl();
 
-if (isset($_GET['format'])) {	$table = array();
+if (isset($_GET['format'])) {
+	$table = array();
 	$needw = true;
 	redirect(FILE_SELF);
-} elseif (isset($_GET['formatfs'])) {	$fsinfo = WM1_readfs($fstbl,$_GET['formatfs']);
+} elseif (isset($_GET['formatfs'])) {
+	$fsinfo = WM1_readfs($fstbl,$_GET['formatfs']);
 	$needw = true;
 	WM1_format($fsinfo);
 	redirect(FILE_SELF);
@@ -179,7 +182,8 @@ if (isset($_GET['format'])) {	$table = array();
 
 // Helper functions
 
-function hddinfo() {	echo get_msg("HDD_I").":";
+function hddinfo() {
+	echo get_msg("HDD_I").":";
 	echo "<br>".get_msg("HDD_C").": ".nicesize(HDD_SIZE*HDD_SECTOR_SIZE);
 	echo "<br>".get_msg("HDD_S").": ".nicesize(HDD_SECTOR_SIZE);
 	echo "<hr>";
@@ -195,8 +199,10 @@ function nicesize($bytes) {
 	return $bytes;
 }
 
-function volumeexists($fstbl,$name) {	if ($name=="") return 0;
-	foreach($fstbl as $k=>$v) {		if (!isset($v['type'])||$v['type']!=1) continue;
+function volumeexists($fstbl,$name) {
+	if ($name=="") return 0;
+	foreach($fstbl as $k=>$v) {
+		if (!isset($v['type'])||$v['type']!=1) continue;
 		$fs = WM1_readfs($fstbl,$k);
 		if (!count($fs)) continue;
 		if ($fs['volume_name']==$name) return 1;
@@ -204,33 +210,46 @@ function volumeexists($fstbl,$name) {	if ($name=="") return 0;
 	return 0;
 }
 
-function findvolumebyname($fstbl,$name,&$fs) {	if ($name=="") return -1;
+function findvolumebyname($fstbl,$name,&$fs) {
+	if ($name=="") return -1;
 	foreach($fstbl as $k=>$v) {
 		if (!isset($v['type'])||$v['type']!=1||!$v['active']) continue;
 		$fs = WM1_readfs($fstbl,$k);
-		if (!count($fs)) continue;		if ($fs['volume_name']==$name) return $k;
+		if (!count($fs)) continue;
+		if ($fs['volume_name']==$name) return $k;
 	}
 	return -1;
 }
 
-function finddirbyname($fs,$dir_sc,$name) {	$ls = WM1_listdir($fs,$dir_sc[0],$dir_sc[1]);
+function finddirbyname($fs,$dir_sc,$name) {
+	$ls = WM1_listdir($fs,$dir_sc[0],$dir_sc[1]);
 	if (!count($ls)) return array();
-	foreach($ls as $k=>$v) {		$ext = "";		if ($v['ext']!="") $ext = ".".$v['ext'];		if (($v['name'].$ext)==$name) return array($v['cluster'],$v['data_sector'],($v['attr'] >> 4) & 1);
+	foreach($ls as $k=>$v) {
+		$ext = "";
+		if ($v['ext']!="") $ext = ".".$v['ext'];
+		if (($v['name'].$ext)==$name) return array($v['cluster'],$v['data_sector'],($v['attr'] >> 4) & 1);
 	}
 	return array();
 }
 
-function rmpathdots($path) {	$npath = $path;
-	foreach($path as $k=>$v) {		if ($v==".") unset($npath[$k]);
-		elseif ($v==".."&&$k>1) {			unset($npath[$k-1]);			unset($npath[$k]);
+function rmpathdots($path) {
+	$npath = $path;
+	foreach($path as $k=>$v) {
+		if ($v==".") unset($npath[$k]);
+		elseif ($v==".."&&$k>1) {
+			unset($npath[$k-1]);
+			unset($npath[$k]);
 		}
-	}	return $npath;
+	}
+	return $npath;
 }
 
-function parsepath($path,$fstbl,&$fs) {	if (!count($fstbl) || !count($path)) return array();
+function parsepath($path,$fstbl,&$fs) {
+	if (!count($fstbl) || !count($path)) return array();
 	$arr = array();
 	//$fs = array();
-	foreach($path as $k=>$v) {		if ($v=="") break;
+	foreach($path as $k=>$v) {
+		if ($v=="") break;
 		if ($k==0) {
 			$tmp = findvolumebyname($fstbl,$v,$fs);
 			if ($tmp<0) return array();
@@ -240,7 +259,8 @@ function parsepath($path,$fstbl,&$fs) {	if (!count($fstbl) || !count($path)) re
 				$tmp = array($fs['root_dir_cluster'],0);
 			} else {
 				$tmp = $arr[$k-1];
-			}			$tmp = finddirbyname($fs,$tmp,$v);
+			}
+			$tmp = finddirbyname($fs,$tmp,$v);
 			if (!count($tmp)) return array();
 			$arr[$k] = $tmp;
 		}
@@ -248,8 +268,10 @@ function parsepath($path,$fstbl,&$fs) {	if (!count($fstbl) || !count($path)) re
 	return $arr;
 }
 
-function add2path($path,$add) {	if ($add==".") return $path;
-	if ($add=="..") {		$path = explode("/",$path);
+function add2path($path,$add) {
+	if ($add==".") return $path;
+	if ($add=="..") {
+		$path = explode("/",$path);
 		unset($path[count($path)-1]);
 		return implode("/",$path);
 	}
@@ -269,7 +291,8 @@ $head = false;
 function head($curfs=-1) {
 	global $head;
 	if ($head) return;
-	$head = true;	echo "[ <a href='?format'>".get_msg("FORMAT_DISK")."</a> ] [ <a href='?mkfstbl'>".get_msg("MK_FS_TBL")."</a> ]<br>";
+	$head = true;
+	echo "[ <a href='?format'>".get_msg("FORMAT_DISK")."</a> ] [ <a href='?mkfstbl'>".get_msg("MK_FS_TBL")."</a> ]<br>";
 	echo "[ <a href='?mkfs'>".get_msg("MKFS")."</a> ]".($curfs>=0?" [ <a href='?formatfs=".$curfs."'>".get_msg("FORMAT_FS")."</a> ]":"")."<br>";
 	echo "<hr>";
 }
@@ -278,13 +301,16 @@ function head($curfs=-1) {
 
 if (!count($fstbl)) {
 	head();
-	hddinfo();	echo get_msg("SEL_P").":<br><br>";	echo get_msg("NO_P");
+	hddinfo();
+	echo get_msg("SEL_P").":<br><br>";
+	echo get_msg("NO_P");
 	die();
 }
 
 $fstypes = array(1=>"WM1");
 
-if (isset($_GET['rmfs'])) {	removefstbl($_GET['rmfs']);
+if (isset($_GET['rmfs'])) {
+	removefstbl($_GET['rmfs']);
 	$needw = true;
 	redirect(FILE_SELF);
 } elseif (isset($_GET['mvfsdw'])) {
@@ -297,13 +323,16 @@ if (isset($_GET['rmfs'])) {	removefstbl($_GET['rmfs']);
 	redirect(FILE_SELF);
 }
 
-if (isset($_GET['mkfs'])) {	head();
+if (isset($_GET['mkfs'])) {
+	head();
 	//echo WM1_mkfs($fstbl,256*126+128*7.75+24,8,"Test v1")."<BR>";  // 1024*127+128*7.75+16
 	//echo WM1_mkfs($fstbl,HDD_SIZE-FS_TBL_SIZE-23,8,"Test v1");
-	if (isset($_POST['mk'])) {		$name = $_POST['name'];
+	if (isset($_POST['mk'])) {
+		$name = $_POST['name'];
 		$size = $_POST['size'];
 		$stype = $_POST['size_type'];
-		if ($stype>1&&$stype<=3) {			$size *= pow(1024,$stype-1);
+		if ($stype>1&&$stype<=3) {
+			$size *= pow(1024,$stype-1);
 		}
 		$csize = $_POST['cluster'];
 		$ctype = $_POST['cluster_type'];
@@ -333,8 +362,10 @@ if (isset($_GET['mkfs'])) {	head();
 		}
 	}
 	$fstype = "";
-	foreach($fstypes as $k=>$v) {		$fstype .= "<option value='$k'>$v</option>\n";
-	}	echo "<form method='post'><table>
+	foreach($fstypes as $k=>$v) {
+		$fstype .= "<option value='$k'>$v</option>\n";
+	}
+	echo "<form method='post'><table>
 	<tr><td>".get_msg("vol_name").":</td><td><input type='text' name='name'></td></tr>
 	<tr><td>".get_msg("size").":</td><td><input type='text' name='size'><select name='size_type'>
 		<option value='1'>".get_msg("bytes")."</option>
@@ -366,26 +397,32 @@ if (count($parr)>0) {
 	$pdat = parsepath($parr,$fstbl,$fs);
 	$c = count($pdat);
 	$last = count($parr)-1;
-	if ($parr[$last]=="") {		unset($parr[$last]);
+	if ($parr[$last]=="") {
+		unset($parr[$last]);
 		$last--;
 	}
 	$bpath = "";
 	$lastp = "";
 	$parr = rmpathdots($parr);
-	foreach($parr as $k=>$v) {		//if ($v==".."||$v==".") break;
+	foreach($parr as $k=>$v) {
+		//if ($v==".."||$v==".") break;
 		$lastp .= ($k!=0?"/":"").htmlspecialchars($v);
-		if ($k==$last) {			$bpath .= "/".htmlspecialchars($v);
-		} else {			$bpath .= "/<a href='?p=".urlencode($lastp)."'>".htmlspecialchars($v)."</a>";
+		if ($k==$last) {
+			$bpath .= "/".htmlspecialchars($v);
+		} else {
+			$bpath .= "/<a href='?p=".urlencode($lastp)."'>".htmlspecialchars($v)."</a>";
 		}
 	}
 	$purl = "p=".$lastp;
 	if (isset($parr[0])) {
-		if (!$c) {		    echo sprintf(get_msg("path_no"),"'/<a href='?p='>ROOT</a>".$bpath."'");
+		if (!$c) {
+		    echo sprintf(get_msg("path_no"),"'/<a href='?p='>ROOT</a>".$bpath."'");
 			die();
 		}
 		$curfs = $pdat[0];
 		if ($c>1) {
-			$tmp = end($pdat);			$curdir = $tmp[0];
+			$tmp = end($pdat);
+			$curdir = $tmp[0];
 			$cursec = $tmp[1];
 			$isdir = $tmp[2];
 		}
@@ -414,7 +451,8 @@ if ($path=="") {
 	<td>".get_msg("fs_tot")."</td>
 	<td></td>
 	</tr>";
-	$us = FS_MAX_SIZE;
+
+	$us = FS_MAX_SIZE;
 	foreach($fstbl as $k=>$v) {
 		$vname = "";
 		$size = $v['total']*HDD_SECTOR_SIZE;
@@ -431,7 +469,8 @@ if ($path=="") {
 
 		$up = ($k<3&&$v['type']==1&&$fstbl[$k+1]['type']!=1?"<a href='?mvfsdw=".$k."'><img src='icons/arrow_down.png'></a>":"");
 		$down = ($k>0&&$v['type']==1&&$fstbl[$k-1]['type']!=1?"<a href='?mvfsup=".$k."'><img src='icons/arrow_up.png'></a>":"");
-		echo "<tr><td>".$v['active']."</td>"
+
+		echo "<tr><td>".$v['active']."</td>"
 		."<td>".($v['type']==1?$fstypes[$v['type']]:($v['type']==0?get_msg("fs_emp"):get_msg("fs_unk")))."</td>"
 		."<td>".$vname."</td><td>".nicesize($size)."</td><td>".nicesize($free)."</td><td>".nicesize($cluster)."</td>"
 		."<td>".$v['start']."</td><td>".$v['end']."</td><td>".$v['total']."</td>"
@@ -442,13 +481,16 @@ if ($path=="") {
 } else {
 	//$fs = WM1_readfs($fstbl,$curfs);
 	if (!count($fs)) {
-		echo get_msg("fs_no").".<br><br>[<a href='".FILE_SELF."'>".get_msg("go2p")."</a>]";		die();
+		echo get_msg("fs_no").".<br><br>[<a href='".FILE_SELF."'>".get_msg("go2p")."</a>]";
+		die();
 	}
 	echo get_msg("path_cur").": /<a href='?p='>ROOT</a>".$bpath."<hr>";
 
-	if ($isdir) {		$curdir = ($curdir==0?$fs['root_dir_cluster']:$curdir);
+	if ($isdir) {
+		$curdir = ($curdir==0?$fs['root_dir_cluster']:$curdir);
 		$ls = WM1_listdir($fs,$curdir,$cursec);
-		if (count($ls) || $curdir==$fs['root_dir_cluster']) {			//echo "[ <a href='?fs=".$curfs."&ent=".$curdir."&d=1&sd=".$cursec."&mkdir'>Create Folder</a> ] [ <a href='?fs=".$curfs."&ent=".$curdir."&d=1&sd=".$cursec."&mkfile'>Create File</a> ]<br><hr>";
+		if (count($ls) || $curdir==$fs['root_dir_cluster']) {
+			//echo "[ <a href='?fs=".$curfs."&ent=".$curdir."&d=1&sd=".$cursec."&mkdir'>Create Folder</a> ] [ <a href='?fs=".$curfs."&ent=".$curdir."&d=1&sd=".$cursec."&mkfile'>Create File</a> ]<br><hr>";
 			echo "[ <a href='?".$purl."&mkdir'>".get_msg("mkdir")."</a> ] [ <a href='?".$purl."&mkfile'>".get_msg("mkfile")."</a> ] [ <a href='?".$purl."&mkupload'>".get_msg("upfile")."</a> ]<br><hr>";
 			if (isset($_GET['mkdir'])) {
 				if (isset($_POST['name'])) {
@@ -456,7 +498,10 @@ if ($path=="") {
 					$err = "";
 					if ($name=="") $err = get_msg("mkdir_em");
 					else {
-						foreach($ls as $k=>$v) {							if (($v['name'].$v['ext'])==$name) {								$err = get_msg("mkfile_ex");								break;
+						foreach($ls as $k=>$v) {
+							if (($v['name'].$v['ext'])==$name) {
+								$err = get_msg("mkfile_ex");
+								break;
 							}
 						}
 					}
@@ -464,16 +509,19 @@ if ($path=="") {
 						$err = WM1_mkfile($fs,$cursec,$name,"",1,$curdir);
 						if ($err==-1) echo get_msg("mkdir_er")."<br>";
 						else { $needw = true; redirect("?".$purl); }
-					} else {						echo $err;
+					} else {
+						echo $err;
 					}
 				}
-				echo "<form method='post'>".get_msg("mkdir_name").": <input type='text' name='name'> <input type='submit' value='OK'></form>";				echo "<hr>";
+				echo "<form method='post'>".get_msg("mkdir_name").": <input type='text' name='name'> <input type='submit' value='OK'></form>";
+				echo "<hr>";
 			} elseif (isset($_GET['mkfile'])) {
 				if (isset($_POST['name'])) {
 					$name = preg_replace("/[^".get_msg("file_preg")."_+,.!@#$%^&(){\[\]}+-\s]/i","",$_POST['name']);
 					$ext = "";
 					$arr = explode(".",$name);
-					if (count($arr)>1) {						$ext = end($arr);
+					if (count($arr)>1) {
+						$ext = end($arr);
 						unset($arr[count($arr)-1]);
 						$name = implode(".",$arr);
 					}
@@ -492,7 +540,8 @@ if ($path=="") {
 						if ($err==-1) echo get_msg("mkfile_er")."<br>";
 						//redirect("?fs=".$curfs."&ent=".$curdir."&d=1");
 						else { $needw = true; redirect("?".$purl); }
-					} else {						echo $err;
+					} else {
+						echo $err;
 					}
 				}
 				echo "<form method='post'>".get_msg("mkfile_name").": <input type='text' name='name'> <input type='submit' value='OK'> (name.ext)</form>";
@@ -529,7 +578,8 @@ if ($path=="") {
 								$cont[] = str2byte(substr($text,$i,4));
 							}
 							$err = WM1_rawwritefile($fs,$fi['cluster'],$err,$cont,$sz);
-							if ($err==3) {								$err = -1;
+							if ($err==3) {
+								$err = -1;
 								WM1_removefile($fs,$fi['cluster'],$fi['data_sector']);
 							}
 						}
@@ -547,10 +597,12 @@ if ($path=="") {
 			}
 		}
 		if (isset($_GET['rmfile'])) {
-			if ($curdir==$fs['root_dir_cluster']) {				echo get_msg("rmdir_root")."<hr>";
+			if ($curdir==$fs['root_dir_cluster']) {
+				echo get_msg("rmdir_root")."<hr>";
 			} elseif(count($ls)>2) {
 				echo get_msg("rmdir_nem")."<hr>";
-			} else {				WM1_removefile($fs,$curdir,$cursec);
+			} else {
+				WM1_removefile($fs,$curdir,$cursec);
 				$needw = true;
 				redirect("?".$_GET['rmfile']);
 			}
@@ -568,23 +620,28 @@ if ($path=="") {
 				//echo "[".($is_dir?"DIR":"FILE")."] <a title='".$info."' href='?fs=".$curfs."&ent=".$v['cluster']."&d=".$is_dir."&sd=".$v['data_sector']."'>".$v['name'].($v['ext']!=""?".".$v['ext']:"")."</a>".(!$is_dir?" <a href='?fs=".$curfs."&ent=".$v['cluster']."&d=".$is_dir."&sd=".$v['data_sector']."&rmfile=".$curdir."&b2s=".$cursec."'><img src='icons/cross.png'></a>":"")."<br>";
 				echo "<img src='icons/".($is_dir?"folder.png":fileicon($v['ext']))."' alt='".($is_dir?"DIR":"FILE")."'> <a title='".$info."' href='?".add2path($purl,urlencode($vname))."'>".$vname."</a>".($vname!="."&&$vname!=".."?" <a href='?".$purl."/".urlencode($vname)."&rmfile=".urlencode($purl)."'><img src='icons/cross.png'></a>":"")."<br>";
 			}
-			if (count($ls)<2||$curdir!=$fs['root_dir_cluster']&&count($ls)<=2) {				echo "<br>".get_msg("dir_e");
+			if (count($ls)<2||$curdir!=$fs['root_dir_cluster']&&count($ls)<=2) {
+				echo "<br>".get_msg("dir_e");
 			}
 		} else {
 			echo get_msg("dir_c");
 		}
 	} else {
 		$exist = WM1_fileexists($fs,$cursec,$curdir);
-		if (isset($_GET['rmfile'])&&$exist) {			WM1_removefile($fs,$curdir,$cursec);
+		if (isset($_GET['rmfile'])&&$exist) {
+			WM1_removefile($fs,$curdir,$cursec);
 			$needw = true;
 			redirect("?".$_GET['rmfile']);
 		}
 		if (!$exist) echo get_msg("f_ne");
 		else {
 			echo "[ <a href='?".$purl."&edit'>".get_msg("f_edit")."</a> ] [ <a href='?".$purl."&upload'>".get_msg("upfile")."</a> ] [ <a href='?".$purl."&download'>".get_msg("f_dw")."</a> ]<br><hr>";
-			if (isset($_GET['upload'])) {				if (isset($_FILES['file'])) {					$text = file_get_contents($_FILES['file']['tmp_name']);
+			if (isset($_GET['upload'])) {
+				if (isset($_FILES['file'])) {
+					$text = file_get_contents($_FILES['file']['tmp_name']);
 					$cont = array();
-					$sz = strlen($text);					for($i=0;$i<strlen($text);$i+=4) {
+					$sz = strlen($text);
+					for($i=0;$i<strlen($text);$i+=4) {
 						$cont[] = str2byte(substr($text,$i,4));
 					}
 					$err = WM1_rawwritefile($fs,$curdir,$cursec,$cont,$sz);
@@ -611,7 +668,8 @@ if ($path=="") {
 				header('Content-disposition: attachment; filename="'.end($parr).'"');
                 echo $cont;
 				die();
-			} elseif (isset($_GET['edit'])) {				if (isset($_POST['content'])) {
+			} elseif (isset($_GET['edit'])) {
+				if (isset($_POST['content'])) {
 					$text = $_POST['content'];
 					$cont = array();
 					$sz = strlen($text);
@@ -625,7 +683,8 @@ if ($path=="") {
 						$needw = true;
 						redirect("?".$purl);
 					}
-				}				$f = WM1_rawreadfile($fs,$curdir,$cursec);
+				}
+				$f = WM1_rawreadfile($fs,$curdir,$cursec);
 				$cont = "";
 				foreach($f as $k=>$v) {
 					$cont .= byte2str($v,0);
@@ -637,7 +696,8 @@ if ($path=="") {
 				$f = WM1_rawreadfile($fs,$curdir,$cursec);
 				//echo microtime(true)-$time."<br>";
 				$fi = WM1_getfileinfo($cursec);
-				echo get_msg("f_cont").":<br><br>";				$empty = true;
+				echo get_msg("f_cont").":<br><br>";
+				$empty = true;
 				$tmp = explode(".",end($parr));
 				$ext = strtolower(end($tmp));
 				if ($ext=="jpg" || $ext=="gif" || $ext=="png"/* || $ext=="bmp"*/) {
@@ -646,10 +706,12 @@ if ($path=="") {
 						$cont .= byte2strraw($v,0);
 						$empty = false;
 					}
-					$cont = substr($cont,0,$fi['size']);					//$img = imagecreatefromjpeg($cont);
+					$cont = substr($cont,0,$fi['size']);
+					//$img = imagecreatefromjpeg($cont);
 					echo "<img src='data:image/".$ext.";base64,".base64_encode($cont)."'>";
 				} elseif ($ext=="bmp") {
-					$start = microtime(true);					$cont = "";
+					$start = microtime(true);
+					$cont = "";
 					foreach($f as $k=>$v) {
 						$cont .= byte2strraw($v,0);
 					}
@@ -675,7 +737,8 @@ if ($path=="") {
 							$bitcount = str2byte(substr($cont,28,2));
 							$compression = str2byte(substr($cont,30,4));
 							$colors = str2byte(substr($cont,46,4));
-							if ($colors==0) {								$colors = 1 << $bitcount;
+							if ($colors==0) {
+								$colors = 1 << $bitcount;
 							}
 						}
 
@@ -688,14 +751,17 @@ if ($path=="") {
 
 						$carr = array();
 
-						if ($bitcount<=8) {                        	$st = 14+$hsize;
+						if ($bitcount<=8) {
+                        	$st = 14+$hsize;
 							$colorsb = ($hsize==12?3:4);
                         	$image = substr($cont,$st);
                             for($i=0;$i<$colors;$i++) {
-                            	$rgb = str2byte(substr($image,$i*$colorsb,$colorsb));								$r = floor(($rgb >> 16) & 0xFF);
+                            	$rgb = str2byte(substr($image,$i*$colorsb,$colorsb));
+								$r = floor(($rgb >> 16) & 0xFF);
 								$g = floor(($rgb >> 8) & 0xFF);
 								$b = floor($rgb & 0xFF);
-                            	$carr[$i] = array($r,$g,$b);
+
+                            	$carr[$i] = array($r,$g,$b);
                             }
 						} elseif ($bitcount==24 || $bitcount==32) {
                         	$rs = 16;
@@ -708,7 +774,8 @@ if ($path=="") {
                     		if ($compression==0) {
 	                        	$rs = 10;
 	                        	$gs = 5;
-	                        	$bm = 0;								$rl = 0x1F;
+	                        	$bm = 0;
+								$rl = 0x1F;
 								$gl = 0x1F;
 								$bl = 0x1F;
                     		} else {
@@ -748,14 +815,18 @@ if ($path=="") {
 						$ofn = floor(ceil($width*$ii/4)*4-$width*$ii);
 
 						if ($bitcount<=4) {
-							$ii = 8/$bitcount;                            for($i=0;$i<=$size;$i++) {
+							$ii = 8/$bitcount;
+                            for($i=0;$i<=$size;$i++) {
 								if ($x>=$width) {
 									$of += $ofn;
 									$x = 0;
 									$y -= 1*$fy;
 								}
-								$rgb = str2byte(substr($image,$i+$of,1));	       						for ($pi=$ii-1;$pi>=0;$pi--) {	       							if ($bitcount==4) $ind = ($rgb >> $pi*4) & 0xF;
-	       							else $ind = ($rgb >> $pi) & 1;	       							$ct = $carr[$ind];
+								$rgb = str2byte(substr($image,$i+$of,1));
+	       						for ($pi=$ii-1;$pi>=0;$pi--) {
+	       							if ($bitcount==4) $ind = ($rgb >> $pi*4) & 0xF;
+	       							else $ind = ($rgb >> $pi) & 1;
+	       							$ct = $carr[$ind];
 	       							$r = $ct[0];
 	       							$g = $ct[1];
 	       							$b = $ct[2];
@@ -767,7 +838,8 @@ if ($path=="") {
 						} else {
 							$lastind = 0; $repeats = 0; $lasti = 0;
 							for($i=0;$i<=$rs;$i+=$ii) {
-								if ($x>=$width) {									$of += $ofn;
+								if ($x>=$width) {
+									$of += $ofn;
 									$x = 0;
 									$y -= 1*$fy;
 								}
@@ -823,14 +895,16 @@ if ($path=="") {
 					$cont = "";
 					foreach($f as $k=>$v) {
 						$data = byte2str($v,0);
-						if ($data!="") {							$cont .= $data;
+						if ($data!="") {
+							$cont .= $data;
 							$empty = false;
 						}
 					}
 					$cont = substr($cont,0,$fi['size']);
 					echo nl2br(htmlspecialchars($cont));
 				}
-				if ($empty) {					echo "File empty.";
+				if ($empty) {
+					echo "File empty.";
 				}
 			}
 		}
