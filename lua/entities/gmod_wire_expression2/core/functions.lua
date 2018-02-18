@@ -10,7 +10,6 @@ __e2setcost(20)
 
 registerOperator("function", "", "", function(self, args)
 
-
 	local Stmt, args = args[2], args[3]
 	local Sig, Return, Args = args[3], args[4], args[6]
 
