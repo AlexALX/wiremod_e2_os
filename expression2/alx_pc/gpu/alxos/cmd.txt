@@ -1,0 +1,934 @@
+@name cmd.e2e
+@persist CmdFS:table CmdAllFs:table CmdDir:table CmdPath:table
+@persist CmdKeyH:string CmdDsH:string CmdCopy:table
+@persist CmdCursor CmdLinesC CmdLines:array CmdHistory:array
+
+#[
+	ALX Wiremod E2 OS
+	Created by AlexALX
+	-------------------
+	Console UI
+]#
+
+#include "alx_pc/gpu/alxos/_main_"
+
+function alxos_console_move() {
+    if (CmdLinesC>=25) {
+        local RM = CmdLinesC-25
+        local NLines = array()
+        for (I=1,CmdLinesC) {
+            local ID = CmdLines[I,number]
+            if (I<=RM) {
+                EGP:egpRemove(ID)   
+            } else {
+                #CmdLines[I-1,number] = ID
+                NLines:pushNumber(ID)
+                EGP:egpPos(ID,EGP:egpPos(ID)-vec2(0,20*RM))    
+            }
+        }
+        LAST_Y -= RM*20
+        CmdLines = NLines
+        CmdLinesC = 25
+        if (LAST_I>100) { LAST_I = GpuData[3,number]+1 }
+    }
+}
+
+function alxos_console_msg(Str:string) {
+    #local Num = GpuData[2,number]
+    local Arr = Str:explode(NL)
+    for (I=1,Arr:count()) {
+        #GpuData[1,table][Num,array] = array(LAST_I,Arr[I,string])
+        #GpuData[2,number] = Num+1
+        CmdLines[CmdLinesC,number] = LAST_I
+        EGP:egpText(LAST_I,Arr[I,string],vec2(BIOS_X,LAST_Y))
+        EGP:egpFont(LAST_I,"Courier New")
+        EGP:egpColor(LAST_I,168,168,168,255) LAST_I++ LAST_Y+=20
+        CmdLinesC++
+        #alxos_console_move()
+    }
+}
+
+function alxos_console_listdir(FS:table,Dir,Sd) {
+    dsSendDirect("fs_listdir",FS["hdd_io",wirelink]:entity(),table(entity(),FS["fs_str_id",string],table(FS,Dir,Sd)))
+}
+
+function alxos_console_listcurdir() {
+    alxos_console_listdir(CmdFS,CmdDir[1,number],CmdDir[2,number])     
+}
+
+function alxos_show_cursor() {
+    CmdCursor = !CmdCursor
+    local Cursor = GpuData[3,number]
+    EGP:egpSetText(Cursor,(CmdCursor ? "_" : ""))
+    timer("cursor_draw",500)    
+}
+
+function alxos_upd_cursor() {
+    local P = GpuData[3,number]
+    local XPos = GpuData[-2,number]
+    EGP:egpPos(P,vec2(XPos,LAST_Y-20))
+}
+
+function alxos_draw_cursor() {
+    GpuData[3,number] = LAST_I
+    local PathX = GpuData[-2,number]
+    EGP:egpText(LAST_I,"_",vec2(PathX,LAST_Y-20))
+    EGP:egpFont(LAST_I,"Courier New")
+    EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
+    
+    registerTimers("cursor_draw","alxos_show_cursor")
+    timer("cursor_draw",500)
+}
+
+function alxos_console_command() {
+    
+    alxos_console_move()
+    
+    GpuData[-1,number] = LAST_I
+    local Path = CmdPath:concat("/")+">"
+    GpuData[-2,number] = BIOS_X + Path:length()*10
+    GpuData[-3,string] = Path
+    GpuData[-4,string] = ""
+    
+    CmdLines[CmdLinesC,number] = LAST_I
+    EGP:egpText(LAST_I,Path,vec2(BIOS_X,LAST_Y))
+    EGP:egpFont(LAST_I,"Courier New")
+    EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
+    LAST_Y += 20
+
+    CmdLinesC++
+    
+    if (GpuData[3,number]!=0) {
+        alxos_upd_cursor()
+    }
+}
+
+function alxos_console_err(Err:string) {
+    alxos_console_msg(Err)
+    alxos_console_command()
+    KeyHandler = "alxos_console_key"
+}
+
+function alxos_console_cls() {
+    egpClear()
+    CmdLinesC = 1
+    CmdLines = array()
+    
+    GpuData[1,table] = table()
+    GpuData[2,number] = 0
+    
+    alxos_console_command()
+    
+    CmdCursor = 0
+    alxos_draw_cursor()
+}
+
+function number alxos_console_listdir_draw(Info:table) {
+    
+    local CmdRun = GpuData[-5,number]
+    
+    if (CmdRun==0) {
+    
+        local InfoC = Info:count()
+        if (InfoC<=2 & CmdDir[1,number]!=CmdFS["root_dir_cluster",number] | InfoC<=1) {
+            local Err = Info[1,string]
+            if (Err=="") {
+                Err = "Directory is empty."   
+            }
+            alxos_console_err(Err)
+            return 0
+        }
+        
+        GpuData[4,table] = Info
+        CmdDir[3,table] = Info
+        
+        GpuData[-5,number] = 1
+        runCmd("alxos_console_listdir_draw",1,Info) 
+        return 1
+    
+    } elseif (CmdRun==1) {
+        local Max = Info:count()-1
+        local I = GpuData[9,number]
+        local TotalDirs = GpuData[3,number]
+        while(perf()) {
+            if (I>Max) { 
+                break    
+            }
+            local Entry = Info[I,table]
+            I++
+            if (Entry["name",string]=="." | Entry["name",string]=="..") { continue }
+            
+            local Sz = alxos_nicesize(Entry["size",number])
+            alxos_console_msg((alxos_wm1_isdir(Entry) ? "<DIR>      " : Sz+
+            " ":repeat(11-Sz:length()))+Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : ""))
+
+            #local Date = Entry["time_create",number]
+            #local DateStr = alxos_wm1_date(Date)
+            #local DateStr = alxos_wm1_time(Date)
+            
+            #TotalDirs++
+        }
+        #GpuData[3,number] = TotalDirs
+        
+        if (I<=Max) { 
+            GpuData[9,number] = I
+            runCmd("alxos_console_listdir_draw",1,Info) 
+            return 1
+        } else {
+            GpuData[-5,number] = 0
+            GpuData[10,number] = 0
+            GpuData[9,number] = 0
+        }
+    
+    }
+    
+    alxos_console_command()
+    KeyHandler = "alxos_console_key"
+    return 0
+}
+
+function table alxos_console_indir(Name:string,Type) {
+    local C = CmdDir[3,table]:count()-1
+    for(I=0,C) {
+        local Entry = CmdDir[3,table][I,table]
+        local IsDir = alxos_wm1_isdir(Entry)
+        if (Entry["name",string]==Name & (IsDir & Type==0 | !IsDir & Type==1 )) {
+            return Entry 
+        }
+    }
+    return table()
+}
+
+function alxos_console_cdpost(Name:string) {
+    CmdDir[3,table] = dsGetTable()
+    local Dir = GpuData[-10,string]
+    if (Dir=="..") {
+        CmdPath:pop()
+    } elseif (Dir:length()==2 && Dir[2]==":") {
+        CmdPath = table(Dir)
+    } else {
+        CmdPath:pushString(Dir)
+    }
+    GpuData[-10,string] = ""
+    if (GpuData[-12,number]==0) {
+        alxos_console_command()
+        CmdDsH = ""
+        KeyHandler = "alxos_console_key"
+    } else {
+        runCmd("alxos_console_readpath",0,GpuData[-11,table])
+    }
+}
+
+function alxos_console_cdpre(Path:string,PArr:array,Entry:table) {
+    if (Path!=".") {
+        CmdDsH = "alxos_console_cdpost"
+        GpuData[-10,string] = Path
+        if (Entry["fs_str_id",string]!="") {
+            CmdDir[1,number] = Entry["root_dir_cluster",number]
+            CmdDir[2,number] = 0
+            CmdFS = Entry
+            alxos_console_listdir(CmdFS,CmdDir[1,number],CmdDir[2,number])  
+        } else {
+            CmdDir[1,number] = Entry["cluster",number]
+            CmdDir[2,number] = Entry["data_sector",number]
+            alxos_console_listdir(CmdFS,Entry["cluster",number],Entry["data_sector",number])  
+        }
+        return
+    }
+    if (GpuData[-12,number]==0) {
+        alxos_console_command()
+        KeyHandler = "alxos_console_key"
+    } else {
+        runCmd("alxos_console_readpath",0,GpuData[-11,table])
+    }
+}
+
+function number alxos_console_readpath_single(Path:string) {
+    if (Path==".." & CmdDir[1,number] == CmdFS["root_dir_cluster",number] | Path=="") {
+        return 0
+    } elseif (Path:length()==2 & Path[2]==":") {
+        if (CmdAllFs[Path[1],table]:count()) {
+            GpuData[-11,table] = CmdAllFs[Path[1],table]
+        } else {
+            return -2
+        }
+        return 1
+    }
+    local Ent = alxos_console_indir(Path,0)
+    if (!Ent:count()) {
+        return -1
+    }
+    GpuData[-11,table] = Ent
+    return 1
+}
+
+function number alxos_console_readpath(Args:table) {
+    local Path = Args[1,string]
+    local Callback = Args[2,string]
+    local Step = Args[3,number]
+    if (Step == 0) {
+        KeyHandler = ""
+        local Tmp = Path:explode("/")
+        local CTmp = Tmp:count()
+        if (CTmp==1) {
+            local Ret = alxos_console_readpath_single(Path)
+            if (Ret==-1) {
+                alxos_console_err("Failed to change folder, invalid path.")
+            } elseif (Ret==-2) {
+                alxos_console_err("Failed to change folder, invalid volume.")
+            } elseif (Ret==1) {
+                local Ent = GpuData[-11,table]
+                GpuData[-11,table] = table()
+                Callback(Path,Tmp,Ent)
+            } elseif (Ret==0) {
+                alxos_console_command()
+                KeyHandler = "alxos_console_key"
+            }
+        } else {
+            Args[3,number] = 1
+            Args[4,array] = Tmp
+            Args[5,number] = CTmp
+            Args[6,number] = 1
+            Args[7,table] = CmdDir:clone()
+            Args[8,table] = CmdPath:clone()
+            Args[9,table] = CmdFS
+            GpuData[-12,number] = 1
+            runCmd("alxos_console_readpath",0,Args)    
+        }
+    } elseif (Step == 1) {
+        local Tmp = Args[4,array]
+        local CTmp = Args[5,number]
+        local CurI = Args[6,number]
+
+        while (perf(80)) {
+            if (CurI>CTmp) {
+                alxos_console_command()
+                CmdDsH = ""
+                KeyHandler = "alxos_console_key"
+                GpuData[-11,table] = table()
+                GpuData[-12,number] = 0
+                return 0    
+            }
+            local Path = Tmp[CurI,string]
+            local Ret = alxos_console_readpath_single(Path)
+    
+            if (Ret==-1) {
+                CmdDir = Args[7,table]
+                CmdPath = Args[8,table]
+                CmdFS = Args[9,table]
+                GpuData[-12,number] = 0
+                CmdDsH = ""
+                alxos_console_err("Failed to change folder, invalid path.")
+                return 0
+            } elseif (Ret==-2) {
+                CmdDir = Args[7,table]
+                CmdPath = Args[8,table]
+                CmdFS = Args[9,table]
+                GpuData[-12,number] = 0
+                CmdDsH = ""
+                alxos_console_err("Failed to change folder, invalid volume.")
+                return 0
+            } elseif (Ret==1) {
+                local Ent = GpuData[-11,table]
+                Args[6,number] = CurI+1
+                GpuData[-11,table] = Args
+                Callback(Path,Tmp,Ent)
+                return 1
+            } elseif (Ret==0) {
+                #Args[6,number] = CurI+1
+                #runCmd("alxos_console_readpath",0,Args) 
+            }
+            CurI++
+        }
+
+        Args[6,number] = CurI
+        runCmd("alxos_console_readpath",1,Args)
+        return 1
+    }
+    return 0
+}
+
+function alxos_console_mkdirpost(Name:string) {
+    CmdDsH = ""
+    CmdDir[3,table][CmdDir[3,table]:count()-1,table] = dsGetTable()
+    alxos_console_err("Folder succesfully created.")
+}
+
+function alxos_console_mkfilepost(Name:string) {
+    CmdDsH = ""
+    CmdDir[3,table][CmdDir[3,table]:count()-1,table] = dsGetTable()
+    alxos_console_err("File succesfully created.")
+}
+
+function alxos_console_delpre(Name:string) {
+    local Info = dsGetTable()
+    local Entry = GpuData[-10,table]
+    if (Info:count()>2) {
+        CmdDsH = ""
+        local FName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
+        local TxtID = DialogData[7,number]
+        alxos_console_err("Directory '"+FName+"' is not empty, cannot remove.")
+    } else {
+        alxos_console_msg("Removing file... 0%")
+        CmdDsH = "alxos_console_delpost"
+        dsSendDirect("fs_removefile",CmdFS["hdd_io",wirelink]:entity(),table(entity(),CmdFS["fs_str_id",string],table(CmdFS,Entry["cluster",number],Entry["data_sector",number])))
+    }
+}
+
+function alxos_console_delpost(Name:string) {
+    CmdDsH = ""
+    stopCmd()
+    
+    #local PercID = CmdLines[CmdLinesC,number]
+    EGP:egpSetText(LAST_I-1,"Removing file... 100%")
+    
+    alxos_console_err("File succesfully removed.")
+    GpuData[-10,table] = table()
+    CmdDir[3,table]:removeTable(GpuData[-11,number])
+    GpuData[-11,number] = 0
+} 
+
+function alxos_console_ro() {
+    alxos_console_err("Can't run this command on read-only file system!")
+}
+
+function number alxos_console_cmd() {
+    local CurTask = CmdFS["hdd_io",wirelink]["CurTask",table]
+    
+    if (CurTask:count()) { runCmd("alxos_console_cmd",100) }
+    else { return 0 }
+    
+    local Max = CurTask[1,number]
+    local Cur = CurTask[2,number]
+    if (Max==0) { return 0 }
+    
+    #local PercID = CmdLines[CmdLinesC,number]
+    local CalcP = round(Cur/Max*100)
+    EGP:egpSetText(LAST_I-1,"Removing file... "+CalcP+"%")
+
+    return 0
+}
+
+function alxos_explorer_fput_post(Name:string) {
+    local Ret = dsGetNumber()
+    if (Ret==-2) {
+        alxos_console_err("Not enough space on disk.")
+    } elseif (Ret!=1) {
+        alxos_console_err("File system internal error.")
+    } else {
+        alxos_console_err("File succesfully written.")
+    }
+    CmdDsH = ""
+}
+
+function alxos_explorer_fget_post(Name:string) {
+    local Data = dsGetString()
+    alxos_console_err(Data) 
+    CmdDsH = ""
+}
+
+function alxos_console_run(Command:string) {
+    local Tmp = Command:find(" ")
+    local Cmd = Command:sub(0,Tmp-1)
+    local Arg = Command:sub(Tmp+1,Command:length())
+    if (Tmp==0) {
+        Cmd = Command
+        Arg = ""   
+    }
+    
+    if (Command!="") {
+        CmdHistory:pushString(Command)
+        if (CmdHistory:count()>15) {
+            CmdHistory:remove(1)    
+        }
+    }
+    GpuData[100,number] = 0
+
+    switch (Cmd) {
+        case "help",
+            if (Arg!="") {
+                alxos_console_err("Invalid command arguments.")
+                return   
+            }
+            alxos_console_msg("Available commands:")
+            alxos_console_msg("help - display help information")
+            alxos_console_msg("cls - clear console")
+            alxos_console_msg("reboot - reboot PC")
+            alxos_console_msg("shutdown - turn off PC")
+            #alxos_console_msg("info - display information about PC")
+            alxos_console_msg("volumes - show list of all available volumes")
+            alxos_console_msg("ls - show list of files and folders")
+            alxos_console_msg("cd path - move to this path")
+            alxos_console_msg("mkdir DirName - create folder with given name")
+            alxos_console_msg("mkfile FileName.ext - create empty file")
+            alxos_console_msg("rm FileName - remove file or folder")
+            alxos_console_msg("fput FileName content - write to file with content")
+            alxos_console_msg("fget FileName - read first 48 bytes from file")
+            alxos_console_msg("start FileName.e2e - run E2 executable")
+            alxos_console_command()
+        break
+        case "volumes",
+        case "vls",
+        case "vol",
+            if (Arg!="") {
+                alxos_console_err("Invalid command arguments.")
+                return   
+            }
+            local MenuTree = table()
+            foreach(K,V:table=CmdAllFs) {
+                if (K=="C") {
+                    MenuTree:unshiftString(K+": ["+V["volume_name",string]+"]")
+                } else {
+                    MenuTree:pushString(K+": ["+V["volume_name",string]+"]")
+                }
+            }
+            
+            alxos_console_msg("Available volumes:")            
+            for(I=1,MenuTree:count()) {
+                alxos_console_msg(MenuTree[I,string])
+            }
+            
+            alxos_console_command()
+        break
+        case "cls",
+        case "clear",
+            alxos_console_cls()
+        break
+        case "echo",
+        case "print",
+            alxos_console_err(Arg)
+        break
+        case "ls",
+        case "dir",
+            if (Arg!="") {
+                alxos_console_err("Invalid command arguments.")
+                return   
+            }
+            alxos_console_msg("Directory content:")
+            KeyHandler = ""
+            #if (Arg=="") {
+                alxos_console_listcurdir()
+            #[} else {
+                alxos_console_readpath(Arg,"alxos_console_listdir_path")
+            }]#
+        break
+        case "cd",
+            alxos_console_readpath(table(Arg,"alxos_console_cdpre"))
+        break
+        case "reboot",
+            if (Arg!="") {
+                alxos_console_err("Invalid command arguments.")
+                return   
+            }
+            reboot()
+        break
+        case "exit",
+        case "quit",
+            if (DEBUG) { DEBUG = 1 }
+            stoptimer("cursor_draw")
+            "alxos_execute"("alxos_explorer")
+        break
+        case "shutdown",
+            if (Arg!="") {
+                alxos_console_err("Invalid command arguments.")
+                return   
+            }
+            dsSendDirect("SHUTDOWN",BIOS,0)  
+        break
+        case "mkdir",
+            if (Arg=="") {
+                alxos_console_err("Please enter folder name.")
+                return   
+            }
+            
+            if (CmdFS["read_only",number]) {
+                alxos_console_ro()
+                return
+            }
+            
+            for(I=0,CmdDir[3,table]:count()) {
+                local Entry = CmdDir[3,table][I,table]
+                local FullName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
+                if (FullName==Arg) {
+                    alxos_console_err("Folder or file with this name already exists.")
+                    return
+                }
+            }
+            
+            KeyHandler = ""            
+            CmdDsH = "alxos_console_mkdirpost"
+            dsSendDirect("fs_mkfile",CmdFS["hdd_io",wirelink]:entity(),table(entity(),CmdFS["fs_str_id",string],table(CmdFS,Arg,"",1,CmdDir[1,number])))   
+        break
+        case "mkfile",
+            if (Arg=="") {
+                alxos_console_err("Please enter file name.")
+                return   
+            }
+            
+            if (CmdFS["read_only",number]) {
+                alxos_console_ro()
+                return
+            }
+            
+            local Tmp = Arg:explode(".")
+            if (Tmp:count()>2) {
+                alxos_console_err("Invalid file name, too many dots.")
+                return 
+            }
+            
+            if (Arg:findRE("[^A-Za-z0-9_!@#$^ .-]")) {
+                alxos_console_err("Invalid file name, forbidden chars.")
+                return
+            }
+            
+            if (Tmp[1,string]:length()>10) {
+                alxos_console_err("Invalid file name, max 10 chars.")
+                return 
+            }
+            
+            if (Tmp[2,string]:length()>3) {
+                alxos_console_err("Invalid file extension, max 3 chars.")
+                return 
+            }
+            
+            for(I=0,CmdDir[3,table]:count()) {
+                local Entry = CmdDir[3,table][I,table]
+                local FullName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
+                if (FullName==Arg) {
+                    alxos_console_err("Folder or file with this name already exists.")
+                    return
+                }
+            }
+            
+            KeyHandler = ""
+            CmdDsH = "alxos_console_mkfilepost"
+            dsSendDirect("fs_mkfile",CmdFS["hdd_io",wirelink]:entity(),table(entity(),CmdFS["fs_str_id",string],table(CmdFS,Tmp[1,string],Tmp[2,string],0,CmdDir[1,number]))) 
+        break
+        case "rm",
+        case "remove",
+            if (Arg=="") {
+                alxos_console_err("Please enter file name.")
+                return   
+            }
+            
+            if (CmdFS["read_only",number]) {
+                alxos_console_ro()
+                return
+            }
+        
+            local File = table()
+            local Num = 0
+        
+            for(I=0,CmdDir[3,table]:count()) {
+                local Entry = CmdDir[3,table][I,table]
+                local FullName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
+                if (FullName==Arg) {
+                    File = Entry
+                    Num = I
+                    break
+                }
+            }
+            
+            if (!File:count()) {
+                alxos_console_err("Folder or file with this name not exists.")
+                return
+            }
+            
+            GpuData[-11,number] = Num
+            
+            KeyHandler = ""
+            
+            if (alxos_wm1_isdir(File)) {
+                GpuData[-10,table] = File
+                CmdDsH = "alxos_console_delpre"
+                dsSendDirect("fs_listdir",CmdFS["hdd_io",wirelink]:entity(),table(entity(),CmdFS["fs_str_id",string],table(CmdFS,File["cluster",number],File["data_sector",number])))    
+            } else {
+                alxos_console_msg("Removing file... 0%")
+                
+                runCmd("alxos_console_cmd",100)
+            
+                CmdDsH = "alxos_console_delpost"
+                dsSendDirect("fs_removefile",CmdFS["hdd_io",wirelink]:entity(),table(entity(),CmdFS["fs_str_id",string],table(CmdFS,File["cluster",number],File["data_sector",number])))
+            }       
+        break
+        case "start",
+        case "run",
+            if (Arg=="") {
+                alxos_console_err("Please enter file name.")
+                return   
+            }
+        
+            local File = table()
+        
+            for(I=0,CmdDir[3,table]:count()) {
+                local Entry = CmdDir[3,table][I,table]
+                local FullName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
+                if (FullName==Arg) {
+                    File = Entry
+                    break
+                }
+            }
+            
+            if (!File:count()) {
+                alxos_console_err("File with this name not exists.")
+                return
+            }
+            
+            if (alxos_wm1_isdir(File) | File["ext",string]!="e2e") {
+                alxos_console_err("This is not E2 executable file.")
+                return
+            }
+            
+            KeyHandler = ""
+            dsSendDirect("alxos_execute",E2_CPU,table(entity(),CmdFS,File))
+        break
+        case "version",
+        case "ver",
+            alxos_console_msg("ALX Wiremod E2 OS - Console v1.0")
+            alxos_console_msg("(c) 2018 by AlexALX")
+            alxos_console_command()
+        break
+        case "fput",
+        case "fwrite",
+            local Tmp2 = Arg:find(" ")
+            local Arg1 = Arg:sub(0,Tmp2-1)
+            local Arg2 = Arg:sub(Tmp2+1,Arg:length())
+            if (Tmp2==0) {
+                Arg1 = Arg
+                Arg2 = ""   
+            }
+        
+            if (Arg1=="") {
+                alxos_console_err("Please enter file name.")
+                return   
+            }
+            
+            if (Arg2=="") {
+                alxos_console_err("Please enter file content.")
+                return   
+            }
+            
+            local File = table()
+        
+            for(I=0,CmdDir[3,table]:count()) {
+                local Entry = CmdDir[3,table][I,table]
+                local FullName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
+                if (FullName==Arg1) {
+                    File = Entry
+                    break
+                }
+            }
+            
+            if (!File:count()) {
+                alxos_console_err("File with this name not exists.")
+                return
+            }
+            
+            if (alxos_wm1_isdir(File)) {
+                alxos_console_err("This is folder!")
+                return
+            }
+            
+            KeyHandler = ""        
+
+            local C = File["cluster",number]
+            local Sd = File["data_sector",number]
+            CmdDsH = "alxos_explorer_fput_post"
+            
+            alxos_console_msg("Writing to file...")
+            
+            #runCmd("alxos_explorer_mkfile_progress",100)
+            
+            dsSendDirect("fs_writefile",CmdFS["hdd_io",wirelink]:entity(),table(entity(),CmdFS["fs_str_id",string],table(CmdFS,C,Sd,Arg2)))    
+        
+        break
+        case "cat",
+        case "fread",
+        case "fget",
+            if (Arg=="") {
+                alxos_console_err("Please enter file name.")
+                return   
+            }
+        
+            local File = table()
+        
+            for(I=0,CmdDir[3,table]:count()) {
+                local Entry = CmdDir[3,table][I,table]
+                local FullName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
+                if (FullName==Arg) {
+                    File = Entry
+                    break
+                }
+            }
+            
+            if (!File:count()) {
+                alxos_console_err("File with this name not exists.")
+                return
+            }
+            
+            if (alxos_wm1_isdir(File)) {
+                alxos_console_err("This is folder!")
+                return
+            }
+            
+            KeyHandler = ""
+            
+            alxos_console_msg("File first 48 bytes:")   
+            CmdDsH = "alxos_explorer_fget_post"         
+            dsSendDirect("fs_readfile",CmdFS["hdd_io",wirelink]:entity(),table(entity(),CmdFS["fs_str_id",string],table(CmdFS,File,0,48)))  
+        break
+        default,
+            if (Command!="") {
+                alxos_console_msg("Unknown command.")
+            }
+            alxos_console_command()
+        break
+    }
+}
+
+function alxos_console_key(Key:string,Pressed) {
+    if (!Pressed) { return } 
+    if (Key=="enter") {
+        alxos_console_run(GpuData[-4,string])
+    } elseif (Key=="up" | Key=="down") {
+    
+        if (CmdHistory:count()) {
+            
+            local Ind = GpuData[100,number]
+            if (Key=="up") {
+                Ind--    
+            } else {
+                Ind++
+            }
+            
+            local Max = CmdHistory:count() 
+            
+            if (Ind<1) {
+                Ind = Max  
+            } elseif (Ind>Max) { 
+                Ind = 1
+            }
+            
+            GpuData[100,number] = Ind
+    
+            local I = GpuData[-1,number]
+            local Path = GpuData[-3,string]
+            local Cmd = CmdHistory[Ind,string]
+        
+            EGP:egpSetText(I,Path+Cmd)
+            GpuData[-4,string] = Cmd
+            GpuData[-2,number] = (Path+Cmd):length()*10 + 10
+            alxos_upd_cursor()
+        }
+    } elseif (Key=="delete") { 
+        local I = GpuData[-1,number]
+        local Path = GpuData[-3,string]
+        local Cmd = ""
+    
+        EGP:egpSetText(I,Path+Cmd)
+        GpuData[-4,string] = Cmd
+        GpuData[-2,number] = (Path+Cmd):length()*10 + 10
+        alxos_upd_cursor()
+    } elseif (Key=="backspace") { 
+        local I = GpuData[-1,number]
+        local Path = GpuData[-3,string]
+        local Cmd = GpuData[-4,string]
+        if (Cmd=="") { return }
+        Cmd = Cmd:sub(0,Cmd:length()-1)
+        EGP:egpSetText(I,Path+Cmd)
+        GpuData[-4,string] = Cmd
+        GpuData[-2,number] = GpuData[-2,number] - 10
+        alxos_upd_cursor()
+    } elseif (Pressed==2) {
+        local KMem = toByte(Key) # handle capital/small without writting own code
+        local Char = toChar((KMem>=128 ? KMem-80 : KMem))
+        local RE = "^[A-Za-z0-9_ /.:-]$"
+        
+        if (Char:findRE(RE) & (KMem<=122 | KMem>=128 & KMem<=143)) {
+            local I = GpuData[-1,number]
+            local Path = GpuData[-3,string]
+            local Cmd = GpuData[-4,string]
+            Cmd += Char
+            EGP:egpSetText(I,Path+Cmd)
+            GpuData[-4,string] = Cmd
+            GpuData[-2,number] = GpuData[-2,number] + 10
+            alxos_upd_cursor()
+        }
+    }
+}
+
+function alxos_console_ds(Name:string) {
+    if (CmdDsH!="") {
+        CmdDsH(Name)
+    } elseif (Name=="fs_listdir") {
+        alxos_console_listdir_draw(dsGetTable())   
+    } elseif (Name=="alxos_runprog") {
+        stoptimer("cursor_draw")
+        local Info = dsGetTable()
+        local TInfo = table(Info[2,table],CmdFS,CmdAllFs,CmdPath,CmdDir)
+        "alxos_execute"(Info[1,string],TInfo)
+    } elseif (Name=="alxos_fail") {
+        alxos_console_err(dsGetString())
+    }
+}
+
+function alxos_console_postinit(Name:string) {
+    CmdDir[3,table] = dsGetTable()
+    
+    alxos_console_command()
+    
+    CmdCursor = 0
+    alxos_draw_cursor()    
+    
+    KeyHandler = "alxos_console_key"  
+
+    CmdDsH = ""
+}
+
+function alxos_console_init(Args:table) {
+    egpClear()
+    CmdFS = Args[2,table]
+    CmdAllFs = Args[3,table]
+    CmdPath = Args[4,table]
+    CmdDir = Args[5,table]
+    
+    if (!CmdDir:count()) {
+        CmdDir[1,number] = CmdFS["root_dir_cluster",number]
+        CmdDir[2,number] = 0
+    }
+    
+    CmdCopy = table()
+    CmdDsH = ""
+    CmdKeyH = ""
+    KeyHandler = ""
+    DsHandler = "alxos_console_ds"
+    #CmdPath = table("C:")
+    CmdLinesC = 1
+    CmdLines = array()
+    if (!CmdHistory:count()) { CmdHistory = array("") }
+    PlugHandler = "alxos_console_onplug"
+    
+    GpuData[1,table] = table()
+    GpuData[2,number] = 0
+    
+    alxos_console_msg("ALX Wiremod E2 OS - Console v1.0")
+    alxos_console_msg("(c) 2018 by AlexALX")
+    
+    CmdDsH = "alxos_console_postinit"
+    alxos_console_listdir(CmdFS,CmdDir[1,number],CmdDir[2,number])       
+}
+
+function alxos_console_onplug(Name:string) {
+    if (Name=="sata_onplug" | Name=="hddio_unplug" | Name=="cd_newdisc") {
+        if (!CmdFS["hddinfo",table]:count() | CmdFS["start_sector",number]==-1) {
+            CmdFS = CmdAllFs["C",table]    
+            CmdPath = table("C:")
+            CmdDir = table(CmdFS["root_dir_cluster",number],0)
+            alxos_console_msg("Disk was unplugged.")
+            alxos_console_command()
+            KeyHandler = "alxos_console_key" 
+            CmdDsH = ""
+            stopCmd()
+        }
+    }
+}

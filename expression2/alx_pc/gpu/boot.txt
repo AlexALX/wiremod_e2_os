@@ -7,14 +7,11 @@
 	PC boot GUI
 ]#
 
-if (INCLUDE) {
-
 #include "alx_pc/gpu/_main_"
 
 function init() {
     egpClear()
     stopAllTimers()    
-    soundStop(0)
     KeyHandler = ""
     DsHandler = ""
     ERR_C = 0
@@ -22,11 +19,11 @@ function init() {
     LAST_I = 1
     local X = BIOS_X
     local Sz = BIOS_SZ
-    EGP:egpText(LAST_I,"Simple BIOS v1.1",vec2(X,0))
+    EGP:egpText(LAST_I,Devices["names",table]["gpu",string]+" - GPU Initialization...",vec2(X,0))
     EGP:egpSize(LAST_I,Sz) LAST_I++
     
     LAST_Y = Sz
-    runCmd("initpost",2500)
+    runCmd("initpost",300)
 }
 
 registerTimers("boot_timer","hdd_timer")
@@ -36,6 +33,22 @@ function hdd_timer() {
 }
 
 function initpost() {
+    egpClear()
+    runCmd("initbiospre",100)
+}
+
+function initbiospre() {
+    LAST_I = 1
+    local X = BIOS_X
+    local Sz = BIOS_SZ
+    EGP:egpText(LAST_I,"Simple BIOS v1.2",vec2(X,0))
+    EGP:egpSize(LAST_I,Sz) LAST_I++
+    
+    LAST_Y = Sz    
+    runCmd("initbios",2000)
+}
+
+function initbios() {
     local I = LAST_I
     local X = BIOS_X
     local Sz = BIOS_SZ
@@ -43,35 +56,40 @@ function initpost() {
     BIOS_INIT = 1
     
     local Status = "OK"
-    if (softQuota()<4000 | TickQuota<14000) {
+    if (softQuota()<5000 | TickQuota<19000) {
         Status = "Error"
         ERR_C = 1
     } else { Status = "OK" }
     local Quota = (softQuota()>TickQuota ? TickQuota : softQuota())
-    EGP:egpText(I,"CPU "+round(Quota/1000,2)+" Mhz - "+Status,vec2(X,Y))
+    EGP:egpText(I,"CPU "+Devices["names",table]["cpu",string]+" ("+round(Quota/1000,2)+" Mhz) - "+Status,vec2(X,Y))
     EGP:egpSize(I,Sz) I++ Y+=Sz
     if (ERR_C) { 
         EGP:egpText(I,"ERROR: CPU is too slow.",vec2(X,Y))
         EGP:egpSize(I,Sz) I++ Y+=Sz
-        if (TickQuota<14000) {
-            EGP:egpText(I,"Minimum e2 tickquota is 15000 on server.",vec2(X,Y))
+        if (TickQuota<19000) {
+            EGP:egpText(I,"Minimum e2 tickquota is 20000 on server.",vec2(X,Y))
             EGP:egpSize(I,Sz) I++ Y+=Sz
             EGP:egpText(I,"Current value is approx "+TickQuota+" (hard or tick).",vec2(X,Y))
             EGP:egpSize(I,Sz) I++ Y+=Sz
         } else {
-            EGP:egpText(I,"Minimum e2 softquota is 4000 on server.",vec2(X,Y))
+            EGP:egpText(I,"Minimum e2 softquota is 5000 on server.",vec2(X,Y))
             EGP:egpSize(I,Sz) I++ Y+=Sz
             EGP:egpText(I,"Current value is "+softQuota()+".",vec2(X,Y))
             EGP:egpSize(I,Sz) I++ Y+=Sz
         }
         err() 
     }
+    
+    if (!EGP:entity():isValid()) {
+        ERR_C = 7
+        err()    
+    }
         
     if (egpMaxObjects()<300) {
         Status = "Error"
         ERR_C = 2
     } else { Status = "OK" }
-    EGP:egpText(I,"GPU "+ceil(egpMaxObjects()/128)*1024+" KB - "+Status,vec2(X,Y))
+    EGP:egpText(I,"GPU "+Devices["names",table]["gpu",string]+" ("+ceil(egpMaxObjects()/128)*1024+" KB) - "+Status,vec2(X,Y))
     EGP:egpSize(I,Sz) I++ Y+=Sz
     if (ERR_C) { 
         EGP:egpText(I,"ERROR: GPU memory is too small.",vec2(X,Y))
@@ -83,28 +101,39 @@ function initpost() {
         err() 
     }
     
-    if (!E2_SPU:isValid()) {
+    if (!Devices["spu",entity]:isValid()) {
         Status = "Not connected"
     } else { Status = "Connected" }
-    EGP:egpText(I,"Sound Card - "+Status,vec2(X,Y))
+    #ifndef soundStop(number)
+        if (Status=="Connected") {
+            Status = "Malfunction"
+        }
+    #endif
+    EGP:egpText(I,"Sound "+Devices["names",table]["spu",string]+" - "+Status,vec2(X,Y))
     EGP:egpSize(I,Sz) I++ Y+=Sz
     
-    if (!->DS) {
+    #ifndef soundStop(number)
+    EGP:egpText(I,"Error: E2 Extension Sound is not enabled!",vec2(X,Y))
+    EGP:egpSize(I,Sz) I++ Y+=Sz
+    #endif
+    
+    if (!DS:entity():isValid()) {
         Status = "Not connected"
     } else { Status = "Connected" }
     EGP:egpText(I,"Digital Screen - "+Status,vec2(X,Y))
     EGP:egpSize(I,Sz) I++ Y+=Sz
     
-    if (!Keyboard) {
-        Status = "Not connected"
+    if (Keyboard[1,entity]==noentity()) {
         ERR_C = 4
-    } else { Status = "Connected" }
-    EGP:egpText(I,"Keyboard - "+Status,vec2(X,Y))
-    EGP:egpSize(I,Sz) I++ Y+=Sz
-    if (ERR_C) { 
+        EGP:egpText(I,"Keyboard - Not connected",vec2(X,Y))
+        EGP:egpSize(I,Sz) I++ Y+=Sz
+        
         EGP:egpText(I,"ERROR: No keyboard detected",vec2(X,Y))
         EGP:egpSize(I,Sz) I++ Y+=Sz
         err() 
+    } else { 
+        EGP:egpText(I,Devices["names",table]["keyboard",string]+" - Connected",vec2(X,Y))
+        EGP:egpSize(I,Sz) I++ Y+=Sz
     }
     
     if (toByte(NB)!=0) {
@@ -113,14 +142,16 @@ function initpost() {
         EGP:egpSize(I,Sz) I++ Y+=Sz
         EGP:egpText(I,"Please connect empty \"To Character\" gate",vec2(X,Y))
         EGP:egpSize(I,Sz) I++ Y+=Sz
-        EGP:egpText(I,"\"Out\" output to \"NullByte\" input on BIOS.",vec2(X,Y))
+        EGP:egpText(I,"\"Out\" output to \"NullByte\" input on BIOS,",vec2(X,Y))
+        EGP:egpSize(I,Sz) I++ Y+=Sz
+        EGP:egpText(I,"Or update your wiremod.",vec2(X,Y))
         EGP:egpSize(I,Sz) I++ Y+=Sz
         err() 
     }
     
-    Y+=Sz
-    EGP:egpText(I,"Connected HDD's: ",vec2(X,Y))
-    EGP:egpSize(I,Sz) I++ Y+=Sz
+    #Y+=Sz
+    #EGP:egpText(I,"Connected HDD's: ",vec2(X,Y))
+    #EGP:egpSize(I,Sz) I++ Y+=Sz
     
     LAST_I = I
     LAST_Y = Y
@@ -133,31 +164,71 @@ function initpost() {
 function inithdd() {
     local Info = dsGetTable()
     HDDS = Info[1,table]
-    HDD_MAX = Info[2,number]
-    FS_TYPES = Info[3,table]
+    FS_TYPES = Info[2,table]
     
     local X = BIOS_X
     local Sz = BIOS_SZ
     
-    if (HDD_MAX==0|!HDD_IO) {
-        EGP:egpText(LAST_I,"No hdd's found.",vec2(X,LAST_Y))
+    if (!HDDS:count()|!HDD_IO:count()) {
+        LAST_Y+=Sz
+        EGP:egpText(LAST_I,"Warning: No hdd's found.",vec2(X,LAST_Y))
         EGP:egpSize(LAST_I,Sz) LAST_I++ LAST_Y+=Sz
     } else {
-        for(I=1,HDD_MAX) {
-            local Item = HDDS[I,table]
-            if (Item:count()) {
-                if (Item["type",number]==1) {
-                    EGP:egpText(LAST_I,"HDD"+(I-1)+" - "+Item["name",string],vec2(X,LAST_Y))
+        
+        local UsbDevices = table()
+        
+        local II = 0
+        
+        for (H=1,Devices["hdd_io",table]:count()) {
+            if (II>12) { break } # gui limitation
+            local Inf = Devices["hdd_io",table][H,table]
+            for(I=1,Inf[4,number]) {
+                local Item = Inf[5,table][I,table]
+            
+                if (I==1) {
+                    local Name = Inf[3,string]+" #"
+                    if (Item["usb",entity]) {
+                        UsbDevices:pushTable(table(Name,Item))
+                        break
+                    }
+                    EGP:egpText(LAST_I,Name+H+": ",vec2(X,LAST_Y))
                     EGP:egpSize(LAST_I,Sz) LAST_I++ LAST_Y+=Sz
+                    if (II>12) { break } # gui limitation
+                }
+                if (Item:count()) {
+                    if (Item["usb",entity]) {
+                        local Name = Inf[3,string]+" #"
+                        UsbDevices:pushTable(table(Name,Item))
+                        continue
+                    }
+                    if (Item["type",number]==1) {
+                        EGP:egpText(LAST_I,"HDD"+(I-1)+" - "+Item["name",string],vec2(X,LAST_Y))
+                        EGP:egpSize(LAST_I,Sz) LAST_I++ LAST_Y+=Sz
+                    } else {
+                        EGP:egpText(LAST_I,"HDD"+(I-1)+" - "+Item["name",string]+" - Size "+(Item["size",number]*Item["sector_size",number])/1024+" KB",vec2(X,LAST_Y))
+                        EGP:egpSize(LAST_I,Sz) LAST_I++ LAST_Y+=Sz
+                    }
                 } else {
-                    EGP:egpText(LAST_I,"HDD"+(I-1)+" - "+Item["name",string]+" - Size "+(Item["size",number]*Item["sector_size",number])/1024+" KB",vec2(X,LAST_Y))
+                    EGP:egpText(LAST_I,"HDD"+(I-1)+" - Not connected",vec2(X,LAST_Y))
                     EGP:egpSize(LAST_I,Sz) LAST_I++ LAST_Y+=Sz
                 }
-            } else {
-                EGP:egpText(LAST_I,"HDD"+(I-1)+" - Not connected",vec2(X,LAST_Y))
-                EGP:egpSize(LAST_I,Sz) LAST_I++ LAST_Y+=Sz
+                II++
+                if (II>12) { break } # gui limitation
             }
         }
+        
+        if (II<=12) {
+            for(U=1,UsbDevices:count()) {
+                local Item = UsbDevices[U,table][2,table]
+                local Name = UsbDevices[U,table][1,string]
+                EGP:egpText(LAST_I,Name+(U-1)+" - Size "+(Item["size",number]*Item["sector_size",number])/1024+" KB",vec2(X,LAST_Y))
+                EGP:egpSize(LAST_I,Sz) LAST_I++ LAST_Y+=Sz
+                II++
+                if (II>12) { break } # gui limitation   
+            }
+            
+        }
+        
     }
     
     KeyHandler = "bios_key"
@@ -172,15 +243,13 @@ function inithdd() {
     timer("boot_timer",100)
     runCmd("boot",2000)
     
-    if (DEBUG==-1) { "bios_key"("delete",1) }
+    if (DEBUG==-1 | DEBUG & Keyboard["Memory",number]==148) { "bios_key"("delete",1) }
 }
 
 function bios_key(Key:string,Pressed) {
     if (!Pressed) { return }
     if (Key=="delete") {
-        INCLUDE = 1
         #include "alx_pc/gpu/bios"
-        INCLUDE = 0
         stoptimer("cmd")
         bios_init()   
     }
@@ -218,9 +287,7 @@ function boot_ds(Name:string) {
             "nobootCD"(Ret[1,string])
         }
     } elseif (Name=="boot_func") {
-        INCLUDE = 1
         #include "alx_pc/gpu/_boot_"
-        INCLUDE = 0
         local Info = dsGetTable()
         if (!initboot(Info)) {
             noboot("Function "+Info[1,string]+" is missing.")   
@@ -239,19 +306,44 @@ function nobootCD(Msg:string) {
     EGP:egpText(LAST_I,"Press F1 to reboot.",vec2(BIOS_X,LAST_Y))
     EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
     
-    local BootHDD = HDDS[BOOT_HDD,table]
+    local BootHDD = BOOT_HDD[1,table]
     
     dsSendDirect("stopdisk",BootHDD["ent",entity],0)
     
     KeyHandler = "bootmenu_key"   
 }
 
+function table findboot() {
+    local Ent = Devices[BOOT_HDD[2,string]+"_bus",table][BOOT_HDD[3,number],array][3,entity]
+    if (Ent) {
+        if (BOOT_HDD[4,string]!="") {
+            for(I=1,Devices["usb",table]:count()) {
+                local UsbCont = Devices["usb",table][I,table]
+                if (UsbCont[1,entity]==Ent) {
+                    if (UsbCont[4,table][BOOT_HDD[4,string],table]:count()) {
+                        Ent = UsbCont[4,table][BOOT_HDD[4,string],table][3,wirelink]:entity()
+                        break
+                    }
+                }    
+            }
+        }
+        local HDD_IOS = Devices["hdd_io",table]
+        for(I=1,HDD_IOS:count()) {
+            if (HDD_IOS[I,table][1,wirelink]:entity()==Ent) {
+                return HDD_IOS[I,table][5,table][BOOT_HDD[1,number],table] 
+            }    
+        }
+    }
+    return table()
+}
+
 function boot() {
     egpClear()
     
-    local BootHDD = HDDS[BOOT_HDD,table]
+    local BootHDD = findboot()
+    BOOT_HDD[5,table] = BootHDD
     
-    if (!BootHDD:count()|!HDD_IO) {
+    if (!BootHDD:count()|!HDD_IO:count()) {
         EGP:egpText(LAST_I,"No bootable device",vec2(BIOS_X,LAST_Y))
         EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
         
@@ -260,36 +352,39 @@ function boot() {
         EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
         KeyHandler = "reboot"
     } else {
+        KeyHandler = ""
     
         if (BootHDD["type",number]==1) {
             EGP:egpText(LAST_I,BootHDD["name",string]+" initialization, please wait...",vec2(BIOS_X,LAST_Y))
             EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
             
             DsHandler = "boot_ds"
-            dsSendDirect("read_disk",HDD_IO:entity(),table("init",entity(),BootHDD))     
+            dsSendDirect("read_disk",BootHDD["hdd_io",wirelink]:entity(),table("init",entity(),BootHDD))     
         } else {
             EGP:egpText(LAST_I,"Loading boot loader...",vec2(BIOS_X,LAST_Y))
             EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
 
             DsHandler = "boot_ds"
-            dsSendDirect("readfstbl",HDD_IO:entity(),table(entity(),BootHDD))
+            dsSendDirect("readfstbl",BootHDD["hdd_io",wirelink]:entity(),table(entity(),BootHDD))
         }
     }
 }
 
 function reboot(Key:string,Pressed) {
     if (!Pressed) { return }
+    KeyHandler = ""
     reboot()
 }
 
 function bootmenu() {
-    local BootHDD = HDDS[BOOT_HDD,table]
+    local BootHDD = BOOT_HDD[5,table]
     local FsTbl = dsGetTable()
+
     if (FsTbl:count()) {
         for(I=0,FsTbl:count()-1) {
             if (FsTbl[I,table]["active",number]==1) {
                 DsHandler = "boot_ds"
-                dsSendDirect("fs_readfs",HDD_IO:entity(),table(entity(),"wm1",table(BootHDD,FsTbl[I,table])))
+                dsSendDirect("fs_readfs",BootHDD["hdd_io",wirelink]:entity(),table(entity(),"wm1",table(BootHDD,FsTbl[I,table])))
                 return
             }   
         }
@@ -315,9 +410,7 @@ function bootmenu_post_cd(Step:number) {
         if (Type=="string") {
             nobootCD(dsGetString())
         } else {
-            INCLUDE = 1
             #include "alx_pc/gpu/_boot_"
-            INCLUDE = 0
             local Info = dsGetTable()
             if (!initboot(Info)) {
                 noboot("Function "+Info[1,string]+" is missing.")   
@@ -334,15 +427,14 @@ function bootmenu_post(Step:number) {
             dsSendDirect("bootmenu",E2_CPU,CurFs)   
         } else {
             noboot("Boot loader not found.")
+            DEBUG = 0
         }
     } elseif (Step==1) {
         local Type = dsGetType()
         if (Type=="string") {
             noboot(dsGetString())
         } else {
-            INCLUDE = 1
             #include "alx_pc/gpu/_boot_"
-            INCLUDE = 0
             local Info = dsGetTable()
             if (!initboot(Info)) {
                 noboot("Function "+Info[1,string]+" is missing.")   
@@ -353,9 +445,7 @@ function bootmenu_post(Step:number) {
 
 #[
 function bootpost() {
-    INCLUDE = 1
     #include "alx_pc/gpu/alxos/installos"
-    INCLUDE = 0
     
     LAST_Y+=BIOS_SZ
     EGP:egpText(LAST_I,"Loading OS installation package...",vec2(BIOS_X,LAST_Y))
@@ -376,6 +466,4 @@ function bootmenu_key(Key:string,Pressed) {
     if (Key=="f1") {
         reboot(Key,Pressed)
     }
-}
-
 }

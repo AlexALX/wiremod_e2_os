@@ -1,9 +1,10 @@
 @name Main SPU func
-@inputs BIOS:entity Speaker:entity
-@outputs E2_SPU:entity
-@persist E2_GPU:entity E2_CPU:entity HDDS:table HDD_MAX Keyboard:wirelink
-@persist KeyUser:entity SpuData:table HDD_IO:wirelink
-@persist CurFs:table DsHandler:string ShutHandler:string
+@inputs Board:wirelink InA SpeakerSocketD
+@outputs EntID
+@persist E2_GPU:entity E2_CPU:entity HDDS:table Keyboard:wirelink
+@persist KeyUser:entity SpuData:table HDD_IO:array
+@persist CurFs:table DsHandler:string ShutHandler:string Device_Name:string
+@persist BIOS:entity Init Speaker:entity FS_TYPES:table Devices:table
 
 #[
     ALX Wiremod E2 PC
@@ -17,16 +18,22 @@ if (first()|duped()) {
 #include "alx_pc/shared/_main_"
 #include "alx_pc/shared/cmd"
     
+EntID = entity():id()
+
 function spuClear() {
     SpuData = table()
 }
 
 function playgmsound(Index,Time,Sound:string) {
+    #ifdef entity:soundPlay(number,number,string)
     Speaker:soundPlay(Index,Time,Sound)
+    #endif
 }
 
 function stopgmsound(Index,FadeTime) {
-   soundStop(Index,FadeTime)
+    #ifdef soundStop(number,number)
+    soundStop(Index,FadeTime)
+    #endif
 }
 
 }

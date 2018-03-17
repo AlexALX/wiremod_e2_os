@@ -8,8 +8,6 @@
     Custom spu programs
 ]#
 
-if (INCLUDE) {
- 
 #include "alx_pc/spu/alxos/_main_"
 
 function alxos_execute(Name:string) {
@@ -31,10 +29,7 @@ function alxos_execute(Name:string,Args:table) {
 #[ midi placeholder
 ALXOS_PROGS["alxos_midi",number] = 1
 function alxos_midi(Args:table) {
-    INCLUDE = 1
     #include "alx_pc/spu/alxos/explorer"
-    INCLUDE = 0
     alxos_midi_init(Args)
 }]#
 
-}

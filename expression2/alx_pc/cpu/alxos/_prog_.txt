@@ -5,8 +5,6 @@
 	ALX Wiremod E2 OS
 	Created by AlexALX
 ]#
-
-if (INCLUDE) {
  
 #include "alx_pc/cpu/alxos/_main_"
 
@@ -27,9 +25,36 @@ function alxos_bmp_reader(FInfo:table) {
     dsSendDirect("alxos_runprog",E2_GPU,table("alxos_bmp_reader",FInfo))
 }
 
+ALXOS_PROGS["alxos_soundplay",number] = 1
+function alxos_soundplay(FInfo:table) {
+    dsSendDirect("alxos_runprog",E2_GPU,table("alxos_explorer_soundplay",FInfo))
+}
+
 ALXOS_PROGS["alxos_cd_burner",number] = 1
 function alxos_cd_burner(FInfo:table) {
     dsSendDirect("alxos_runprog",E2_GPU,table("alxos_cd_burner"))
 }
-    
+
+ALXOS_PROGS["alxos_console",number] = 1
+function alxos_console(FInfo:table) {
+    dsSendDirect("alxos_runprog",E2_GPU,table("alxos_console"))
 }
+    
+ALXOS_PROGS["alxos_partitions",number] = 1
+function alxos_partitions(FInfo:table) {
+    DsHandler = "alxos_setup_ds"
+    dsSendDirect("alxos_runprog",E2_GPU,table("alxos_partitions"))
+}
+
+ALXOS_PROGS["alxos_network_chat",number] = 1
+function alxos_network_chat(FInfo:table) {
+    dsSendDirect("alxos_runprog",E2_GPU,table("alxos_network_chat"))
+}
+    
+# program associations, for now hardcoded...
+ALXOS_PROG_ASOC["bmp",string] = "alxos_bmp_reader"
+ALXOS_PROG_ASOC["txt",string] = "alxos_txt_reader"
+ALXOS_PROG_ASOC["ini",string] = "alxos_txt_reader"
+ALXOS_PROG_ASOC["e2e",string] = "alxos_txt_reader"
+ALXOS_PROG_ASOC["e2s",string] = "alxos_txt_reader"
+ALXOS_PROG_ASOC["gms",string] = "alxos_soundplay"

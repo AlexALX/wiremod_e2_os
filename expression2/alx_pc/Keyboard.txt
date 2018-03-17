@@ -1,0 +1,72 @@
+@name Keyboard Controller
+@inputs InA Memory User:entity Keyboard:wirelink
+@outputs EntID
+@persist BIOS:entity Init Device_Name:string
+
+#[
+    ALX Wiremod E2 PC
+    Created by AlexALX
+    -------------------
+    Keyboard controller
+]#
+
+if (first()|duped()) {
+    
+    #include "alx_pc/shared/_main_"
+    
+    BIOS = getentity(InA)
+    EntID = entity():id()
+    Init = 0
+    Device_Name = "PS/2 Keyboard"
+    
+    function usb_init() {
+        Init = 1
+        local Info = dsGetTable()
+        local USB_Device = Info[2,entity]
+        dsSendDirect("usbcontroller",USB_Device,table("keyboard",wirelink(),table(User)))
+    }
+    
+}
+
+if (dupefinished()) {
+    BIOS = getentity(InA)
+}
+
+if (~InA) {
+    local New_BIOS = getentity(InA)
+    if (BIOS!=New_BIOS & Init) {
+        #usbShutdown()
+        Init = 0
+    }
+    BIOS = New_BIOS
+    exit()
+}
+
+if (!BIOS:isValid()) { exit() }
+
+if (inputClk()) {
+    if (!Init) { exit() }
+    local Name = inputClkName()
+    if (Name=="Memory") {
+        dsSendDirect("keyboard",BIOS,table(Name,Memory))    
+    } elseif (Name=="User") {
+        dsSendDirect("keyboard",BIOS,table(Name,User))    
+    }#[ elseif (Name=="Keyboard") {
+        dsSendDirect("keyboard",BIOS,table(Name,Keyboard))    
+    }]#
+    exit()
+}
+
+if (dsClk()) {
+    local Name = dsClkName()
+    if (Name=="key_socket") {
+        Init = 1
+        dsSendDirect(Name,BIOS,table(getentity(User:id()),dsGetNumber(),Device_Name))
+    } elseif (Name=="SHUTDOWN") {
+        Init = 0
+    } elseif (Name=="Kick") {
+        Keyboard["Kick",number] = 0
+    } elseif (Name=="usbcontroller") {
+        usb_init()
+    }
+}

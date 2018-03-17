@@ -9,7 +9,7 @@
 ]#
 
 if (first()|duped()) {
- 
+
 #include "alx_pc/shared/_main_"
 
 function runCmd(Cmd:string,Delay,NoDebug) {
@@ -55,6 +55,10 @@ function stopCmd() {
     CMD = ""
     CMDArg = 0
     CMDA = table()
+}
+
+function string curCmd() {
+    return CMD   
 }
 
 #[ added in CPU/GPU etc

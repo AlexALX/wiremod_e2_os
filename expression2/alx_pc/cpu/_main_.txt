@@ -1,9 +1,8 @@
 @name Main CPU func
-@inputs BIOS:entity
-@outputs E2_CPU:entity
-@persist E2_GPU:entity E2_SPU:entity HDDS:table HDD_MAX Keyboard:wirelink
-@persist KeyUser:entity CpuData:table HDD_IO:wirelink
-@persist CurFs:table DsHandler:string
+@inputs Board:wirelink InA
+@persist BIOS:entity E2_GPU:entity E2_SPU:entity HDDS:table Keyboard:table
+@persist KeyUser:entity CpuData:table HDD_IO:array Devices:table
+@persist CurFs:table DsHandler:string Init Device_Name:string
 
 #[
 	ALX Wiremod E2 PC
@@ -13,12 +12,33 @@
 ]#
 
 if (first()|duped()) {
-    
+
 #include "alx_pc/shared/_main_"
 #include "alx_pc/shared/cmd"
     
 function cpuClear() {
     CpuData = table()
+}
+
+function cpuShutdown() {
+    if (!Init) { return }
+    cpuClear()
+    DsHandler = ""
+    Init = 0   
+    runOnKeys(KeyUser,0)
+    #Keyboard = nowirelink()
+    KeyUser = noentity()
+    stopAllTimers()
+}
+
+function handleKeys(KeyboardUser:entity) {
+    if (KeyboardUser:isValid()) {
+        runOnKeys(KeyboardUser,1)
+        KeyUser = KeyboardUser
+    } else {
+        runOnKeys(KeyUser,0)
+        KeyUser = noentity()
+    }       
 }
    
 }

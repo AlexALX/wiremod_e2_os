@@ -2,22 +2,32 @@
 @model models/cheeze/wires/cpu.mdl
 
 #[
-	ALX Wiremod E2 PC
-	Created by AlexALX
-	-------------------
-	E2 CPU, purpose:
-	- init boot loader
-	- Keyboard handler
-	- alxos e2 cpu programs
+    ALX Wiremod E2 PC
+    Created by AlexALX
+    -------------------
+    E2 CPU, purpose:
+    - init boot loader
+    - Keyboard handler
+    - alxos e2 cpu programs
+    - plug & play handle for OS
 ]#
 
 if (first()|duped()) {
     
-#include "alx_pc/shared/_main_"
 #include "alx_pc/cpu/_main_"
+#include "alx_pc/cpu/_boot_"
+
+setColor(178,178,255)
     
-E2_CPU = entity()
-dsSendDirect("reload",BIOS,"cpu")
+BIOS = getentity(InA)
+Board["A",number] = entity():id()
+if (!duped()) {
+    dsSendDirect("reload",BIOS,"cpu")
+}
+Init = 0
+
+Device_Name = "ALX Phantom C1"
+KeyUser = noentity()
  
 function err(ERR) {
     dsSendDirect("err",BIOS,ERR)
@@ -45,9 +55,27 @@ function getHddsInfo(Step) {
 }]#
 
 function ready() {
-    dsSendDirect("ready",E2_GPU,0)
+    handleKeys(KeyUser)
+    dsSendDirect("ready",E2_GPU,SysFs)
 }
 
+function socket_init() {
+    dsSendDirect("cpu_socket",BIOS,table("cpu",entity(),Device_Name))    
+}
+
+}
+
+if (dupefinished()) {
+    Board["A",number] = entity():id()
+    BIOS = getentity(InA)
+}
+
+if (~InA) {
+    local New_BIOS = entity(InA)
+    if (BIOS!=New_BIOS & Init) {
+        cpuShutdown()
+    }
+    BIOS = New_BIOS
 }
 
 if (!BIOS:isValid()) { exit() }
@@ -55,33 +83,33 @@ if (!BIOS:isValid()) { exit() }
 if (dsClk()) {
     local Name = dsClkName()
     if (Name=="init") {
+        Init = 1
         local Info = dsGetTable()
         NB = Info[1,string]
-        E2_GPU = Info[3,entity]
-        E2_SPU = Info[4,entity]
-        local KeyboardArr = Info[5,array]
-        Keyboard = (KeyboardArr[2,number] ? KeyboardArr[1,wirelink] : nowirelink()) # bug - empty wirelink crash e2!
-        local HDDIO_Arr = Info[6,array]
-        HDD_IO = (HDDIO_Arr[2,number] ? HDDIO_Arr[1,wirelink] : nowirelink())
-        HDDS = Info[9,table]
-        HDD_MAX = Info[10,number]
-        TickQuota = Info[12,number]
-        if (!Info[8,number]) {
+        Devices = Info[2,table]
+        E2_GPU = Devices["gpu",entity]
+        E2_SPU = Devices["spu",entity]
+        Keyboard = Devices["keyboard",table]
+        HDD_IO = Devices["hdd_io",array]
+        HDDS = Info[5,table]
+        TickQuota = Info[7,number]
+        if (!Info[4,number]) {
             dsSendDirect(Name,BIOS,"cpu")
         }
+    } elseif (Name=="cpu_socket") {
+        socket_init()
     } elseif (Name=="fstbl") {
         CurFs = dsGetTable()
     } elseif (Name=="keyboard") {
-        local KeyboardUser = dsGetEntity()
-        if (KeyboardUser:isValid()) {
-            runOnKeys(KeyboardUser,1)
-            KeyUser = KeyboardUser
+        local Info = dsGetTable()
+        if (Info[1,string]=="Memory") {
+            dsSendDirect("keyboard",E2_GPU,Info[2,number])
         } else {
-            runOnKeys(KeyUser,0)
-            KeyUser = noentity()
-        }    
+            handleKeys(Info[2,entity])
+        }
     } elseif (Name=="SHUTDOWN") {
-        dsSendDirect("SHUTDOWN",BIOS,dsGetNumber())
+        cpuShutdown()
+        #dsSendDirect("SHUTDOWN",BIOS,dsGetNumber())
     } elseif (Name=="hddinfo") {
         #[local Type = dsGetType()
         if (Type=="entity") {
@@ -96,11 +124,9 @@ if (dsClk()) {
         }]#
         #dsSendDirect("gethdds",BIOS,dsGetEntity())
     } elseif (Name=="ready") {
+        KeyUser = dsGetEntity()
         ready()
     } elseif (Name=="bootmenu") {
-        INCLUDE = 1
-        #include "alx_pc/cpu/_boot_"
-        INCLUDE = 0
         initboot()
     } elseif (DsHandler!="") {
         DsHandler(Name)
@@ -115,4 +141,12 @@ if (keyClk(KeyUser) & Keyboard) {
 
 if (clk("cmd")) {
     cmdClk()
+    exit()
+}
+
+if (clk(clkName())) {
+    local Name = clkName()
+    if (SharedTimers:exists(Name)) {
+        SharedTimers[Name,string]()
+    }
 }

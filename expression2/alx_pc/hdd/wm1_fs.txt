@@ -20,8 +20,6 @@
         Support file creation/modify/access time as unix stamp.		
 ]#
 
-if (INCLUDE) {
-    
 #include "alx_pc/hdd/_main_"
 #include "alx_pc/shared/cmdqueue"
 
@@ -46,7 +44,7 @@ function number wm1_readfatcluster(FS:table,C) {
     return ((readCell(FS["hddinfo",table],O) >> (C % 2)*16) && 0xFFFF)  
 }
 
-function number wm1_findlastcluster(FS:table,C) {
+function wm1_findlastcluster(FS:table,C) {
     #local Tmp = wm1_readfatcluster(FS,C)
     #if (!Tmp) { return 0 }
     cmdRun("wm1_findlastcluster",table(FS,C))
@@ -184,6 +182,7 @@ function number cmd_wm1_updatefat(CmdData:table) {
         } 
         return 1   
     }
+    return 0
 }
 
 function number wm1_checkFAT(FS:table) {
@@ -395,6 +394,9 @@ function table wm1_readfs(Args:table) {
     local O = FsTbl["start",number]
     if (((readCell(HDD,O+13) >> 16) && 0xFFFF)!=0x55AA) { return table() } # invalid FS
     FsInfo["hddinfo",table] = HDD
+    FsInfo["hdd_io",wirelink] = wirelink()
+    FsInfo["start_sector",number] = O
+    FsInfo["end_sector",number] = FsTbl["end",number]
     FsInfo["boot_func",string] = byte2str(readCell(HDD,O+1),0)+byte2str(readCell(HDD,O+2),0)+byte2str(readCell(HDD,O+3),0)
     FsInfo["fs_str_id",string] = byte2str(readCell(HDD,O),0)
     FsInfo["bytes_in_sector",number] = HDD["sector_size",number]
@@ -499,7 +501,7 @@ function table wm1_getfileinfo(HDD:table,Of) {
     return Ret
 }
 
-function number wm1_getsize(FS:table,C) {
+function wm1_getsize(FS:table,C) {
     local Size = FS["sectors_in_cluster",number]*FS["bytes_in_sector",number]
     cmdRun("wm1_getsize",table(FS,C,Size,Size))
 }
@@ -635,7 +637,7 @@ function number cmd_wm1_listdir(CmdData:table) {
     local II = CmdData[6,number]
     local SI = Ents:count()
     local I = CmdData[7,number]
-    while(perf(80)) {
+    while(perf(85)) {
         if (I>Max) { #I=0,Max-1 
             cmdClearRes()
             CmdResult = Ents
@@ -1380,6 +1382,7 @@ function number wm1_mkfile(Args:table) {
     local Tmp = wm1_direxists(FS,Dir)
     if (!Tmp) { return 0 } # dir not exists
     cmdRun("wm1_mkfile",table(FS,0,0,Name,Ext,Is_Dir,Dir))
+    return 1
 }
 
 function number cmd_wm1_mkfile(CmdData:table) {
@@ -1591,8 +1594,6 @@ function cmdComplete(CmdComplete:string) {
     
 Mkfs = 0
 RunCmd = "NO"
-    
-}
 
 if (RunCmd=="" | changed(Mkfs) & Mkfs) {
     RunCmd = "wm1_listdir"
@@ -1674,6 +1675,7 @@ if (RunCmd=="" | changed(Mkfs) & Mkfs) {
     #exit()
 }
 
+#ifdef httpClk()
 if (httpClk()) {
     #FsTbl = readfstbl()
     #CurFs = wm1_readfs(FsTbl,0)
@@ -1703,6 +1705,7 @@ if (httpClk()) {
     #OutStr = HData
     cmdRun("parseHttp",table(Len,HData,array(),1))    
 }
+#endif
 
 #[
 if (changed(CmdComplete) & CmdComplete!="") {

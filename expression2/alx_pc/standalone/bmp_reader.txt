@@ -1,0 +1,426 @@
+@name Standalone BMP Reader
+@inputs DS:wirelink
+@outputs Percent
+@persist BMP_NoKeepAR BmpData:table
+
+#ifndef httpClk()
+    error("HTTP e2 extension is required for this script.")
+#else
+
+if (first()|duped()) {
+
+
+runOnChat(1)
+runOnHTTP(1)
+
+BmpData = table()
+
+BMP_NoKeepAR = 0 # 0 - keep asset ratio, 1 - scale to screen size
+Percent = 0
+
+function dsClear() {
+    BmpData = table()
+    DS[1048569] = 2
+    DS[1048574] = 0
+    DS[1048575] = 1
+    Percent = 0
+}
+
+function number str2byte(Str:string) {
+    if (Str=="") { return 0 } 
+    local Str = Str:sub(1,4) 
+    local Ret = 0
+    for(I=1,Str:length()) {
+        local Byte = toByte(Str,I)
+        #if (Byte==-1) { Byte = 0 }
+        Ret += (Byte << 8*(I-1))
+    }
+    return Ret
+}
+
+function number trailingZeros(N) {
+    if(N==0) { return 32 }
+    local S = 0
+    while (N>0) {
+        local Rest=mod(N,2)
+        if (Rest==0) {
+            S++   
+        } else {
+            break
+        }
+        N=(N-Rest)/2
+    }
+    return S
+}
+
+function alxos_bmp_draw() {
+    local Data = BmpData["data",string]
+    local Size = BmpData[5,number]
+    if (Size==0) {
+        local Format = Data:sub(1,2)
+        if (Format=="BM") {
+            local Size = BmpData["size",number]
+            local Offset = str2byte(Data:sub(11,14))+1
+            local HSize = str2byte(Data:sub(15,18))
+            
+            local Width = str2byte(Data:sub(19,22))
+            local Height = str2byte(Data:sub(23,26))
+
+            local Compression = str2byte(Data:sub(31,34))
+
+            local Colors = str2byte(Data:sub(47,50))
+
+            local BitCount = str2byte(Data:sub(29,30))
+            local ColorsB = 4
+            
+            if (HSize==12) { # OS/2 BMP
+                Width = str2byte(Data:sub(19,20))   
+                Height = str2byte(Data:sub(21,22))  
+                Compression = 0
+                Colors = 0
+                BitCount = str2byte(Data:sub(25,26))  
+                ColorsB = 3    
+            }
+            BmpData[5,number] = ColorsB
+            
+            if (Height<0) { # flip row order checkbox
+                BmpData[20,number] = -1
+                Height *= -1
+            } else {
+                BmpData[20,number] = 1
+            }
+            
+            if (Width<1 | Height<1 | Compression!=0 & (Compression!=3 | Compression==3 & BitCount==32) | Size==0) {
+                print(_HUD_PRINTTALK,"Unsupported BMP file.")
+                return
+            }
+
+            if (Width>512 | Height>512) {
+                print(_HUD_PRINTTALK,"Max BMP resolution is 512x512 (current is "+Width+"x"+Height+").")
+                return
+            }
+
+            if (BitCount==24 || BitCount==32) {
+                BmpData[14,number] = 16
+                BmpData[15,number] = 8
+                BmpData[16,number] = 0
+                BmpData[17,number] = 0xFF
+                BmpData[18,number] = 0xFF
+                BmpData[19,number] = 0xFF
+            } elseif (BitCount==16) {
+                if (Compression==0) {
+                    BmpData[14,number] = 10
+                    BmpData[15,number] = 5
+                    BmpData[16,number] = 0
+                    BmpData[17,number] = 0x1F
+                    BmpData[18,number] = 0x1F
+                    BmpData[19,number] = 0x1F
+                } else {
+                    local RM = str2byte(Data:sub(55,58))
+                    local GM = str2byte(Data:sub(59,62))
+                    local BM = str2byte(Data:sub(63,66))
+
+                    local RS = trailingZeros(RM)
+                    local GS = trailingZeros(GM)
+                    local BS = trailingZeros(BM)
+
+                    BmpData[14,number] = RS
+                    BmpData[15,number] = GS
+                    BmpData[16,number] = BS
+                    BmpData[17,number] = RM >> RS
+                    BmpData[18,number] = GM >> GS
+                    BmpData[19,number] = BM >> BS
+                }
+            } else {
+                BmpData[22,table] = table()
+                if (Colors==0) {
+                    Colors = 1 << BitCount
+                }
+                BmpData[23,number] = Colors
+                BmpData[24,number] = 1
+                BmpData[25,number] = 0
+            }
+            BmpData[26,number] = BitCount
+
+            local II = BitCount/8
+            BmpData[21,number] = II
+            BmpData[27,number] = 8/BitCount
+
+            BmpData[3,number] = Width
+            BmpData[4,number] = Height
+            #BmpData[5,number] = Size
+            local FSize = BmpData["size",number]
+            
+            if (!BMP_NoKeepAR) {
+                local SWH = (Width>Height ? Width : Height)
+                BmpData[31,number] = (Height>Width ? floor((Height-Width)/2) : 0 )
+                BmpData[32,number] = (Width>Height ? floor((Width-Height)/2) : 0 )
+                DS[1048573] = SWH
+                DS[1048572] = SWH
+            } else {
+                BmpData[31,number] = 0
+                BmpData[32,number] = 0
+                DS[1048573] = Width
+                DS[1048572] = Height
+            }
+
+            BmpData[6,number] = 0
+            BmpData[7,number] = Height-1
+
+            local Bytes = ceil(Width*II/4)*4 # how many bytes we read
+            if (FSize<Bytes) { Bytes = FSize-Offset }
+            BmpData[10,number] = Bytes
+
+            BmpData[9,number] = 0
+            BmpData[8,number] = Offset
+
+            BmpData[13,number] = floor(ceil(Width*II/4)*4-Width*II)
+
+            if (BitCount<=8) {
+                Bytes = (Colors>32 ? 32*ColorsB : Colors*ColorsB)
+                BmpData[28,number] = Bytes
+                BmpData[29,number] = Offset
+                BmpData[8,number] = 14+HSize+1
+                BmpData[30,number] = 0
+            }
+
+            alxos_bmp_draw()
+
+        } else {
+            print(_HUD_PRINTTALK,"This is not valid BMP file.")
+            return
+        }
+    } else {
+        local X = BmpData[6,number]
+        local Y = BmpData[7,number]
+        local I = BmpData[8,number]
+
+        local Width = BmpData[3,number]
+        local Height = BmpData[4,number]
+
+        local SI = BmpData[9,number]
+
+        local Bytes = BmpData[10,number]
+        local HTTPData = Data
+        local Data = Data:sub(I,I+Bytes-1)
+
+        #if (X==0 & Y==Height-1) {
+            #print(Data:sub(55,59))
+            #Data = Data:sub(55,Data:length())
+            #print(Data:replace(NB,"0"))
+        #}
+
+        local Max = Data:length()
+
+        #[if (SI==Max) {
+            BmpData[100,string] = Data+BmpData[100,string]
+        }]#
+
+        Percent = round(I/BmpData["size",number]*100)
+        
+        local RCol = BmpData[24,number]
+        local BitCount = BmpData[26,number]
+
+        if (RCol==1) {
+            local Colors = BmpData[23,number]
+            local CTbl = BmpData[22,table]
+            local CTblI = BmpData[30,number]
+            local ColorsB = BmpData[5,number] 
+            
+            while(perf(90)) {
+                if (CTblI>=Colors) {
+                    CTblI = Colors
+                    break
+                }
+
+                local Sub = str2byte(Data:sub(SI+1,SI+ColorsB))
+                local R = floor((Sub >> 16) && 0xFF)
+                local G = floor((Sub >> 8) && 0xFF)
+                local B = floor(Sub && 0xFF)
+
+                CTbl[CTblI,vector] = vec(R,G,B)
+                SI+=ColorsB
+                CTblI++
+                if (SI>=Max) {
+                    SI = Max
+                    break
+                }
+            }
+
+            if (CTblI==Colors) {
+                BmpData[24,number] = 2
+                BmpData[9,number] = 0
+                BmpData[8,number] = BmpData[29,number]
+            } else {
+                BmpData[30,number] = CTblI
+                if (SI==Max) {
+                    local Bytes = BmpData[28,number]
+                    local Next = I+Bytes
+                    BmpData[8,number] = Next
+                    BmpData[9,number] = 0
+                } else {
+                    BmpData[9,number] = SI
+                    BmpData[11,string] = Data
+                }
+            }
+            timer("bmp",1)
+
+            return
+        }
+
+        #local Of = BmpData[13,number]
+
+        local II = BmpData[21,number]
+
+        local RS = BmpData[14,number]
+        local GS = BmpData[15,number]
+        local BS = BmpData[16,number]
+        local RL = BmpData[17,number]
+        local GL = BmpData[18,number]
+        local BL = BmpData[19,number]
+        local FY = BmpData[20,number]
+
+        local LI = BmpData[27,number]
+        local CTbl = BmpData[22,table]
+        
+        local Xadd = BmpData[31,number]
+        local Yadd = BmpData[32,number]
+        
+        local PosMul = (Xadd>Yadd ? Height : Width)
+        
+        while(perf(90)) {
+            if (SI>=Max | Y<0) {
+                SI = Max
+                break
+            }
+
+            if (BitCount<=4) {
+                local Sub = str2byte(Data:sub(SI+1,SI+1))
+                local YF = Y
+                if (FY==-1) {
+                    YF = Height-Y
+                }
+                YF += Yadd
+
+                for (PI=LI-1,0,-1) {
+                    local IND = (BitCount==4 ? (Sub >> PI*4) && 0xF : (Sub >> PI) && 1 )
+                    local RGB = CTbl[IND,vector]
+                    DS[(X+Xadd)+YF*PosMul] = RGB[1]*65536 + RGB[2]*256 + RGB[3]
+                    X++
+                }
+                SI++
+                if (X>=Width) {
+                    SI += BmpData[13,number]
+                    X = 0
+                    Y--
+                }
+                continue
+            }
+
+            local Sub = str2byte(Data:sub(SI+1,SI+II))
+
+            local YF = Y
+            if (FY==-1) {
+                YF = Height-Y
+            }
+            YF += Yadd
+
+            if (II<3) {
+                if (RCol==2) {
+                    local RGB = CTbl[Sub,vector]
+                    DS[(X+Xadd)+YF*PosMul] = RGB[1]*65536 + RGB[2]*256 + RGB[3]
+                } else {
+                    local R = floor((Sub >> RS) && RL)
+                    local G = floor((Sub >> GS) && GL)
+                    local B = floor(Sub && BL)
+
+                    R *= floor(0xFF/RL)
+                    G *= floor(0xFF/GL)
+                    B *= floor(0xFF/BL)
+
+                    DS[(X+Xadd)+YF*PosMul] = R*65536 + G*256 + B
+                }
+            } else {
+                DS[(X+Xadd)+YF*PosMul] = Sub #R*65536 + G*256 + B
+            }
+
+            X++
+            SI+=II
+
+            if (X>=Width) {
+                SI += BmpData[13,number]
+                X = 0
+                Y--
+            }
+
+        }
+
+        #BmpData[13,number] = Of
+        BmpData[9,number] = SI
+        BmpData[6,number] = X
+        BmpData[7,number] = Y
+
+        local End = BmpData[12,number]
+
+        if (Y<0 | End==1) {    
+            print(_HUD_PRINTTALK,"BMP successfully parsed.")        
+            return
+        }
+
+        if (SI<Max) {
+            BmpData[11,string] = Data
+        } else {
+
+            local Bytes = BmpData[10,number]
+            local Next = I+Bytes
+            
+            local Sz = BmpData["size",number]
+
+            if (Next>Sz) {
+                #Bytes = Next*(-1)
+                BmpData[12,number] = 1
+                Bytes = Next-Sz
+                Next = Sz
+                #BmpData[10,number] = Bytes
+            }
+
+            BmpData[8,number] = Next
+            #BmpData[9,number] = Bytes
+            BmpData[9,number] = 0
+
+            #print(I+" "+Next+" | "+Bytes)
+        }
+        timer("bmp",1)
+    }
+
+}
+
+}
+
+if (chatClk(owner())) {
+    local Said = owner():lastSaid():trim()
+    local Find = Said:find(" ")
+    local Cmd = Said:left(Find-1)
+    local Url = Said:sub(Find+1) 
+    if (Cmd=="!bmp") {
+        httpRequest(Url)    
+    } elseif (Cmd=="!bmpabort" | Cmd=="!bmpstop") {
+        print(_HUD_PRINTTALK,"BMP rendering canceled.")     
+        stoptimer("bmp")
+    }
+    exit()
+}
+
+if (httpClk()) {
+    dsClear()  
+    BmpData["data",string] = httpData()   
+    BmpData["size",number] = BmpData["data",string]:length()
+    alxos_bmp_draw()
+    exit()
+}
+
+if (clk("bmp")) {
+    alxos_bmp_draw()
+}
+
+#endif

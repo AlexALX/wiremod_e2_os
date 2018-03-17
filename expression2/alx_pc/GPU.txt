@@ -2,45 +2,56 @@
 @model models/expression 2/cpu_processor.mdl
 
 #[
-	ALX Wiremod E2 PC
-	Created by AlexALX
-	-------------------
-	E2 GPU, purpose:
-	- EGP and Digital Screen handler
-	- GUI for BIOS/Boot/ALX OS
-	- alxos e2 gpu programs
+    ALX Wiremod E2 PC
+    Created by AlexALX
+    -------------------
+    E2 GPU, purpose:
+    - EGP and Digital Screen handler
+    - GUI for BIOS/Boot/ALX OS
+    - alxos e2 gpu programs
 ]#
 
 if (first()|duped()) {
-    
-#include "alx_pc/shared/_main_"
-#include "alx_pc/gpu/_main_"
 
-E2_GPU = entity() # stupid fix for entity loss on reload
-dsSendDirect("reload",BIOS,"gpu")
+#include "alx_pc/gpu/boot"
+
+runOnLast(1)
+
+setColor(200,255,200)
+
+BIOS = getentity(InA)
+Board["A",number] = entity():id()
+if (!duped()) {
+    dsSendDirect("reload",BIOS,"gpu")
+}
+Init = 0
+
+EntID = entity():id()
+
+Device_Name = "ALX GhostForce X1"
 
 BIOS_X = 10
 BIOS_SZ = 24
 
-BOOT_HDD = 1
+BOOT_HDD = table()
 
 EgpCleanHandler = ""
+PlugHandler = ""
 
 function initGpu() {
     local Info = dsGetTable()
     NB = Info[1,string]
-    E2_CPU = Info[2,entity]
-    E2_SPU = Info[4,entity]
-    local KeyboardArr = Info[5,array]
-    Keyboard = (KeyboardArr[2,number] ? KeyboardArr[1,wirelink] : nowirelink()) # bug - empty wirelink crash e2!
-    local HDDIO_Arr = Info[6,array]
-    HDD_IO = (HDDIO_Arr[2,number] ? HDDIO_Arr[1,wirelink] : nowirelink())
-    BOOT_HDD = Info[7,number]
-    HDDS = Info[9,table]
-    HDD_MAX = Info[10,number]
-    FS_TYPES = Info[11,table]
-    TickQuota = Info[12,number]
-    if (!Info[8,number]) {
+    Devices = Info[2,table]
+    BOOT_HDD = Info[3,table]
+    E2_CPU = Devices["cpu",entity]
+    E2_SPU = Devices["spu",entity]
+    Keyboard = Devices["keyboard",table]
+    HDD_IO = Devices["hdd_io",table]
+    HDDS = Info[5,table]
+    FS_TYPES = Info[6,table]
+    TickQuota = Info[7,number]
+    Init = 1
+    if (!Info[4,number]) {
         dsSendDirect("init",BIOS,"gpu")
         egpClear()
         dsClear()
@@ -48,23 +59,83 @@ function initGpu() {
 }
 
 function ready() {
-    INCLUDE = 1
-    #include "alx_pc/gpu/boot"
-    INCLUDE = 0
+    SysFS = dsGetTable()
     init()
 }
 
-function shutdown() {
+function gpuShutdown() {
     if (ShutHandler!="") {
-        ShutHandler()   
+        ShutHandler(dsGetArray())   
         ShutHandler = ""
     }
     stopAllTimers()
+    GpuData = table()
+    Init = 0
+    PlugHandler = ""
     egpClear()
     dsClear()
-    dsSendDirect("SHUTDOWN",E2_CPU,dsGetNumber())
 }
 
+function pcie_init() {
+    dsSendDirect("pcie",BIOS,table("gpu",entity(),Device_Name))
+    Screens:clear()
+    EGP = nowirelink()
+    DS = nowirelink()
+    for (I=0,1) {
+        dsSendDirect("wirelink",entity(ioGetInputNumber("ScreenSockG_"+I)),entity())    
+    }
+}
+
+function shutdown() {
+    gpuShutdown()
+    dsSendDirect("SHUTDOWN",BIOS,dsGetArray())
+    Screens:clear()
+    EGP = nowirelink()
+    DS = nowirelink()
+}
+
+function number findscreen(ID) {
+    for (I=0,1) {
+        if (ID==ioGetInputNumber("ScreenSockG_"+I)) {
+            return I    
+        }
+    }
+    return -1
+}
+
+function screen_connect() {
+    local Info = dsGetTable()
+    local ID = Info[1,number]
+    local WL = Info[2,wirelink]    
+    local WLI = WL:entity():id()
+    if (WL) {
+        if (!EGP:entity():isValid() & WL:entity():type()=="gmod_wire_egp") {
+            EGP = WL
+            Screens[WLI,number] = findscreen(ID)
+            if (GpuData["BSOD",array]:count()) {
+                alxos_bsod(GpuData["BSOD",array])    
+            }
+        } elseif (!DS:entity():isValid() & WL:entity():type()=="gmod_wire_digitalscreen") {
+            DS = WL
+            Screens[WLI,number] = findscreen(ID)
+        }
+    }    
+}
+
+}
+
+if (dupefinished()) {
+    Board["A",number] = entity():id()
+    BIOS = getentity(InA)
+    EntID = entity():id()
+}
+
+if (~InA) {
+    local New_BIOS = getentity(InA)
+    if (BIOS!=New_BIOS & Init) {
+        gpuShutdown()
+    }
+    BIOS = New_BIOS
 }
 
 if (!BIOS:isValid()) { exit() }
@@ -74,12 +145,38 @@ if (changed(E2_CPU)|first()) {
     dsSendDirect("initgpu",E2_CPU,entity())   
 }]#
 
+if (inputClk()) {
+    if (!Init) { exit() }
+    local Name = inputClkName()
+    if (Name:find("ScreenSockG")) {
+        local Ent = entity(ioGetInputNumber(Name))
+        local ID = Name:right(1):toNumber()
+        if (Ent) {
+            dsSendDirect("wirelink",Ent,entity())    
+        } else {
+            if (!EGP:entity():id() | Screens[EGP:entity():id(),number]==ID) {
+                EGP = nowirelink()
+                stopAllTimers()
+                dsSendDirect("BSOD",BIOS,array(3))
+            } elseif (!DS:entity():id() | Screens[DS:entity():id(),number]==ID) {
+                DS = nowirelink()
+            }
+        }
+    }    
+    exit()
+}
+
 if (dsClk("keyboard")) {
-    local KeyArr = dsGetArray()
+    local Type = dsGetType()
     if (KeyHandler=="") {
         #if (Key==13 & !BIOS_INIT) { init() }
     } else {
-        KeyHandler(KeyArr[1,string],KeyArr[2,number])
+        if (Type=="number") {
+            KeyHandler(toChar(dsGetNumber()),2)
+        } else {
+            local KeyArr = dsGetArray()
+            KeyHandler(KeyArr[1,string],KeyArr[2,number])
+        }
     }
     exit()
 }
@@ -88,6 +185,10 @@ if (dsClk()) {
     local Name = dsClkName()
     if (Name=="ready") {
         ready()
+    } elseif (Name=="pcie") {
+        pcie_init()
+    } elseif (Name=="wirelink") {
+        screen_connect()
     } elseif (Name=="init") {
         initGpu()
     } elseif (Name=="SHUTDOWN") {
@@ -96,6 +197,10 @@ if (dsClk()) {
     } elseif (Name=="CMD") {
         local Cmd = dsGetString()
         Cmd()   
+    } elseif (Name=="sata_onplug" | Name=="usb_onplug" | Name=="hddio_unplug" | Name=="network_unplug" | Name=="cd_newdisc") {
+        if (PlugHandler!="") {
+            PlugHandler(Name)
+        }
     } elseif (DsHandler!="") {
         DsHandler(Name)
     }
@@ -117,17 +222,26 @@ if (clk(clkName())) {
 }
 
 if (clk("cmd")) {
-    cmdClk()   
+    cmdClk()
 }
 
+#ifdef httpClk()
 if (httpClk()) {
     if (HTTP_Handler!="") {
         HTTP_Handler()   
     }   
 }
+#endif
 
 if (chatClk(ChatPlayer)) {
     if (ChatHandler!="") {
         ChatHandler(ChatPlayer)  
+    }
+}
+
+if (last() & !DEBUG) {
+    if (ShutHandler!="") {
+        ShutHandler(array(4))   
+        ShutHandler = ""
     }
 }

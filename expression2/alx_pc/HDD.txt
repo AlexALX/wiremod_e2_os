@@ -1,10 +1,10 @@
 @name HDD
-@inputs Bank1:wirelink Bank2:wirelink Bank3:wirelink Bank4:wirelink
-@outputs HDD:wirelink
+@inputs PlugSocket:wirelink InA Bank1:wirelink Bank2:wirelink Bank3:wirelink Bank4:wirelink
+@outputs EntID
 @persist HDD_BANK_SIZE HDD_SECTOR_SIZE HDD_SIZE HDD_BANK_MAX HDD_TYPE HDD_NAME:string
-@persist HDD_Banks:array HDD_IO:entity
+@persist HDD_Banks:array HDD_IO:entity HDD_ID
 @trigger 
-@model models/expression 2/cpu_controller.mdl
+#@model models/expression 2/cpu_controller.mdl
 
 #[
     ALX Wiremod E2 PC
@@ -16,15 +16,19 @@
 
 if (first()|duped()) {
     
-HDD = wirelink()
-HDD_IO = noentity()
+#include "alx_pc/shared/_main_"
+    
+HDD_IO = getentity(InA)
 
-HDD_BANK_SIZE = 256*1024
+HDD_BANK_SIZE = 256*1024 # limitation of DHDD
 HDD_SECTOR_SIZE = 4
 HDD_BANK_MAX = 4
 
 HDD_TYPE = 0
 HDD_NAME = "Wire DHDD" # vendor name
+
+PlugSocket["A",number] = entity():id()
+EntID = entity():id()
 
 function sendData() {
     local Check = array()
@@ -39,19 +43,28 @@ function sendData() {
 
     HDD_SIZE = HDD_BANK_SIZE*HDD_Banks:count()
 
-    dsSendDirect("hddinit",HDD_IO,table(wirelink(),HDD_TYPE,HDD_NAME,HDD_SIZE,HDD_BANK_SIZE,HDD_SECTOR_SIZE,HDD_Banks))   
+    dsSendDirect("hddinit",HDD_IO,table(wirelink(),HDD_TYPE,HDD_ID,HDD_NAME,HDD_SIZE,HDD_BANK_SIZE,HDD_SECTOR_SIZE,HDD_Banks))   
 }
 
 }
 
-if (dsClk("init") & (HDD_IO==noentity() | dsGetTable()[1,entity]==HDD_IO)) {
+if (~PlugSocket | dupefinished()) {
+    PlugSocket["A",number] = entity():id()
+}
+
+if (~InA) {
+    HDD_IO = getentity(InA)    
+}
+
+if (dsClk("sata_init") & (HDD_IO==noentity() | dsGetTable()[1,entity]==HDD_IO)) {
     local Info = dsGetTable()
-    HDD_IO = Info[1,entity]
-    timer("sendData",Info[2,number])
-}
-
-if (dsClk("unlink") & HDD_IO==dsGetEntity()) {
-    HDD_IO = noentity()
+    #HDD_IO = Info[1,entity]
+    HDD_ID = Info[3,number]
+    if (Info[2,number]==0) {
+        sendData()
+    } else {
+        timer("sendData",Info[2,number])
+    }
 }
 
 if (clk("sendData")) {

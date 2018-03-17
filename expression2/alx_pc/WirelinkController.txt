@@ -1,0 +1,25 @@
+@name Wirelink Screen Controller
+@inputs Ent:wirelink InG
+@outputs EntID
+
+#[
+    ALX Wiremod E2 PC
+    Created by AlexALX
+    -------------------
+    Wirelink Controller for screens
+]#
+
+if (first()|duped()) {
+    dsSetScope(2) # allow signals from any e2 in mp    
+}
+
+if (~Ent|first()|duped()|~InG) {
+    EntID = entity():id()
+    Ent:egpClear()
+    Ent[1048574] = 0
+    Ent[1048575] = 1
+}
+
+if (dsClk("wirelink") & InG==dsGetEntity():id()) {
+    dsSendDirect("wirelink",dsGetEntity(),table(entity():id(),Ent))    
+}

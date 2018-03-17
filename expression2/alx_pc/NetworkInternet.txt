@@ -1,0 +1,214 @@
+@name Internet Connector
+@inputs Start NetSocket:wirelink NetSocketC Dish:entity
+@outputs Init BusyInd EntID NetSocketIndG NetSocketIndY
+@persist NWData:table Device_Name:string
+
+#[
+    ALX Wiremod E2 PC
+    Created by AlexALX
+    -------------------
+    Internet provider device
+]#
+
+if (first()|duped()) {
+    
+dsSetScope(2) # allow signals from any e2 in mp
+
+EntID = 0
+Device_Name = "Satellite Internet #"+entity():id()
+Init = 0
+
+function nwIndY(Act) {
+    if (Act) {
+        if (!NWData["nwIndY",number]) {
+            NWData["nwIndY",number] = 1
+            timer("nwIndY",100)
+        }
+    } else {
+        NWData:unset("nwIndY")
+        stoptimer("nwIntY")
+    }
+    NetSocketIndY = Act
+}
+
+function nwBusyInd(Act) {
+    if (Act) {
+        if (!NWData["nwBusyInd",number]) {
+            NWData["nwBusyInd",number] = 1
+            timer("nwBusyInd",350)            
+        }
+    } else {
+        NWData:unset("nwBusyInd")
+        stoptimer("nwBusyInd")
+    }
+    BusyInd = Act
+}
+
+function nwShutdown() {
+    if (!Init) { return }
+    Init = 0
+    ioSetOutput("NetSocketIndG",0)
+    local WL = ioGetInputWirelink("NetSocket")
+    WL["B",number] = 0
+    nwIndY(0)    
+    EntID = 0
+    NWData = table()
+    stopAllTimers()
+    #ifdef runOnHTTP(number)
+    runOnHTTP(0)
+    #endif
+    BusyInd = 0
+}
+
+function nwinit() {
+    if (Init | !Dish:isValid() | Dish:type()!="gmod_wire_data_satellitedish") { return }
+
+    local Ent = entity(ioGetInputNumber("NetSocketC"))
+    local Act = Ent ? 1 : 0
+    local WL = ioGetInputWirelink("NetSocket")
+    if (!WL["B",number]) { Act = 0 }
+    WL["B",number] = WL:entity():id()
+    ioSetOutput("NetSocketIndG",Act)
+    nwIndY(Act)
+    
+    NWData["requests",table] = table()
+
+    EntID = entity():id()
+    Init = 1
+    #ifdef runOnHTTP(number)
+    runOnHTTP(1)
+    #endif
+}
+        
+function number nwinterface(ID) {
+    if (ID==0) { return 0 }
+    if (ioInputEntity("NetSocket"):id()==ID) {
+        return 1
+    }
+    return 0
+}
+        
+}
+
+#ifndef httpCanRequest()
+    error("This device cannot work without e2 http extension.")
+    exit()
+#else
+
+if (~Start) {
+    if (Start) {
+        if (Init) {
+            nwShutdown()
+        } else {
+            nwinit()
+        }   
+    } 
+    exit()
+}
+
+if (~Dish) {
+    if (Init) {
+        nwShutdown()    
+    }    
+}
+
+if (clk("nwIndY")) {
+    if (!Init) { exit() }
+    nwIndY(0)
+    exit()
+}
+
+if (!Init) { exit() }
+
+if (clk("nwBusyInd")) {
+    if (!httpCanRequest()) {
+        nwBusyInd(!BusyInd)
+        timer("nwBusyInd",350)
+    } else {
+        nwBusyInd(0)
+    }
+    exit()    
+}
+
+if (inputClk()) {
+    local Name = inputClkName()
+    if (Name:find("NetSocket")) {
+        local Ent = entity(ioGetInputNumber("NetSocketC"))
+        local Act = Ent ? 1 : 0
+        local WL = ioGetInputWirelink("NetSocket")
+        if (!WL["B",number]) { Act = 0 }
+        WL["B",number] = WL:entity():id()
+        ioSetOutput("NetSocketIndG",Act)
+        nwIndY(Act)
+    }
+    exit()
+}
+
+if (clk("httpRequest")) {
+    local Requests = NWData["requests",table]
+    if (Requests:count()) {
+        if (NWData["in_progress",number]) { exit() }
+        local Info = Requests[1,table] # get first always
+        if (httpCanRequest()) {
+            nwBusyInd(1)
+            NWData["in_progress",number] = 1
+            httpRequest(Info[5,string])
+            timer("httpRequestTimeout",Info[7,number] ? Info[7,number] : 9000)
+        } else {
+            timer("httpRequest",250)
+        }
+    }
+    exit()
+}
+
+if (clk("httpRequestTimeout")) {
+    NWData["in_progress",number] = 0
+    local Requests = NWData["requests",table]
+    Requests:removeTable(1)
+    timer("httpRequest",250)
+}
+
+if (httpClk()) {
+    if (!Init) { exit() }
+    local Requests = NWData["requests",table]
+    if (Requests:count()) {
+        local Info = Requests[1,table] # get first always
+        if (Info[6,string]!=httpRequestUrl()) { exit() }
+        local Send = table(NetSocket:entity():id(),Info[1,number],Info[3,number],Info[4,string],Info[5,string],httpData())
+        Send[0,number] = NetSocket["B",number]
+        dsSendDirect("nwdata",entity(NetSocketC),Send)
+        NWData["in_progress",number] = 0
+        Requests:removeTable(1)
+        stoptimer("httpRequestTimeout")
+        timer("httpRequest",250)
+    }
+}
+
+if (dsClk()) {
+    local Name = dsClkName()    
+    
+    if (Name=="nwdata") {
+        local Info = dsGetTable()
+        local Interface = nwinterface(Info[0,number])
+        if (!Interface) { exit() } # not valid        
+        if (Info[2,number]==0 | Info[2,number]<-1) { exit() } # drop packets to non-exists devices
+        nwIndY(1)
+        local Cmd = Info[5,string]
+        if (Cmd=="internet_connect") {
+            local Info = table(NetSocket:entity():id(),Info[1,number],Info[3,number],Info[4,string],Info[5,string],Device_Name)
+            Info[0,number] = NetSocket["B",number]
+            dsSendDirect("nwdata",entity(NetSocketC),Info)
+        } elseif (Cmd=="internet_request") {
+            NWData["requests",table]:pushTable(Info)
+            if (httpCanRequest()) {
+                nwBusyInd(1)                
+                NWData["in_progress",number] = 1
+                httpRequest(Info[6,string])
+                timer("httpRequestTimeout",Info[7,number] ? Info[7,number] : 9000)
+            } else {
+                timer("httpRequest",250)
+            }
+        }
+    }
+}
+#endif

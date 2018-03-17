@@ -8,16 +8,63 @@ if (first()|duped()) {
     Created by AlexALX
 ]#
 
-#include "alx_pc/shared/_main_" 
 #include "alx_pc/cd/_main_"   
 
-HDD = wirelink()
-HDD_IO = noentity()
+HDD_IO = getentity(InA)
 HDD_TYPE = 1
 HDD_NAME = "Wire BD-RE Drive" # vendor name
 
+PlugSocket["A",number] = entity():id()
+
 exit()
 
+}
+
+if (dupefinished()) {
+    Length = DefLength-0.1
+    LengthUp = DefLengthUp-0.1
+    
+    if (Holder:hasOutput("DiskEntity")) {
+        BugTest = 0 # new wiremod for sure don't need this check
+    } else {
+        BugTest = 1
+    }
+    DriveData = table()
+    clearBufferBoth()
+    exit()    
+}
+
+if (~PlugSocket | dupefinished()) {
+    PlugSocket["A",number] = entity():id()
+}
+
+if (~InA) {
+    HDD_IO = getentity(InA)   
+    if (!HDD_IO:isValid()) {
+        stopDisk()
+    } 
+}
+
+if (~SupportedDiscs) {
+    supportDisc()   
+}
+
+if (~Locked) {
+    if (DisableNewDiskCmd) { exit() }
+    if (Holder:hasOutput("DiskEntity")) {
+        # doing that in next tick
+        timer("cd_newdisc",0)
+    } else {
+        stopDiskRot()
+        dsSendDirect("cd_newdisc",HDD_IO,table(entity(),HDD_ID,curDisk()))
+    }
+    exit()
+}
+
+if (clk("cd_newdisc")) {
+    stopDiskRot()
+    dsSendDirect("cd_newdisc",HDD_IO,table(entity(),HDD_ID,curDisk()))
+    exit()    
 }
 
 if (tickClk()) {
@@ -36,9 +83,9 @@ if (tickClk()) {
         }
     } elseif (LastPos<0 | LastPosUp<0) {
         LastPos += ReaderSpeed*tickInterval()
-        LastPos = clamp(LastPos,-34,0)
+        LastPos = clamp(LastPos,MaxPos,0)
         LastPosUp += ReaderSpeed*tickInterval()
-        LastPosUp = clamp(LastPosUp,-34,0)
+        LastPosUp = clamp(LastPosUp,MaxPos,0)
     }
     
     if (MoveTrack) {
@@ -55,14 +102,15 @@ if (tickClk()) {
             MoveDir = 0
         }
         local CheckPos = 0
+        # MaxPos = -34 | -100 | -15
         if (CurStack) {
-            LastPosUp = clamp(LastPosUp,-34,0)
+            LastPosUp = clamp(LastPosUp,MaxPos,0)
             CheckPos = LastPosUp
         } else {
-            LastPos = clamp(LastPos,-34,0)
+            LastPos = clamp(LastPos,MaxPos,0)
             CheckPos = LastPos
         }
-        if (CheckPos==0 | CheckPos==-34) {
+        if (CheckPos==0 | CheckPos==MaxPos) {
             if (MoveTrack==-1 & CheckPos==0) {
                 MoveTrack = 0
             }
@@ -72,13 +120,28 @@ if (tickClk()) {
         }
     }
     
-    ReaderEnt:setPos(DriveBase:toWorld(ReaderPos+vec(0,-LastPos,LastPosZ)))
-    ReaderEnt:setAng(DriveBase:angles())
-    ReaderEnt:propFreeze(1)
     
-    ReaderEntUp:setPos(DriveBaseUp:toWorld(ReaderPosUp+vec(0,-LastPosUp,LastPosUpZ)))
-    ReaderEntUp:setAng(DriveBaseUp:angles())
-    ReaderEntUp:propFreeze(1)
+    if (Hydraulics) {
+        Length = DefLength-LastPos
+        LengthUp = DefLengthUp+LastPosUp
+        
+        #[if (ReaderEnt:pos():distance(HolderEnt:pos())>MaxDistance) {
+            Length = 0.1    
+        }
+        if (ReaderEntUp:pos():distance(HolderEnt:pos())>MaxDistanceUp) {
+            LengthUp = 0.1   
+        }]#
+    } else {
+        #ifdef entity:propFreeze(number)
+        ReaderEnt:setPos(DriveBase:toWorld(ReaderPos+vec(0,-LastPos,LastPosZ)))
+        ReaderEnt:setAng(DriveBase:angles())
+        ReaderEnt:propFreeze(1)
+        
+        ReaderEntUp:setPos(DriveBaseUp:toWorld(ReaderPosUp+vec(0,-LastPosUp,LastPosUpZ)))
+        ReaderEntUp:setAng(DriveBaseUp:angles())
+        ReaderEntUp:propFreeze(1)
+        #endif
+    }
     
     #soundPitch(0,CurSpeedY/7)
     
@@ -116,8 +179,10 @@ if (inputClk()) {
     if (Name=="Holder" | Name=="Wheel") {
         HolderEnt = Holder:entity()
         #HolderEnt:parentTo(Wheel)
+        #ifdef entity:propFreeze(number)
         HolderEnt:propFreeze(0)
         Wheel:propFreeze(0)
+        #endif
     } elseif (Name=="SetSpeed") {
         if (SetSpeed>0) {
             Speed = SetSpeed*100
@@ -137,6 +202,11 @@ if (inputClk()) {
         if (CurStack) {
             CurReader = ReaderUp  
         }
+    #ifdef entity:propFreeze(number)
+    } elseif (Name=="UseHydraulics") {
+        Hydraulics = UseHydraulics
+        ReaderSpeed = (UseHydraulics ? 10 : 40 )
+    #endif
     }#[ elseif (Name=="DriveBase" | Name=="StandEnt") {
         #StandEnt:parentTo(DriveBase)
     }]#
@@ -152,16 +222,16 @@ if (dsClk()) {
     }]#
     
     switch(Name) {
-    case "init",
+    case "sata_init",
         if (HDD_IO==noentity() | dsGetTable()[1,entity]==HDD_IO) {
             local Info = dsGetTable()
-            HDD_IO = Info[1,entity]
-            timer("sendData",Info[2,number])
-        }
-    break
-    case "unlink",
-        if (HDD_IO==dsGetEntity()) {
-            HDD_IO = noentity()
+            #HDD_IO = Info[1,entity]
+            HDD_ID = Info[3,number]
+            if (Info[2,number]==0) {
+                sendData()
+            } else {
+                timer("sendData",Info[2,number])
+            }
         }
     break
     case "read_disk",
@@ -169,9 +239,9 @@ if (dsClk()) {
         if (Info[5,number] | Info[-1,number]) {
             stopDisk()
         }
-        if (Info[-2,entity]) {
+        #[if (Info[-2,entity]) {
             HDD_IO = Info[-2,entity]   
-        }
+        }]#
         DriveData = table(Info)
         readDisk()
     break

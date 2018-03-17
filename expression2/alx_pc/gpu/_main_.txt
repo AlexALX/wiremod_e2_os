@@ -1,10 +1,11 @@
 @name Main GPU func
-@inputs BIOS:entity EGP:wirelink DS:wirelink
-@outputs E2_GPU:entity
-@persist E2_CPU:entity E2_SPU:entity BIOS:entity HDD_IO:wirelink HDDS:table HDD_MAX 
-@persist BIOS_INIT KeyHandler:string DsHandler:string ChatHandler:string ChatPlayer:entity GpuData:table BOOT_HDD
-@persist LAST_I LAST_Y BIOS_X BIOS_SZ ERR_N ERR_C Keyboard:wirelink ShutHandler:string
-@persist FS_TYPES:table EgpCleanHandler:string
+@inputs Board:wirelink InA ScreenSockG_0 ScreenSockG_1
+@outputs EntID
+@persist E2_CPU:entity E2_SPU:entity BIOS:entity HDD_IO:table HDDS:table Screens:array
+@persist BIOS_INIT KeyHandler:string DsHandler:string ChatHandler:string ChatPlayer:entity GpuData:table BOOT_HDD:table
+@persist LAST_I LAST_Y BIOS_X BIOS_SZ ERR_N ERR_C Keyboard:table ShutHandler:string PlugHandler:string
+@persist FS_TYPES:table EgpCleanHandler:string Init Device_Name:string Devices:table SysFS:table
+@persist EGP:wirelink DS:wirelink
 
 #[
 	ALX Wiremod E2 PC

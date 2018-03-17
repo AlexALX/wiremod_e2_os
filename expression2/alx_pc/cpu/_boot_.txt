@@ -8,10 +8,6 @@
 	Boot handler, execute alxos boot menu
 ]#
 
-if (INCLUDE) {
-    
-#include "alx_pc/cpu/_main_"
-
 function initboot() {
     local CurFs = dsGetTable()
     if (BOOT_FUNC:exists(CurFs["boot_func",string])) {
@@ -19,22 +15,26 @@ function initboot() {
     } else {
         dsSendDirect("bootmenu",E2_GPU,"Function "+CurFs["boot_func",string]+" is missing.")
     }
-}    
+}
 
 # Custom Boot Functions
 # Max func name len 12 chars for currect file systems
 
 BOOT_FUNC["alxos_boot",number] = 1
 function alxos_boot(CurFs:table) {
-    INCLUDE = 1
     #include "alx_pc/cpu/alxos/bootmenu"
-    INCLUDE = 0
     alxos_boot_init(CurFs)
 }
 
 BOOT_FUNC["alxos_setup",number] = 1
 function alxos_setup(CurFs:table) {
+    DsHandler = "alxos_setup_ds"
     dsSendDirect("boot_func",E2_GPU,table("alxos_setup"))
 }
-    
+
+# plug/unplug handler for setup
+function alxos_setup_ds(Name:string) {
+    if (Name=="usb_onplug" | Name=="sata_onplug" | Name=="hddio_unplug" | Name=="usbcont_unplug" | Name=="cd_newdisc") { 
+        dsSendDirect(Name,E2_GPU,dsGetTable())
+    }    
 }

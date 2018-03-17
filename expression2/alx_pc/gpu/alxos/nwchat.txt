@@ -1,0 +1,1019 @@
+@name nwchat.e2e
+@persist NwChatKeyH:string NwChatDsH:string NwChatMode NwChatInterface NwChatController:entity NwChatNick:string
+@persist NwChatData:table NwChatLocal NwChatStarted NwChatMax
+
+#[
+    ALX Wiremod E2 OS
+    Created by AlexALX
+    -------------------
+    Network chat program
+    Complete client/server chat program
+    Can hold up to 10 users
+    Disconnect check and other stuff
+]#
+
+#include "alx_pc/gpu/alxos/_main_"
+
+function alxos_nwchat_bg() {
+    EGP:egpBox(LAST_I,vec2(0,0),vec2(512,472))
+    EGP:egpColor(LAST_I,0,0,168,255) LAST_I++
+
+    EGP:egpBoxOutline(LAST_I,vec2(2,2),vec2(508,468))
+    EGP:egpColor(LAST_I,85,255,255,255) LAST_I++
+    
+    EGP:egpBoxOutline(LAST_I,vec2(5,5),vec2(502,462))
+    EGP:egpColor(LAST_I,85,255,255,255) LAST_I++
+    
+    LAST_Y=8
+}
+
+function alxos_nwchat_ft(Opts:array) {
+    local LAST_X = 5
+    local Quit = 0
+    
+    local ReDraw = GpuData[-100,number]
+    if (!ReDraw) { GpuData[-100,number] = LAST_I }
+    GpuData[-103,array] = Opts
+
+    for(I=1,8) {
+        # quit always last
+        if (I<8 & Opts[I,string]=="Quit") { 
+            Opts[8,string] = Opts[I,string] 
+            Opts[I,string] = ""
+        }
+        if (ReDraw) {
+            local ID = ReDraw+(I-1)*3+2
+            EGP:egpText(ID,Opts[I,string],EGP:egpPos(ID))
+        } else {
+            EGP:egpText(LAST_I,I:toString(),vec2(LAST_X,495))
+            EGP:egpSize(LAST_I,14)
+            EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
+            LAST_X += 12
+            
+            EGP:egpBox(LAST_I,vec2(LAST_X,492),vec2(47,20))
+            EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
+            LAST_X += 2
+            
+            EGP:egpText(LAST_I,Opts[I,string],vec2(LAST_X,495))
+            EGP:egpSize(LAST_I,14)
+            EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+            LAST_X += 50
+        }
+    }
+}
+
+function number alxos_nwchat_dialog(Title:string,Width,Height,Type:string,Callback:string,Info:table) {
+    local Parent = alxos_dialog(Title,Width,Height,Type,Callback,Info)
+    if (!GpuData[-104,array]:count()) {
+        GpuData[-102,string] = NwChatKeyH
+        GpuData[-104,array] = GpuData[-103,array]
+    }
+    NwChatKeyH = "dialog"
+    alxos_nwchat_ft(array("Quit"))
+    return Parent
+}
+
+function alxos_nwchat_closedialog() {
+    alxos_closedialog()
+    NwChatKeyH = GpuData[-102,string]
+    GpuData[-101,number] = 0
+    alxos_nwchat_ft(GpuData[-104,array])
+    GpuData:removeArray(-104)
+}
+
+function alxos_nwchat_menu(Title:string,MenuTree:table,Width) {
+    alxos_menu(Title,MenuTree,Width)
+
+    if (!GpuData[-104,array]:count()) {
+        GpuData[-102,string] = NwChatKeyH
+        GpuData[-104,array] = GpuData[-103,array]
+    }
+    NwChatKeyH = "menu"
+    alxos_nwchat_ft(array("Quit"))  
+}
+
+function alxos_nwchat_closemenu() {
+    alxos_closemenu()
+    NwChatKeyH = GpuData[-102,string]
+    GpuData[-101,number] = 0
+    alxos_nwchat_ft(GpuData[-104,array])
+    GpuData:removeArray(-104)
+}
+
+function alxos_nwchat_cursor() {
+    NwChatData["cursor",number] = !NwChatData["cursor",number]
+    local Cursor = GpuData[3,number]
+    EGP:egpSetText(Cursor,(NwChatData["cursor",number] ? "_" : ""))
+    timer("cursor_draw",500)    
+}
+
+function alxos_nwchat_updcur() {
+    local P = GpuData[3,number]
+    local XPos = GpuData[-2,number]
+    EGP:egpPos(P,vec2(XPos,LAST_Y))
+}
+
+function alxos_nwchat_drawcur() {
+    local CurI = GpuData[3,number]
+    local PathX = GpuData[-2,number]
+    EGP:egpText(CurI,"_",vec2(PathX,LAST_Y))
+    EGP:egpFont(CurI,"Courier New")
+    EGP:egpColor(CurI,168,168,168,255)
+    
+    registerTimers("cursor_draw","alxos_nwchat_cursor")
+    timer("cursor_draw",500)
+}
+
+function alxos_nwchat_stopcur() {
+    stoptimer("cursor_draw")
+    local ID = GpuData[3,number]
+    EGP:egpSetText(ID,"")    
+}
+
+function number alxos_nwchat_move() {
+    local CmdLinesC = NwChatData["msgc",number]
+    local CmdLines = NwChatData["msg",array]
+    if (CmdLinesC>=23) {
+        local RM = CmdLinesC-23
+        local NLines = array()
+        for (I=1,CmdLinesC-1) {
+            local ID = CmdLines[I,number]
+            if (I<=RM) {
+                EGP:egpRemove(ID)   
+            } else {
+                #CmdLines[I-1,number] = ID
+                NLines:pushNumber(ID)
+                EGP:egpPos(ID,EGP:egpPos(ID)-vec2(0,20*RM))    
+            }
+        }
+        LAST_Y -= RM*20
+        NwChatData["msg",array] = NLines
+        NwChatData["msgc",number] = 23
+        if (LAST_I>100) { LAST_I = GpuData[3,number]+1 }
+        return 1
+    }
+    return 0
+}
+
+function alxos_nwchat_msg(Str:string) {
+    local Arr = Str:explode(NL)
+    for (I=1,Arr:count()) {
+        NwChatData["msg",array][NwChatData["msgc",number],number] = LAST_I
+        EGP:egpText(LAST_I,Arr[I,string],vec2(BIOS_X,LAST_Y))
+        EGP:egpFont(LAST_I,"Courier New")
+        EGP:egpColor(LAST_I,168,168,168,255) LAST_I++ LAST_Y+=20
+        NwChatData["msgc",number] = NwChatData["msgc",number]+1
+    }
+    
+    local Cmd = GpuData[-1,number]
+    local Move = alxos_nwchat_move()
+    if (Cmd!=0 & NwChatStarted | Move) {
+        EGP:egpPos(Cmd,vec2(BIOS_X,LAST_Y))
+        alxos_nwchat_updcur()
+    }
+}
+
+function alxos_nwchat_command() {
+    
+    local CmdI = GpuData[-1,number]
+    local Path = NwChatNick+"> "
+    GpuData[-2,number] = BIOS_X + Path:length()*10
+    GpuData[-3,string] = Path
+    GpuData[-4,string] = ""
+    
+    EGP:egpText(CmdI,Path,vec2(BIOS_X,LAST_Y))
+    EGP:egpFont(CmdI,"Courier New")
+    EGP:egpColor(CmdI,168,168,168,255)
+}
+
+function alxos_nwchat_stopcommand() {
+    local CmdI = GpuData[-1,number]
+    EGP:egpSetText(CmdI,"")
+    alxos_nwchat_stopcur()    
+}
+
+function alxos_nwchat_updcommand() {
+    local CmdI = GpuData[-1,number]
+    local Path = NwChatNick+"> "
+    local Cmd = ""
+    GpuData[-3,string] = Path
+    GpuData[-4,string] = Cmd
+    
+    EGP:egpSetText(CmdI,Path+Cmd)
+    EGP:egpPos(CmdI,vec2(BIOS_X,LAST_Y))
+    
+    GpuData[-2,number] = BIOS_X + (Path+Cmd):length()*10
+    alxos_nwchat_updcur()
+}
+
+function alxos_nwchat_broadcast(Msg:string,Ignore,Type:string) {
+    alxos_nwchat_msg(Msg) 
+    local Clients = NwChatData["clients",table]:keys()
+    for (I=1,Clients:count()) {
+        if (Clients[I,number]==Ignore) { continue }
+        dsSendDirect("nwsend",NwChatController,table(NwChatInterface,Clients[I,number],NwChatLocal,"gpu",Type,Msg))
+    }
+}
+
+function alxos_nwchat_broadcast(Msg:string,Ignore) {
+    alxos_nwchat_broadcast(Msg,Ignore,"chatmessage")      
+}
+
+function alxos_nwchat_pingreg() {
+    registerTimers("chat_ping","alxos_nwchat_ping")
+    timer("chat_ping",(NwChatMode ? 30000 : 10000))
+    if (NwChatMode==0) {
+        registerTimers("chat_pong","alxos_nwchat_pong")
+    }
+}
+
+function alxos_nwchat_wait4pong() {
+    timer("chat_pong",1000)    
+}
+
+function alxos_nwchat_ping() {
+    if (!NwChatStarted) { return }
+    if (NwChatMode) {
+        local Pings = table()
+        local PingKeys = NwChatData["cl_pings",table]:keys()
+        for (I=1,NwChatData["cl_pings",table]:count()) {
+            local Client = PingKeys[I,number]
+            local Time = NwChatData["cl_pings",table][Client,number]
+            if (Time<curtime()) {
+                local Msg = NwChatData["clients",table][Client,string]+" disconnected"
+                NwChatData["clients",table]:unset(Client)
+                alxos_nwchat_broadcast(Msg,0)
+            } else {
+                Pings[Client,number] = Time
+            }
+        }
+        NwChatData["cl_pings",table] = Pings
+        timer("chat_ping",30000)
+    } else {
+        dsSendDirect("nwsend",NwChatController,table(NwChatInterface,NwChatData["server",table][2,number],NwChatLocal,"gpu","chatping"))
+        timer("chat_ping",10000)
+        alxos_nwchat_wait4pong()
+    }
+}
+
+function alxos_nwchat_pingupd(Client) {
+    if (NwChatMode) {
+        NwChatData["cl_pings",table][Client,number] = curtime()+15
+        dsSendDirect("nwsend",NwChatController,table(NwChatInterface,Client,NwChatLocal,"gpu","chatping"))
+    }
+}
+
+function alxos_nwchat_pingdel(Client) {
+    if (NwChatMode) {
+        NwChatData["cl_pings",table]:unset(Client) 
+    }
+}
+
+function alxos_nwchat_pingstart() {
+    timer("chat_ping",10000)
+}
+
+function alxos_nwchat_pingupd() {
+    if (NwChatMode==0) {
+        stoptimer("chat_pong")
+        timer("chat_ping",10000)    
+    }
+}
+
+function alxos_nwchat_pong() {
+    if (NwChatMode==0) {
+        "alxos_nwchat_leave"("Connection timeout.")
+    }    
+}
+
+function alxos_nwchat_pingstop() {
+    stoptimer("chat_ping")
+    stoptimer("chat_pong")
+}
+
+function alxos_nwchat_initsv() {
+    if (NwChatKeyH!="leave") {
+        alxos_nwchat_closedialog()
+    }
+    
+    NwChatData["clients",table] = table()
+    NwChatData["cl_pings",table] = table()
+    
+    if (GpuData[-1,number]) {
+        alxos_nwchat_msg(NwChatNick+"'s chat server successfully started.")
+        alxos_nwchat_updcommand()
+        alxos_nwchat_drawcur()
+    } else {
+        NwChatData["msg",array] = array()
+        NwChatData["msgc",number] = 1
+        GpuData[-1,number] = LAST_I LAST_I++
+        GpuData[3,number] = LAST_I LAST_I++
+        alxos_nwchat_msg(NwChatNick+"'s chat server successfully started.")
+        alxos_nwchat_command()
+        alxos_nwchat_drawcur()
+    }
+    alxos_nwchat_pingreg()
+    NwChatKeyH = "chat"
+    alxos_nwchat_ft(array("Info","ChNick","Clear","Stop","Quit"))
+    NwChatStarted = 1
+}
+
+function alxos_nwchat_postcl() {
+    alxos_nwchat_closedialog()
+    
+    if (GpuData[-1,number]) {
+        local SvName = NwChatData["server",table][1,string]
+        alxos_nwchat_msg("Welcome to "+SvName+"'s chat server.")
+        alxos_nwchat_updcommand()
+        alxos_nwchat_drawcur()
+    } else {
+        NwChatData["msg",array] = array()
+        NwChatData["msgc",number] = 1
+        GpuData[-1,number] = LAST_I LAST_I++
+        GpuData[3,number] = LAST_I LAST_I++
+        local SvName = NwChatData["server",table][1,string]
+        alxos_nwchat_msg("Welcome to "+SvName+"'s chat server.")
+        alxos_nwchat_command()
+        alxos_nwchat_drawcur()
+    }
+    alxos_nwchat_pingreg()
+    NwChatKeyH = "chat"
+    alxos_nwchat_ft(array("Info","ChNick","Clear","Leave","Quit"))
+    NwChatStarted = 1
+}
+
+function number alxos_nwchat_searchpost() {
+    
+    if (NwChatData["servers",table]:count()) { 
+        alxos_nwchat_closedialog()
+        
+        local MenuTree = table()
+        
+        for (I=1,NwChatData["servers",table]:count()) {
+            MenuTree:pushTable(table(0,NwChatData["servers",table][I,table][1,string]+"'s server","alxos_nwchat_selnick",NwChatData["servers",table]))    
+        }
+        alxos_nwchat_menu("Servers",MenuTree,280)
+        
+        return 0   
+    }
+    
+    local Parent = alxos_nwchat_dialog("Failed",360,60,"yesno","alxos_nwchat_serversretry",table())
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"No servers found. Do you want to retry?",vec2(0,-10))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    return 0
+}
+
+function number alxos_nwchat_fail() {
+    local Parent = alxos_nwchat_dialog("Failed",410,60,"yesno","alxos_nwchat_initcl",table())
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Connection to server failed. Do you want to retry?",vec2(0,-10))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    return 0
+}
+
+function alxos_nwchat_error(Msg:string) {
+    local Callback = "alxos_nwchat_closedialog"
+    if (Msg=="Nickname already in use.") { Callback = "alxos_nwchat_selnick" }
+    local Parent = alxos_nwchat_dialog("Failed",380,60,"ok",Callback,table())
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,Msg,vec2(0,-10))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+}
+
+function alxos_nwchat_initcl(Args:table) {
+    #[if (Args:count()) {
+        alxos_nwchat_closemenu()
+        NwChatData["server",table] = Args[6,table][1,table]
+    }]#
+    
+    dsSendDirect("nwsend",NwChatController,table(NwChatInterface,NwChatData["server",table][2,number],NwChatLocal,"gpu","chatconnect",NwChatNick))     
+    
+    local Parent = alxos_nwchat_dialog("Connecting...",340,60,"none","",table())
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Please wait while establish connection...",vec2(0,-10))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    runCmd("alxos_nwchat_fail",1000,0)
+} 
+
+function alxos_nwchat_initcl() {
+    if (DialogData[-5,number]!=1) {
+        alxos_nwchat_closedialog()
+        return   
+    }    
+    alxos_nwchat_initcl(table())
+}
+
+function alxos_nwchat_servers() {
+    local Parent = alxos_nwchat_dialog("Searching...",340,60,"none","",table())
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Please wait while establish connection...",vec2(0,-10))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    dsSendDirect("nwsend",NwChatController,table(NwChatInterface,-1,NwChatLocal,"gpu","chatserver"))
+    runCmd("alxos_nwchat_searchpost",1000,0)
+    NwChatData["servers",table] = table()
+}
+
+function alxos_nwchat_serversretry() {
+    if (DialogData[-5,number]!=1) {
+        alxos_nwchat_closedialog()
+        return   
+    }    
+    
+    alxos_nwchat_servers()
+}
+
+function alxos_nwchat_selnick(Args:table) {
+    if (Args:count()) {
+        alxos_nwchat_closemenu()
+        NwChatData["server",table] = Args[6,table][1,table]
+    }
+    
+    local Parent = alxos_nwchat_dialog("Select Nickname",400,80,"text","alxos_nwchat_setnick",table())
+    local Entries = table()
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Your Nickname:",vec2(-180,-22))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpBox(LAST_I,vec2(-180,-4),vec2(360,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    Entries[0,table] = table(LAST_I,NwChatNick,"^[A-Za-z0-9_ -]$",10)
+    EGP:egpText(LAST_I,NwChatNick+"_",vec2(-178,-4))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    DialogData[10,table] = Entries
+    DialogData[11,number] = 0
+    DialogData[12,number] = Entries:count()
+    
+    NwChatKeyH = "dialog"
+}
+
+function alxos_nwchat_selnick() {
+    #[if (DialogData[-5,number]!=1) {
+        alxos_nwchat_closedialog()
+        return   
+    }]#
+    
+    alxos_nwchat_selnick(table())
+}
+
+function alxos_nwchat_chnick() {
+    GpuData[-3,string] = NwChatNick+"> "
+    local ID = GpuData[-1,number]
+    local Cmd = GpuData[-4,string]
+    GpuData[-2,number] = BIOS_X + (GpuData[-3,string]+Cmd):length()*10
+    EGP:egpSetText(ID,GpuData[-3,string]+Cmd)
+    alxos_nwchat_updcur()   
+}
+
+function alxos_nwchat_setnick() {
+    local Set = (DialogData[-5,number]==1 ? 1 : 0 )
+    if (!Set) {
+        alxos_nwchat_closedialog()
+        return   
+    }
+    
+    local NickTbl = DialogData[10,table][0,table]
+    
+    if (NickTbl[2,string]:trim()=="") {
+        local Parent = alxos_nwchat_dialog("Error",280,60,"ok","alxos_nwchat_selnick",table())
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Nickname cannot be empty!",vec2(0,-10))
+        EGP:egpAlign(LAST_I,1)
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+        return    
+    }
+    
+    if (NwChatStarted) {
+        local OldNick = NwChatNick
+        alxos_nwchat_closedialog()
+        if (NickTbl[2,string]==OldNick) { return }
+        if (NwChatMode==1) {
+            NwChatNick = NickTbl[2,string]
+            alxos_nwchat_chnick()
+            local Msg = OldNick+" changed nick to "+NwChatNick
+            alxos_nwchat_broadcast(Msg,0)
+        } else {
+            alxos_nwchat_wait4pong()
+            dsSendDirect("nwsend",NwChatController,table(NwChatInterface,NwChatData["server",table][2,number],NwChatLocal,"gpu","changenick",NickTbl[2,string]))
+        }   
+    } else {
+        NwChatNick = NickTbl[2,string]
+        if (NwChatMode==1) { 
+            alxos_nwchat_initsv()    
+        } else {
+            alxos_nwchat_initcl(table())
+        }
+    }
+}
+
+function alxos_nwchat_selmode() {
+    local Inf = table()
+    Inf["Yes",array] = array("Server",60,-130)
+    Inf["No",array] = array("Client",55,38)
+    local Parent = alxos_nwchat_dialog("Select mode",400,60,"yesno","alxos_nwchat_mode",Inf)
+    
+    NwChatData["server",table] = table()
+    NwChatData["servers",table] = table()
+    NwChatData["clients",table] = table()
+    DialogData[7,number] = LAST_I
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Do you want start server or use client?",vec2(-180,-12))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+}
+
+function alxos_nwchat_sellocal() {
+    local Inf = table()
+    Inf["Yes",array] = array("Remote",70,-140)
+    Inf["No",array] = array("Local",50,43)
+    
+    local Txt = (NwChatMode==1 ? "Select mode" : "Search mode" )
+    
+    local Parent = alxos_nwchat_dialog(Txt,450,100,"yesno","alxos_nwchat_local",Inf)
+    
+    DialogData[7,number] = LAST_I
+    DialogData[-10,table]:pushNumber(LAST_I)
+    
+    Txt = (NwChatMode==1 ? "Do you want to make an local server?" : "Where you want to find servers?" )    
+    EGP:egpText(LAST_I,Txt,vec2(-205,-32))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    Txt = (NwChatMode==1 ? "Local server will be available only in home network." : "Local search will find local servers in home network." )  
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,Txt,vec2(-205,-12))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    Txt = (NwChatMode==1 ? "Remote server will be available in all networks." : "Remove search will find remote servers in all networks." )  
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,Txt,vec2(-205,8))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+}
+
+function alxos_nwchat_infomsg(Args:table) {
+    local Ping = ""
+    #[if (NwChatData["ping",number]) {
+        local Time = realtime()
+        Ping = NL+"Ping: "+(Time-NwChatData["ping",number])+"ms"
+        
+        NwChatData["ping",number] = 0    
+    }]#
+    alxos_nwchat_msg("Server owner: "+Args[1,string]+NL+"Clients: "+Args[2,string]+Ping)
+}
+
+function alxos_nwchat_info() {
+    if (NwChatMode==1) {
+        alxos_nwchat_infomsg(table(NwChatNick,"["+(NwChatData["clients",table]:count()+1)+"/"+NwChatMax+"]"))
+    } else {
+        #NwChatData["ping",number] = realtime()
+        dsSendDirect("nwsend",NwChatController,table(NwChatInterface,NwChatData["server",table][2,number],NwChatLocal,"gpu","chatinfo"))
+    }
+}
+
+function alxos_nwchat_clear() {
+    LAST_Y = 8
+    LAST_I = GpuData[3,number]+1
+    local ID = GpuData[-1,number]
+    EGP:egpPos(ID,vec2(BIOS_X,LAST_Y))
+    alxos_nwchat_updcur()
+    
+    local CmdLinesC = NwChatData["msgc",number]
+    local CmdLines = NwChatData["msg",array]
+    for (I=1,CmdLinesC) {
+        local ID = CmdLines[I,number]
+        EGP:egpRemove(ID)
+    }
+    NwChatData["msg",array] = array()
+    NwChatData["msgc",number] = 1
+}
+
+function alxos_nwchat_local() {
+    if (DialogData[-5,number]==0) {
+        alxos_nwchat_closedialog()
+        return   
+    }
+    local Mode = (DialogData[-5,number]==1 ? 0 : 1 )
+    NwChatLocal = Mode
+    
+    if (NwChatMode==1) {
+        alxos_nwchat_selnick(table())
+    } else {
+        alxos_nwchat_servers()
+    }
+}
+
+function alxos_nwchat_setnw(Info:table) {
+    alxos_nwchat_closemenu()
+    NwChatInterface = Info[6,table][1,number]
+    NwChatController = Info[6,table][2,entity]
+    alxos_nwchat_sellocal()
+}
+
+function alxos_nwchat_selnw() {
+    local MenuTree = table()
+    
+    local NwConnectsK = Devices["nw_connects",table]:keys()
+    for (I=1,Devices["nw_connects",table]:count()) {
+        local Entry = Devices["nw_connects",table][NwConnectsK[I,number],table]
+        if (Entry[1,array][2,number]) {
+            MenuTree:pushTable(table(0,"en"+Entry[1,array][1,number]+" - "+Entry[5,string]+" #"+Entry[4,number],"alxos_nwchat_setnw",table(Entry[1,array][1,number],Entry[3,entity])))    
+        } 
+    }
+    
+    if (!MenuTree:count()) {
+        local Parent = alxos_nwchat_dialog("Error",320,60,"ok","alxos_nwchat_closedialog",table())
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"No active network interfaces found!",vec2(0,-10))
+        EGP:egpAlign(LAST_I,1)
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+        return
+    }  
+    
+    alxos_nwchat_menu("Interfaces",MenuTree,350)
+}
+
+function alxos_nwchat_mode() {
+    if (DialogData[-5,number]==0) {
+        alxos_nwchat_closedialog()
+        return   
+    }
+    
+    local Mode = (DialogData[-5,number]==1 ? 1 : 0 )
+    NwChatMode = Mode
+    
+    alxos_nwchat_closedialog()
+    alxos_nwchat_selnw()
+}
+
+function alxos_nwchat_send(Msg:string) {
+    if (Msg:trim()=="") { return }
+    
+    local I = GpuData[-1,number]
+    local Path = GpuData[-3,string]
+    local Cmd = ""
+
+    EGP:egpSetText(I,Path+Cmd)
+    GpuData[-4,string] = Cmd
+    GpuData[-2,number] = (Path+Cmd):length()*10 + 10
+    
+    alxos_nwchat_msg(NwChatNick+": "+Msg)       
+    if (NwChatMode==1) {
+        local Clients = NwChatData["clients",table]:keys()
+        for (I=1,Clients:count()) {
+            dsSendDirect("nwsend",NwChatController,table(NwChatInterface,Clients[I,number],NwChatLocal,"gpu","chatmessage",NwChatNick+": "+Msg))
+        }
+    } else {
+        alxos_nwchat_wait4pong()
+        dsSendDirect("nwsend",NwChatController,table(NwChatInterface,NwChatData["server",table][2,number],NwChatLocal,"gpu","chatmessage",Msg))
+    }    
+}
+
+function alxos_nwchat_leave(Err:string) {
+    local Ft2 = "Retry"
+    if (NwChatMode) {
+        local Msg = "Server shutdown."
+        alxos_nwchat_broadcast(Msg,0,"chatdisconnect")
+        alxos_nwchat_stopcommand()
+        NwChatData["clients",table] = table()
+        NwChatData["cl_pings",table] = table()
+        NwChatStarted = 0
+        Ft2 = "Start"
+    } else {
+        if (Err!="") {
+            alxos_nwchat_msg(Err)
+        } else {
+            alxos_nwchat_msg("Disconnected from server.")
+            dsSendDirect("nwsend",NwChatController,table(NwChatInterface,NwChatData["server",table][2,number],NwChatLocal,"gpu","chatdisconnect"))
+        }
+        alxos_nwchat_stopcommand()
+        NwChatStarted = 0
+    }
+    alxos_nwchat_pingstop()
+    alxos_nwchat_ft(array("New",Ft2,"Clear","Quit"))
+    NwChatKeyH = "leave"
+}
+
+function alxos_nwchat_leave() {
+    alxos_nwchat_leave("")    
+}
+
+function alxos_nwchat_quit() {
+    local Parent = alxos_nwchat_dialog("Quit",400,60,"yesno","alxos_nwchat_quitpost",table())
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Do you want really want to exit?",vec2(-180,-12))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+}
+
+function alxos_nwchat_quitpost() {
+    if (DialogData[-5,number]==1) {
+        if (NwChatStarted) {
+            alxos_nwchat_leave()
+        }
+        if (DEBUG) { DEBUG = 1 }
+        stoptimer("cursor_draw")
+        "alxos_execute"("alxos_explorer")
+    } else {
+        alxos_nwchat_closedialog()
+    }    
+}
+
+function alxos_nwchat_key(Key:string,Pressed) {
+    if (!Pressed) { return } 
+    if (NwChatKeyH=="new") {
+        if (Key=="f1") {
+            alxos_nwchat_selmode()
+        } elseif (Key=="f8") {
+            alxos_nwchat_quit()
+        }
+    } elseif (NwChatKeyH=="leave") {
+        if (Key=="f1") {
+            NwChatKeyH = "new"
+            alxos_nwchat_ft(array("New","Quit"))
+            alxos_nwchat_selmode()
+        } elseif (Key=="f2") {
+            if (NwChatMode==1) {
+                alxos_nwchat_initsv()
+            } else {
+                alxos_nwchat_initcl(table())
+            }
+        } elseif (Key=="f3") {
+            alxos_nwchat_clear()
+        } elseif (Key=="f8") {
+            alxos_nwchat_quit()
+        }
+    } elseif (NwChatKeyH=="dialog") {
+        if (NwChatDsH!="") { return }
+        local Index = DialogData[-5,number]
+        local Type = DialogData[-2,string]
+        if (alxos_dialog_key(Key,Pressed)) {
+            return
+        }
+    } elseif (NwChatKeyH=="menu") {
+        alxos_menu_key(Key,"alxos_nwchat_closemenu")   
+    } elseif (NwChatKeyH=="chat") {
+        if (Key=="f1") {
+            alxos_nwchat_info()
+        } elseif (Key=="f2") {
+            alxos_nwchat_selnick(table())
+        } elseif (Key=="f3") {
+            alxos_nwchat_clear()
+        } elseif (Key=="f4") {
+            alxos_nwchat_leave()
+        } elseif (Key=="f8") {
+            alxos_nwchat_quit()
+        } elseif (Key=="enter") {
+            alxos_nwchat_send(GpuData[-4,string])
+        } elseif (Key=="delete") { 
+            local I = GpuData[-1,number]
+            local Path = GpuData[-3,string]
+            local Cmd = ""
+        
+            EGP:egpSetText(I,Path+Cmd)
+            GpuData[-4,string] = Cmd
+            GpuData[-2,number] = (Path+Cmd):length()*10 + 10
+            alxos_nwchat_updcur()
+        } elseif (Key=="backspace") { 
+            local I = GpuData[-1,number]
+            local Path = GpuData[-3,string]
+            local Cmd = GpuData[-4,string]
+            if (Cmd=="") { return }
+            Cmd = Cmd:sub(0,Cmd:length()-1)
+            EGP:egpSetText(I,Path+Cmd)
+            GpuData[-4,string] = Cmd
+            GpuData[-2,number] = GpuData[-2,number] - 10
+            alxos_nwchat_updcur()
+        } elseif (Pressed==2) {
+            local KMem = toByte(Key) # handle capital/small without writting own code
+            local Char = toChar((KMem>=128 ? KMem-80 : KMem))
+            local RE = "^[A-Za-z0-9_ /.:;'!@#&*(){}+$^%%=\\%[%]?<>\"%|-]$"
+            
+            if (Char:findRE(RE) & (KMem<=125 | KMem>=128 & KMem<=143)) {
+                local I = GpuData[-1,number]
+                local Path = GpuData[-3,string]
+                local Cmd = GpuData[-4,string]
+                Cmd += Char
+                EGP:egpSetText(I,Path+Cmd)
+                GpuData[-4,string] = Cmd
+                GpuData[-2,number] = GpuData[-2,number] + 10
+                alxos_nwchat_updcur()
+            }
+        }
+    }
+}
+
+function number alxos_nwchat_nickcheck(Info:table,Action:string) {
+    if (Info[6,string]:trim()=="") {
+        dsSendDirect("nwsend",NwChatController,table(NwChatInterface,Info[1,number],NwChatLocal,"gpu",Action,"Nickname is empty.",1))
+        return 0
+    }
+    
+    if (NwChatNick==Info[6,string]) {
+        dsSendDirect("nwsend",NwChatController,table(NwChatInterface,Info[1,number],NwChatLocal,"gpu",Action,"Nickname already in use.",1))
+        return 0
+    }
+    
+    local ClientKeys = NwChatData["clients",table]:keys()
+    for (I=1,ClientKeys:count()) {
+        local Item = NwChatData["clients",table][ClientKeys[I,number],string]
+        if (Info[6,string]==Item) {
+            dsSendDirect("nwsend",NwChatController,table(NwChatInterface,Info[1,number],NwChatLocal,"gpu",Action,"Nickname already in use.",1))
+            return 0
+        }
+    }
+    return 1
+}
+
+function alxos_nwchat_ds(Name:string) {
+    if (Name=="nwdata") {
+        local Info = dsGetTable()
+        local Cmd = Info[5,string]
+        if (NwChatLocal==1 & Info[3,number]==0) { return } # remote to local connection drop
+        if (Cmd=="chatserver") {
+            if (NwChatMode==1) {
+                if (!NwChatStarted) { return }
+                dsSendDirect("nwsend",NwChatController,table(NwChatInterface,Info[1,number],NwChatLocal,"gpu","chatserver",NwChatNick))  
+            } else {
+                if (Info[6,string]=="") { return } # loop to self
+                if (NwChatData["server",table]:count()) { return }
+                NwChatData["servers",table]:pushTable(table(Info[6,string],Info[1,number]))
+            }   
+        } elseif (Cmd=="chatconnect") {
+            if (NwChatMode==1) {
+                if (!NwChatStarted) { return }
+                if (NwChatData["clients",table]:count()+1>=NwChatMax) {
+                    dsSendDirect("nwsend",NwChatController,table(NwChatInterface,Info[1,number],NwChatLocal,"gpu","chatconnect","Server is full."))
+                } else {
+                    local Client = NwChatData["clients",table][Info[1,number],string]
+                    if (Client=="") {
+                        if (!alxos_nwchat_nickcheck(Info,"chatconnect")) { return }
+                        
+                        NwChatData["clients",table][Info[1,number],string] = Info[6,string]
+                        alxos_nwchat_broadcast(Info[6,string]+" connected",Info[1,number])        
+                    } else {
+                        local Msg = Client+" reconnected"
+                        if (Info[6,string]!=Client) {
+                            Msg += NL+Client+" changed nick to "+Info[6,string]
+                            NwChatData["clients",table][Info[1,number],string] = Info[6,string]
+                        }
+                        alxos_nwchat_broadcast(Msg,Info[1,number])
+                    }
+                    alxos_nwchat_pingupd(Info[1,number])
+                    dsSendDirect("nwsend",NwChatController,table(NwChatInterface,Info[1,number],NwChatLocal,"gpu","chatconnect","ok"))
+                }
+            } else {
+                if (NwChatStarted) { return }
+                if (Info[1,number]==NwChatData["server",table][2,number]) {
+                    stopCmd()
+                    if (Info[6,string]=="ok") {
+                        alxos_nwchat_postcl()
+                        alxos_nwchat_pingupd()
+                    } else {
+                        alxos_nwchat_error(Info[6,string])
+                    }
+                }
+            }
+        } 
+        
+        if (!NwChatStarted) { return }
+        
+        if (Cmd=="chatmessage") {
+            if (NwChatMode==1) { 
+                local Client = NwChatData["clients",table][Info[1,number],string]
+                
+                if (Client!="") {
+                    if (Info[6,string]:trim()=="") { return }
+                    alxos_nwchat_broadcast(Client+": "+Info[6,string],Info[1,number])
+                    alxos_nwchat_pingupd(Info[1,number])
+                }
+            } else {
+                local Server = NwChatData["server",table]
+                
+                if (Info[1,number]==Server[2,number]) {            
+                    alxos_nwchat_msg(Info[6,string])
+                    alxos_nwchat_pingupd()
+                }
+            }
+        } elseif (Cmd=="changenick") {
+            if (NwChatMode==1) {
+                local Client = NwChatData["clients",table][Info[1,number],string]
+                
+                if (Client!="") {
+                    if (!alxos_nwchat_nickcheck(Info,"changenick")) { return }
+                    
+                    local Msg = Client+" changed nick to "+Info[6,string]
+                    NwChatData["clients",table][Info[1,number],string] = Info[6,string]
+                    alxos_nwchat_broadcast(Msg,Info[1,number])
+                    alxos_nwchat_pingupd(Info[1,number])
+                    
+                    dsSendDirect("nwsend",NwChatController,table(NwChatInterface,Info[1,number],NwChatLocal,"gpu","changenick",Info[6,string]))
+                }
+            } else {
+                if (Info[1,number]==NwChatData["server",table][2,number]) {
+                    if (Info[7,number]) {
+                        alxos_nwchat_error(Info[6,string])
+                    } else {
+                        local OldNick = NwChatNick
+                        NwChatNick = Info[6,string]
+                        alxos_nwchat_chnick()
+                        alxos_nwchat_msg(OldNick+" changed nick to "+NwChatNick)
+                    }
+                    alxos_nwchat_pingupd()
+                }
+            }
+        } elseif (Cmd=="chatinfo") {
+            if (NwChatMode==1) {
+                local Client = NwChatData["clients",table][Info[1,number],string]
+                
+                if (Client!="") {
+                    alxos_nwchat_pingupd(Info[1,number])
+                    dsSendDirect("nwsend",NwChatController,table(NwChatInterface,Info[1,number],NwChatLocal,"gpu","chatinfo",NwChatNick,"["+(NwChatData["clients",table]:count()+1)+"/"+NwChatMax+"]"))
+                }
+            } else {
+                if (Info[1,number]==NwChatData["server",table][2,number]) {
+                    alxos_nwchat_infomsg(table(Info[6,string],Info[7,string])) 
+                    alxos_nwchat_pingupd()  
+                }
+            }
+        } elseif (Cmd=="chatdisconnect") {
+            if (NwChatMode==1) {
+                local Client = NwChatData["clients",table][Info[1,number],string]
+                
+                if (Client!="") {
+                    local Msg = Client+" disconnected"
+                    NwChatData["clients",table]:unset(Info[1,number]) 
+                    alxos_nwchat_broadcast(Msg,0)
+                    alxos_nwchat_pingdel(Info[1,number])
+                }           
+            } else {
+                if (Info[1,number]==NwChatData["server",table][2,number]) {
+                    alxos_nwchat_msg(Info[6,string])
+                    alxos_nwchat_stopcommand()
+                    alxos_nwchat_pingstop()
+                    NwChatStarted = 0
+                    NwChatKeyH = "leave"
+                    alxos_nwchat_ft(array("New","Retry","Clear","Quit"))
+                }
+            }
+        } elseif (Cmd=="chatping") {
+            if (NwChatMode==1) {
+                local Client = NwChatData["clients",table][Info[1,number],string]
+                
+                if (Client!="") {
+                    alxos_nwchat_pingupd(Info[1,number])
+                    dsSendDirect("nwsend",NwChatController,table(NwChatInterface,Info[1,number],NwChatLocal,"gpu","chatping"))
+                }
+            } else {
+                if (Info[1,number]==NwChatData["server",table][2,number]) {
+                    alxos_nwchat_pingupd()
+                }
+            }
+        }
+    }
+}
+
+function alxos_nwchat_init(Args:table) {
+    egpClear()
+    
+    alxos_nwchat_bg()
+    
+    DsHandler = "alxos_nwchat_ds"
+    KeyHandler = "alxos_nwchat_key"
+    
+    NwChatKeyH = "new"
+    NwChatDsH = ""
+    
+    NwChatStarted = 0
+    NwChatMax = 10 # max clients
+    
+    alxos_nwchat_ft(array("New","Quit"))
+    
+    #alxos_nwchat_selmode()
+}

@@ -8,9 +8,9 @@
 	For now without multiple OS support
 ]#
 
-if (INCLUDE) {
-    
-#include "alx_pc/gpu/_main_" 
+ALXOS_INCLUDED = 0
+#include "alx_pc/gpu/_main_"
+#include "alx_pc/gpu/alxos/_prog_"
 
 function alxos_boot_init(Name:string) {
     egpClear()
@@ -67,12 +67,9 @@ function alxos_boot_ds(Name:string) {
     } elseif (Name=="alxos_fail") {
         "alxos_fail"(dsGetString())  
     } elseif (Name=="alxos_runprog") {
-        INCLUDE = 1
-        #include "alx_pc/gpu/alxos/_prog_"
-        INCLUDE = 0
         local Info = dsGetTable()
         if (ALXOS_PROGS:exists(Info[1,string])) {
-            Info[1,string]()   
+            Info[1,string](Info)   
         } else {
             "alxos_fail"("Function "+Info[1,string]+" is missing. Press F1 to reboot.")
         }
@@ -143,6 +140,4 @@ function alxos_boot_post() {
         EGP:egpText(ID,(5-Cur):toString(),EGP:egpPos(ID))
         runCmd("alxos_boot_post",1000)
     }
-}
-    
 }

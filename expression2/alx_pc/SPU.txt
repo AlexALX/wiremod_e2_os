@@ -1,5 +1,5 @@
 @name SPU
-@model models/bull/gates/logic.mdl
+#@model models/beer/wiremod/gate_e2_mini.mdl
 
 #[
     ALX Wiremod E2 PC
@@ -15,19 +15,68 @@ if (first()|duped()) {
 #include "alx_pc/shared/_main_"
 #include "alx_pc/spu/_main_"
 
-E2_SPU = entity()
-dsSendDirect("reload",BIOS,"spu")
+#include "alx_pc/spu/alxos/_prog_"
+
+setColor(200,255,255)
+
+BIOS = getentity(InA)
+Board["A",number] = entity():id()
+if (!duped()) {
+    dsSendDirect("reload",BIOS,"spu")
+}
+
+Init = 0
+Device_Name = "Mono 1-channel Card"
+
+Speaker = getentity(SpeakerSocketD)
  
 function shutdown() {
+    if (!Init) { return }
     if (ShutHandler!="") {
         ShutHandler()   
         ShutHandler = ""
     }
     stopAllTimers()
     spuClear()
-    dsSendDirect("SHUTDOWN",E2_CPU,dsGetNumber())
+    #dsSendDirect("SHUTDOWN",E2_CPU,dsGetNumber())
+    DsHandler = ""
+    Init = 0
+    #ifdef soundPurge()
+    soundPurge()
+    #endif
 }
 
+function pci_init() {
+    dsSendDirect("pci",BIOS,table("spu",entity(),Device_Name))
+}
+
+function usb_init() {
+    Init = 1
+    local Info = dsGetTable()
+    local USB_Device = Info[2,entity]
+    dsSendDirect("usbcontroller",USB_Device,table("spu",wirelink(),table()))
+}
+
+}
+
+if (dupefinished()) {
+    Board["A",number] = entity():id()
+    BIOS = getentity(InA)
+}
+
+if (~SpeakerSocketD) {
+    Speaker = getentity(SpeakerSocketD)
+    #ifdef soundPurge()
+    soundPurge()
+    #endif
+}
+
+if (~InA) {
+    local New_BIOS = entity(InA)
+    if (BIOS!=New_BIOS & Init) {
+        shutdown()
+    }
+    BIOS = New_BIOS
 }
 
 if (!BIOS:isValid()) { exit() }
@@ -37,18 +86,22 @@ if (dsClk()) {
     if (Name=="init") {
         local Info = dsGetTable()
         NB = Info[1,string]
-        E2_CPU = Info[2,entity]
-        E2_GPU = Info[3,entity]
-        local KeyboardArr = Info[5,array]
-        Keyboard = (KeyboardArr[2,number] ? KeyboardArr[1,wirelink] : nowirelink()) # bug - empty wirelink crash e2!
-        local HDDIO_Arr = Info[6,array]
-        HDD_IO = (HDDIO_Arr[2,number] ? HDDIO_Arr[1,wirelink] : nowirelink())
-        HDDS = Info[9,table]
-        HDD_MAX = Info[10,number]
-        TickQuota = Info[12,number]
-        if (!Info[8,number]) {
+        Devices = Info[2,table]
+        E2_CPU = Devices["cpu",entity]
+        E2_GPU = Devices["gpu",entity]
+        Keyboard = Devices["keyboard",wirelink]
+        HDD_IO = Devices["hdd_io",array]
+        HDDS = Info[5,table]
+        FS_TYPES = Info[6,table]
+        TickQuota = Info[7,number]
+        Init = 1
+        if (!Info[4,number]) {
             dsSendDirect(Name,BIOS,"spu")
         }
+    } elseif (Name=="pci") {
+        pci_init()
+    } elseif (Name=="usbcontroller") {
+        usb_init()
     } elseif (Name=="playgmsound") {
         local Info = dsGetTable()
         playgmsound(Info[1,number],Info[2,number],Info[3,string])
@@ -58,10 +111,6 @@ if (dsClk()) {
     } elseif (Name=="SHUTDOWN") {
         shutdown()
     } elseif (Name=="alxos_runprog") {
-        INCLUDE = 1
-        #include "alx_pc/spu/alxos/_main_"
-        #include "alx_pc/spu/alxos/_prog_"
-        INCLUDE = 0
         local Info = dsGetTable()
         if (ALXOS_PROGS:exists(Info[1,string])) {
             Info[1,string](Info[2,table])

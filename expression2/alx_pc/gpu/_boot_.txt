@@ -8,8 +8,6 @@
 	Init boot menu
 ]#
 
-if (INCLUDE) {
-    
 #include "alx_pc/gpu/_main_"
 
 function number initboot(Info:table) {
@@ -19,24 +17,20 @@ function number initboot(Info:table) {
         return 0
     }
     return 1
-}    
+}
 
 # Custom Boot Functions
 # Max func name len 12 chars for currect file systems
 
 BOOT_FUNC["alxos_boot",number] = 1
 function alxos_boot(Name:string) {
-    INCLUDE = 1
     #include "alx_pc/gpu/alxos/bootmenu"
-    INCLUDE = 0
     alxos_boot_init(Name)
 }
 
 BOOT_FUNC["alxos_setup",number] = 1
 function alxos_setup(Name:string) {
-    INCLUDE = 1
     #include "alx_pc/gpu/alxos/installos"
-    INCLUDE = 0
     
     LAST_Y+=BIOS_SZ
     EGP:egpText(LAST_I,"Loading OS installation package...",vec2(BIOS_X,LAST_Y))
@@ -47,6 +41,4 @@ function alxos_setup(Name:string) {
     KeyHandler = ""
     
     runCmd("installos",2000,table("welcome"))
-}
-
 }

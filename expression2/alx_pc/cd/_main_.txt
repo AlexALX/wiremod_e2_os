@@ -1,14 +1,14 @@
 @name Main cd drive func
-@inputs DriveBase:entity DriveBaseUp:entity Wheel:entity Holder:wirelink Reader:wirelink ReaderUp:wirelink DisableRot SetSpeed
-@outputs HDD:wirelink Started CurDiskInfo:table CurSpeed
-@persist HDD_TYPE HDD_NAME:string HDD_IO:entity
+@inputs PlugSocket:wirelink InA Locked DriveBase:entity DriveBaseUp:entity Wheel:entity Holder:wirelink 
+@inputs Reader:wirelink ReaderUp:wirelink DisableRot SetSpeed UseHydraulics Device_Name:string SupportedDiscs:string 
+@inputs MaxPos DisableNewDiskCmd ReaderPos:vector ReaderPosUp:vector DefLength DefLengthUp
+@outputs Started CurDiskInfo:table CurSpeed Length LengthUp
+@persist HDD_TYPE HDD_NAME:string HDD_IO:entity Hydraulics HDD_ID #MaxDistance MaxDistanceUp
 @persist ReaderEnt:entity ReaderEntUp:entity HolderEnt:entity DelayFix MoveTrack MoveDir CurStack CurReader:wirelink
-@persist NoLaserPos LastPosZ LastPos LastPosUpZ LastPosUp ReaderPos:vector ReaderPosUp:vector ReaderSpeed 
+@persist NoLaserPos LastPosZ LastPos LastPosUpZ LastPosUp ReaderSpeed
 @persist DiskTypes:table DiskTypesD:array BookTypes:array DataTypes:array DiskTracks:array DiskSectors:array BugTest
-@persist Speed OrigSpeed DiskSpeed DriveData:table LastSpeedY CurDisk:entity Init
+@persist Speed OrigSpeed DiskSpeed DriveData:table LastSpeedY CurDisk:entity Init SuppDiscs:table
 
-if (first()|duped()) {
-    
 #include "alx_pc/shared/_main_"
 #include "alx_pc/shared/cmd"
     
@@ -17,14 +17,28 @@ runOnTick(1)
 Started = 0
     
 NoLaserPos = -0.2
-ReaderPos = vec(-6,-38,12)
-ReaderPosUp = vec(-6,-43,12)
+#ReaderPos = vec(-6,-38,12)
+#ReaderPosUp = vec(-6,-43,12)
 DiskSpeed = 400
-ReaderSpeed = 40
+#ifdef entity:propFreeze(number)
+Hydraulics = UseHydraulics
+#else
+Hydraulics = 1
+#endif
+ReaderSpeed = (Hydraulics ? 10 : 40)
+
+#DefLength = 18
+#DefLengthUp = 52.5
+#MaxDistance = 60
+#MaxDistanceUp = 60
 
 LastPos = 0
 LastPosUp = 0
-BugTest = 1
+if (Holder:hasOutput("DiskEntity")) {
+    BugTest = 0 # new wiremod for sure don't need this check
+} else {
+    BugTest = 1
+}
 DelayFix = 0
 
 CurReader = Reader
@@ -34,18 +48,34 @@ HolderEnt = Holder:entity()
 #HolderEnt:parentTo(Wheel)
 #StandEnt:parentTo(DriveBase)
 
+#ifdef entity:propFreeze(number)
 HolderEnt:propFreeze(0)
 Wheel:propFreeze(0)
+#endif
 
 CurDiskInfo = table()
 
-DiskTracks = array()
-DiskSectors = array()
+if (!duped()) {
+    DiskTracks = array()
+    DiskSectors = array()
+    SuppDiscs = table()
+}
 
 #printTable(DiskSectors)
 
 #local FPS = 66 # reader FPS
 #LaserFPS = floor(LaserFPS/1)*1000
+    
+function supportDisc() {
+    SuppDiscs:clear()
+    local Arr = SupportedDiscs:explode(",")
+    for(I=1,Arr:count()) {
+        local Pos = Arr[I,string]:find("=")
+        if (!Pos) { continue }
+        local Type = Arr[I,string]:left(Pos-1)
+        SuppDiscs[Type,number] = Arr[I,string]:right(1):toNumber()
+    }
+}
     
 function calcTracks() {
     local First = DriveData[1,number]
@@ -73,6 +103,7 @@ function calcTracks() {
         DriveData[3,number] = LastSector
         runCmd("calcTracks",1)   
     } else {
+        supportDisc()
         #printTable(DiskSectors)
         DriveData = table()
         "clearBufferBoth"()
@@ -116,34 +147,61 @@ function clearCommands() {
 function disableLaser(Num) {
     if (Num) {
         LastPosUpZ = NoLaserPos
+        ReaderUp["Range",number] = 0
     } else {
         LastPosZ = NoLaserPos
+        Reader["Range",number] = 0
     }
 }
 
 function disableLaser() {
     LastPosZ = NoLaserPos
     LastPosUpZ = NoLaserPos  
+    ReaderUp["Range",number] = 0
+    Reader["Range",number] = 0
 }
 
 function enableLaser(Num) {
     if (Num) {
         LastPosUpZ = 0.0
+        ReaderUp["Range",number] = 38
     } else {
         LastPosZ = 0.0
+        Reader["Range",number] = 38
     }
 }
 
 function enableLaser() {
     LastPosZ = 0.0
     LastPosUpZ = 0.0
+    ReaderUp["Range",number] = 38
+    Reader["Range",number] = 38
 }
 
 function number isDiskRotating() {
-    return !(LastSpeedY<Speed*0.75) # | LastSpeedY>Speed*2.0)
+    return !(LastSpeedY<Speed*0.6) # | LastSpeedY>Speed*2.0)
 }
 
 DiskTypes = table()
+
+local Info = table()
+Info["type",string] = "LaserDisc"
+Info["model",string] = "models/venompapa/wirecd_huge.mdl"
+Info["max_speed",number] = 1600
+Info["density",number] = 16
+Info["raw_sectors",number] = 97
+Info["raw_tracks",number] = 6
+Info["tracks",number] = 5
+Info["first_track",number] = 1
+Info["first_addr",number] = 0
+Info["stacks",number] = 1
+local Sectors = 69
+Info["sectors",number] = Sectors
+Info["sectors_stack",number] = Sectors
+Info["max_addr",number] = Sectors*512
+Info["size",number] = Sectors*512*4 # 138kb
+DiskTypes:pushTable(Info)
+
 local Info = table()
 Info["type",string] = "CD"
 Info["model",string] = "models/venompapa/wirecd_medium.mdl"
@@ -306,11 +364,14 @@ Info["max_addr",number] = Sectors*512
 Info["size",number] = Sectors*512*4 #576kb
 DiskTypes:pushTable(Info)
 
+#local STR = ""
 DiskTypesD = array()
 for (I=1,DiskTypes:count()) {
     DiskTypesD[DiskTypes[I,table]["raw_sectors",number],number] = I
     DiskTypes[I,table]["type_id",number] = I
+    #STR += DiskTypes[I,table]["type",string]+"=1,"
 }
+#print(STR)
 
 BookTypes[0,string] = "RW"
 BookTypes[1,string] = "R"
@@ -321,8 +382,9 @@ DataTypes[1,string] = "Data"
 DataTypes[2,string] = "Audio"
 
 function sendData() {
+    local DName = (Device_Name!="" ? Device_Name : HDD_NAME)
     dsSendDirect("hddinit",HDD_IO,
-        table(wirelink(),HDD_TYPE,HDD_NAME,Reader,ReaderUp,DiskTypes,BookTypes,DataTypes,DiskTracks,DiskSectors)
+        table(wirelink(),HDD_TYPE,HDD_ID,DName,DiskTypes,BookTypes,DataTypes,DiskTracks,DiskSectors,SuppDiscs,Reader,ReaderUp)
     )  
 }
 
@@ -399,7 +461,7 @@ function moveToTrack(Track) {
         MoveTrack = Track
         local Pos = (CurStack ? LastPosUp : LastPos)
         if (CurTrack!=0) { MoveDir = (Track>CurTrack ? 1 : -1) }
-        elseif (Pos<=-34) { MoveDir = -1 }
+        elseif (Pos<=MaxPos) { MoveDir = -1 }
         elseif (Pos>0) { MoveDir = 1 }
         elseif (MoveDir==0) { MoveDir = 1 }
     }
@@ -487,7 +549,21 @@ function moveTo(Sector,Track,Stack) {
 }
 
 function entity curDisk() {
+    # new wiremod update
+    if (Holder:hasOutput("DiskEntity")) {
+        return Holder["DiskEntity",entity]
+    }    
+    #ifdef rangerOffset(vector,vector)
     return rangerOffset(ReaderEnt:toWorld(vec(0,0,15)),ReaderEnt:toWorld(vec(0,0,40))):entity()   
+    #else
+    local Ents = HolderEnt:getConstraints()
+    for (I = 1, Ents:count()) {
+        if (Ents[I,entity]:type()=="gmod_wire_cd_disk") {
+            return Ents[I,entity]
+        }
+    }
+    #endif
+    return noentity()
 }
 
 function number checkDiskIO(Args:table) {
@@ -630,7 +706,12 @@ function initDisk() {
                 if (DiskTypesD[Sectors,number]) {
                     local Disk = DiskTypes[DiskTypesD[Sectors,number],table]
                     if (Density==Disk["density",number] & Tracks==Disk["raw_tracks",number] & CurDisk:model()==Disk["model",string]) {
-                        if (CurReader[4]==Disk["first_track",number]) {
+                        if (!SuppDiscs:exists(Disk["type",string])) {
+                            DriveData[3,number] = -1
+                            DriveData[4,string] = "ERROR: Unsupported disc insterted."
+                            MoveDir = -1
+                            disableLaser()
+                        } elseif (CurReader[4]==Disk["first_track",number]) {
                             Move = 0
                             DriveData[2,number] = Move
                             DriveData[5,number] = 1
@@ -645,7 +726,7 @@ function initDisk() {
                     }
                 } else {
                     DriveData[3,number] = -1
-                    DriveData[4,string] = "ERROR: Incorrect disc geometry."
+                    DriveData[4,string] = "ERROR: Unsupported disc insterted."
                     MoveDir = -1
                     disableLaser()
                 }
@@ -673,8 +754,10 @@ function readDisk() {
             moveToStart()  
         }
         
+        #ifdef entity:propFreeze(number)
         HolderEnt:propFreeze(0)
         Wheel:propFreeze(0) 
+        #endif
         
         #[Wheel:soundPlay(0,0,"ambient/machines/spin_loop.wav")
         soundPitch(0,0)
@@ -688,7 +771,12 @@ function readDisk() {
             stopDisk()
         } elseif (!isDiskRotating() & !DisableRot) {
             local Data = DriveData[1,table]
-            Data[1,string] = "ERROR: Failed to rotate disk."
+            Data[1,string] = "ERROR: Failed to rotate disk."+NL+"Please unfreeze holder and gear."
+            dsSendDirect("read_disk",HDD_IO,Data)
+            stopDisk()
+        } elseif (Hydraulics & (ReaderEnt:isFrozen() | ReaderEntUp:isFrozen())) {
+            local Data = DriveData[1,table]
+            Data[1,string] = "ERROR: Failed to move reading lenses."+NL+"Please unfreeze top and bottom lenses."
             dsSendDirect("read_disk",HDD_IO,Data)
             stopDisk()
         } elseif (Init==1 & CurDisk==curDisk()) {
@@ -703,9 +791,13 @@ function readDisk() {
 
 stopDisk()
 
-calcTracks()
-
+if (!duped()) {
+    calcTracks()
 }
+
+Wheel:setMass(200)
+Holder:entity():setMass(50)
+
 #[ still not work
 if (dupefinished()) {
     HolderEnt:propFreeze(0)

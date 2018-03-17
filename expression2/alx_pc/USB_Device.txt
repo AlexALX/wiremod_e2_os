@@ -1,0 +1,79 @@
+@name USB Device
+@inputs UsbBoard:wirelink InA ContID USB_NAME:string
+@outputs A Board:wirelink
+@persist USB:entity Controller:entity
+
+#[
+    ALX Wiremod E2 PC
+    Created by AlexALX
+    -------------------
+    USB Device Controller
+]#
+
+if (first()|duped()) {
+    
+#include "alx_pc/shared/_main_"
+
+if (duped()) {
+    USB = noentity()
+    Controller = noentity()
+} else { 
+    USB = getentity(InA)
+    Controller = getentity(ContID)
+}
+UsbBoard["A",number] = entity():id()
+Board = wirelink()
+
+#[function sendData() {
+    dsSendDirect("usb",USB,table(Type,entity(),Controller))   
+}]#
+
+}
+
+if (~UsbBoard | dupefinished()) {
+    UsbBoard["A",number] = entity():id()
+}
+
+if (~ContID) {
+    Controller = getentity(ContID)
+}
+
+if (~InA) {
+    local Old_USB = USB
+    USB = getentity(InA)  
+    if (Old_USB!=USB) {
+        dsSendDirect("SHUTDOWN",Controller,1)
+        A = 0
+        exit()
+    }
+}
+
+if (dsClk("SHUTDOWN")) {
+    dsSendDirect("SHUTDOWN",Controller,1)
+    A = 0
+    exit()
+}
+
+if (dsClk("usbcontroller")) {
+    local Info = dsGetTable()
+    local Type = Info[1,string]
+    local WL = Info[2,wirelink]
+    dsSendDirect("usbdevice",USB,table(Type,entity(),WL,USB_NAME,Info[3,table],entity():id(),WL:entity():id())) 
+    exit()
+}
+
+if (dsClk("usbinit")) {
+    local BIOS = dsGetNumber()
+    #USB = Info[1,entity]
+    A = BIOS
+    dsSendDirect("usbcontroller",Controller,table(USB_NAME,entity()))
+    #timer("sendData",10)
+}
+#[
+if (dsClk("unlink") & USB==dsGetEntity()) {
+    USB = noentity()
+}
+#[
+if (clk("sendData")) {
+    sendData()   
+}]#

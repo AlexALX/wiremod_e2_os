@@ -1,0 +1,179 @@
+@name Network Switch
+@inputs Start NetSocket_0:wirelink NetSocketC_0 NetSocket_1:wirelink NetSocketC_1
+@inputs NetSocket_2:wirelink NetSocketC_2 NetSocket_3:wirelink NetSocketC_3
+@inputs NetSocket_4:wirelink NetSocketC_4
+@outputs Init EntID NetSocketIndG_0 NetSocketIndY_0
+@outputs NetSocketIndG_1 NetSocketIndY_1 NetSocketIndG_2 NetSocketIndY_2
+@outputs NetSocketIndG_3 NetSocketIndY_3 NetSocketIndG_4 NetSocketIndY_4
+@persist NW_MAX Device_Name:string NWData:table
+
+#[
+    ALX Wiremod E2 PC
+    Created by AlexALX
+    -------------------
+    Network switch
+]#
+
+if (first()|duped()) {
+    
+dsSetScope(2) # allow signals from any e2 in mp
+    
+NW_MAX = 5
+EntID = 0
+Device_Name = "Network Switch"
+Init = 0
+
+function nwIndY(ID,Act) {
+    if (Act) {
+        if (!NWData["nwIndY_"+ID,number]) {
+            NWData["nwIndY_"+ID,number] = 1
+            timer("nwIndY_"+ID,100)
+        }
+    } else {
+        NWData:unset("nwIndY_"+ID)
+        stoptimer("nwIntY_"+ID)
+    }
+    ioSetOutput("NetSocketIndY_"+ID,Act)
+}
+
+function nwShutdown() {
+    if (!Init) { return }
+    Init = 0
+    for (I=0,NW_MAX-1) {
+        ioSetOutput("NetSocketIndG_"+I,0)
+        local WL = ioGetInputWirelink("NetSocket_"+I)
+        WL["B",number] = 0
+        nwIndY(I,0)
+    }
+    EntID = 0
+    NWData = table()
+}
+
+function clearcache(ID) {
+    foreach(K,V:number = NWData) {
+        if (K:left(6)!="cache_") { continue }
+        if (V==ID) {
+            NWData:unset(K)
+        }    
+    }
+}
+
+function nwinit() {
+    if (Init) { return }
+    for (I=1,NW_MAX) {
+        local ID = I-1
+        local Ent = entity(ioGetInputNumber("NetSocketC_"+ID))
+        local Act = Ent ? 1 : 0
+        local WL = ioGetInputWirelink("NetSocket_"+ID)
+        if (!WL["B",number]) { Act = 0 }
+        WL["B",number] = WL:entity():id()
+        ioSetOutput("NetSocketIndG_"+ID,Act)
+        nwIndY(ID,Act)
+        clearcache(WL:entity():id())
+    }
+    EntID = entity():id()
+    Init = 1
+}
+
+function number nwinterface(ID) {
+    if (ID==0) { return -1 }
+    for (I=0,NW_MAX-1) {
+        if (ioInputEntity("NetSocket_"+I):id()==ID & ioGetInputNumber("NetSocketC_"+I)) {
+            return I
+        }
+    }
+    return -1
+}
+
+function nwbroadcast(Interface,Info:table) {
+    NWData["cache_"+Info[1,number],number] = Info[0,number]
+    for(I=0,NW_MAX-1) {
+        if (Interface==I) { continue } 
+        local WL = ioGetInputWirelink("NetSocket_"+I)
+        if (WL & WL["B",number]) {
+            local Ent = entity(WL["C",number])
+            if (Ent) {
+                local InfoC = Info:clone()
+                InfoC[0,number] = WL["B",number]
+                dsSendDirect("nwdata",Ent,InfoC)
+                nwIndY(I,1)
+            }
+        }
+    }
+}
+
+}
+
+if (~Start) {
+    if (Start) {
+        if (Init) {
+            nwShutdown()
+        } else {
+            nwinit()
+        }   
+    } 
+    exit()
+}
+
+if (clk(clkName())) {
+    if (!Init) { exit() }
+    local Name = clkName()
+    if (Name:find("nwIndY_")) {
+        local ID = Name:right(1):toNumber()
+        nwIndY(ID,0)
+    }
+    exit()
+}
+
+if (!Init) { exit() }
+
+if (inputClk()) {
+    local Name = inputClkName()
+    if (Name:find("NetSocket")) {
+        local ID = Name:right(1):toNumber()
+        local Ent = entity(ioGetInputNumber("NetSocketC_"+ID))
+        local Act = Ent ? 1 : 0
+        local WL = ioGetInputWirelink("NetSocket_"+ID)
+        if (!WL["B",number]) { Act = 0 }
+        WL["B",number] = WL:entity():id()
+        ioSetOutput("NetSocketIndG_"+ID,Act)
+        nwIndY(ID,Act)
+        clearcache(WL:entity():id())
+    }
+    exit()
+}
+
+if (dsClk()) {
+    local Name = dsClkName()    
+    
+    if (Name=="nwdata") {
+        local Info = dsGetTable()
+        local Interface = nwinterface(Info[0,number])      
+        if (Interface==-1) { exit() } # not valid        
+        if (Info[2,number]==0 | Info[2,number]<-1) { exit() } # drop packets to non-exists devices
+        nwIndY(Interface,1)
+        if (Info[2,number]==-1) {
+            nwbroadcast(Interface,Info)
+        } else {
+            local ID = NWData["cache_"+Info[2,number],number]
+            if (!ID) { # if not found in cache - sent to all
+                nwbroadcast(Interface,Info)
+                exit()
+            }
+            local Interface = nwinterface(ID)
+            if (Interface!=-1) {
+                local WL = ioGetInputWirelink("NetSocket_"+Interface)
+                if (WL & WL["B",number]) {
+                    NWData["cache_"+Info[1,number],number] = Info[0,number]
+                    local Ent = entity(WL["C",number])
+                    if (Ent) {
+                        Info[0,number] = WL["B",number]
+                        dsSendDirect("nwdata",Ent,Info)
+                        nwIndY(Interface,1)
+                    }
+                }
+            }
+        }
+    }
+    exit()
+}

@@ -6,8 +6,6 @@
     Created by AlexALX
 ]#
 
-if (INCLUDE) {
-
 #include "alx_pc/hdd/_main_"
 #include "alx_pc/shared/cmdqueue"
 
@@ -268,6 +266,9 @@ function table wcd_emptyfs(CD:table,Empty) {
     local FsInfo = table()
 
     FsInfo["hddinfo",table] = CD
+    FsInfo["hdd_io",wirelink] = wirelink()
+    FsInfo["start_sector",number] = -1
+    FsInfo["end_sector",number] = -1
     FsInfo["boot_func",string] = ""
     FsInfo["fs_str_id",string] = "WCD"
     FsInfo["bytes_in_sector",number] = CD["sector_size",number]
@@ -317,6 +318,9 @@ function table readcdinfo(CD:table) {
     local O = 0
     if (((readCellCD(CD,O+13) >> 16) && 0xFFFF)!=0x55CD) { return wcd_emptyfs(CD,1) } # invalid FS
     FsInfo["hddinfo",table] = CD
+    FsInfo["hdd_io",wirelink] = wirelink()
+    FsInfo["start_sector",number] = O
+    FsInfo["end_sector",number] = (readCellCD(CD,O+6) >> 16) && 0xFFFF
     FsInfo["boot_func",string] = byte2str(readCellCD(CD,O+1),0)+byte2str(readCellCD(CD,O+2),0)+byte2str(readCellCD(CD,O+3),0)
     FsInfo["fs_str_id",string] = byte2str(readCellCD(CD,O),0)
     FsInfo["bytes_in_sector",number] = CD["sector_size",number]
@@ -377,7 +381,7 @@ function wcd_listdir_init(Args:table) {
         
     CmdDelay = 1
     if (!FS["total_sectors",number]) {
-        cmdRun("wcd_listdir",table(FS,Dir,table(),0,0,0))
+        cmdRun("wcd_listdir",table(FS,Dir,table(),0,0,0,Ret))
         return   
     }
     cmdRun("wcd_read_struct",table(FS,ID,WCD_Rsv,Dir))
@@ -389,7 +393,7 @@ function wcd_listdir(Args:table) {
     if (Dir==0) { Dir = WCD_Rsv }
     local ID = FS["hddinfo",table]["ent",entity]:id()
     CmdDelay = 1
-    if (!WCD_ReadBuffer[ID,table]:count()) {
+    if (!WCD_ReadBuffer[ID,table]:count() | !FS["total_sectors",number]) {
         dsSendDirect("read_disk",FS["hddinfo",table]["ent",entity],
             table("init",entity(),FS["hddinfo",table],"wcd_listdir_init",FS,ID,Dir)
         )
@@ -437,10 +441,15 @@ function number cmd_wcd_listdir(CmdData:table) {
     local I = CmdData[5,number]
     local II = CmdData[6,number]
     local ID = FS["hddinfo",table]["ent",entity]:id()
-    while(perf(80)) {
-        if (I>Max) { #I=0,Max-1 
+    while(perf(85)) {
+        if (I>Max) { #I=0,Max-1
             cmdClearRes()
-            CmdResult = Ents
+            local Err = CmdData[7,string]
+            if (Err!="") {
+                CmdResult = table(Err)
+            } else {
+                CmdResult = Ents
+            }
             return 0
         }
         local O = II+Of
@@ -468,7 +477,7 @@ function number wcd_sysdir(Entry:table) {
     return 0
 }
 
-function number wcd_add2dir(Args:table) {
+function wcd_add2dir(Args:table) {
     local CD = Args[1,table]
     local Sector = Args[2,number]
     local Entries = Args[3,table]
@@ -913,6 +922,4 @@ function wcd_readfile_finish(Name:string,Args:table) {
 
 function number cmd_wcd_readfile_finish(Args:table) {
     return 0
-}
-
 }

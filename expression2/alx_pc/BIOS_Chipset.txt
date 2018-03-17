@@ -1,9 +1,10 @@
 @name BIOS / Chipset
-@inputs ROM:wirelink Speaker:entity E2_CPU:entity E2_GPU:entity E2_SPU:entity HDD_IO:wirelink NoFanSound
-@inputs Keyboard:wirelink KeyboardUser:entity NullByte:string Power Reset
-@outputs BIOS:entity PowerInd HDDInd
-@persist INIT POST ERR_N ERR_I HDDS:table HDD_MAX FS_TYPES:table Shutdown ShutStep ShutMax Block SndBl
-@persist Reboot Reload HardReset BOOT_HDD
+@inputs ROM:wirelink Speaker:entity CPU_SOCKET PCIE_SOCKET0 PCIE_SOCKET1 PCI_SOCKET0 PCI_SOCKET1 PCI_SOCKET2
+@inputs KeyboardSocket Power Reset NoFanSound NullByte:string
+@outputs BIOS:entity BIOS_ID PowerInd HDDInd
+@persist INIT POST ERR ERR_N ERR_I HDDS:table HDD_C FS_TYPES:table Shutdown ShutStep ShutMax Block SndBl
+@persist Reboot Reload HardReset BOOT_HDD:table BiosData:table MaxPCIE MaxPCI
+@persist Devices:table HDD_IO_C BSOD:array
 @trigger 
 @model models/jaanus/wiretool/wiretool_controlchip.mdl
 
@@ -22,6 +23,7 @@
     1 short with different frequencies - CPU error
     1 long 3 short - GPU error
     1 long 2 short - GPU EGP limits error
+    3 long - no EGP connected
     2 long - Keyboard error
     1 very long - Null Byte error
     2 short - bad sound card
@@ -30,66 +32,105 @@
 if (first()|duped()) {
 
 #include "alx_pc/shared/_main_"
+
+runOnLast(1)
     
+ERR = 0
 ERR_N = 0
 ERR_I = 0
 INIT = 0
 POST = 0
 Reload = 0
-BOOT_HDD = 0
+BOOT_HDD = table()
 PowerInd = 0
 Block = 0
 SndBl = 0
+BiosData = table()
+MaxPCIE = 2
+MaxPCI = 3
+
+Shutdown = 0
+ShutStep = 0
+
+
+HDD_IO_C = 0
 
 BIOS = entity()
-    
+BIOS_ID = entity():id()
+
+Devices = table()
+
 function err() {
     if (ERR_N==0) {
         if (ERR_I==7) { exit() }
+        #ifdef soundPlay(number,number,string)
         Speaker:soundPlay(0,0.25,"synth/square_440.wav")
+        #endif
         timer("err",500)
         ERR_I++
     } elseif (ERR_N==1) {
         if (ERR_I==1) {
+            #ifdef soundPlay(number,number,string)
             Speaker:soundPlay(0,0.4,"synth/square_880.wav")
+            #endif
             ERR_I = 0
         } else {
+            #ifdef soundPlay(number,number,string)
             Speaker:soundPlay(0,0.4,"synth/square_440.wav")
+            #endif
             ERR_I = 1
         }
         timer("err",500)
     } elseif (ERR_N==2 | ERR_N==3) {
         if (ERR_I==ERR_N+1) { exit() }
         if (ERR_I==0) {
+            #ifdef soundPlay(number,number,string)
             Speaker:soundPlay(0,0.75,"synth/square_440.wav")
+            #endif
             timer("err",1250)
         } else {
+            #ifdef soundPlay(number,number,string)
             Speaker:soundPlay(0,0.25,"synth/square_440.wav")
+            #endif
             timer("err",500)
         }
         ERR_I++
-    } elseif (ERR_N==4) {
-        if (ERR_I==2) { exit() }
+    } elseif (ERR_N==4 | ERR_N==7) {
+        if (ERR_I==2 & ERR_N==4 | ERR_I==3 & ERR_N==7) { exit() }
+        #ifdef soundPlay(number,number,string)
         Speaker:soundPlay(0,0.75,"synth/square_440.wav")
+        #endif
         timer("err",1250)
         ERR_I++
     } elseif (ERR_N==5) {
+        #ifdef soundPlay(number,number,string)
         Speaker:soundPlay(0,2,"synth/square_440.wav")
+        #endif
     } elseif (ERR_N==6) {
         if (ERR_I==2) { exit() }
+        #ifdef soundPlay(number,number,string)
         Speaker:soundPlay(0,0.5,"synth/square_440.wav")
+        #endif
         timer("err",750)
         ERR_I++
     } elseif (ERR_N==-1) {
+        #ifdef soundPlay(number,number,string)
         Speaker:soundPlay(12,0.25,"synth/square_440.wav")
+        #endif
+        exit()
     }
+    ERR = 1
     exit()
 }
 
 function shutdown() {
     stopAllTimers()
     if (!Reboot) { 
-        soundStop(99,0.3) 
+        #ifdef soundStop(number,number)
+        if (!BSOD:count()) {
+            soundStop(99,0.3) 
+        }
+        #endif
         Block = 1 
         timer("block",400)
         #SndBl = 0
@@ -114,31 +155,92 @@ function shutdown() {
     }]#
 }
 
+function shutdownDevices() {
+    local StartT = 1
+    local StartI = 1
+    if (BiosData["CurT",number]) {
+        StartT = BiosData["CurT",number]
+        StartI = BiosData["CurI",number]
+    } else {
+        dsSendDirect("SHUTDOWN",Devices["cpu",entity],BSOD)
+        dsSendDirect("SHUTDOWN",Devices["keyboard",table][1,entity],BSOD)
+    }
+    for(T=StartT,2) {
+        local Tbl = Devices[(T==1 ? "pcie" : "pci")+"_bus",table]
+        local Tmp = Tbl:keys()
+        for(I=StartI,Tbl:count()) {
+            if (!checkPerf(5000)) {
+                BiosData["CurT",number] = T
+                BiosData["CurI",number] = I
+                timer("shutdownDevices",33)
+                #stoptimer("shutdownpost")
+                timer("shutdownpost",100)
+                return
+            }
+            local Ent = Tbl[Tmp[I,number],array][3,entity]
+            if (Ent) {
+                dsSendDirect("SHUTDOWN",Ent,BSOD)    
+            }
+        }
+    }
+    BiosData:unset("CurT")
+    BiosData:unset("CurI")
+}
+
 function shutdownpost(Name:string,SDown) {
+    if (!INIT) { return }
+    ShutStep = SDown
+    if (SDown==1) {
+        #ShutMax = HDDS:count()+4
+        stopAllTimers()
+        if (!Reboot) {
+            dsSendDirect("Kick",Devices["keyboard",table][1,entity],1)
+        }
+        shutdownDevices()
+        timer("shutdownpost",100)
+    } else {
+        stoptimer("shutdownpost")
+        if (BSOD[1,number]) { BSOD = array() exit() }
+        Shutdown = 0
+        INIT = 0
+        POST = 0
+        ShutStep = 0
+        HDDInd = 0
+        timer("block",400)
+        if (Reboot) {
+            timer("init",500)
+        } else {
+            PowerInd = 0
+        }
+    }
+}
+        
+#[ old code
+function shutdownpost_old(Name:string,SDown) {
     ShutStep = SDown
     stoptimer("shutdownpost")
     if (SDown==1) {
         #ShutMax = HDDS:count()+4
         stopAllTimers()
         if (!Reboot) {
-            Keyboard["Kick",number] = 0
-        }
-        if (E2_CPU:isValid()) {
-            dsSendDirect(Name,E2_CPU,SDown)
-            timer("shutdownpost",100)
+            dsSendDirect("Kick",Devices["keyboard",table][1,entity],1)
+        }        
+        if (Devices["cpu",entity]:isValid()) {
+            dsSendDirect(Name,Devices["cpu",entity],SDown)
+            timer("shutdownpost",50)
         } else {
             shutdownpost(Name,SDown+1)
         }
     } elseif (SDown==2) {
-        if (E2_GPU:isValid()) {
-            dsSendDirect(Name,E2_GPU,SDown)
+        if (Devices["gpu",entity]:isValid()) {
+            dsSendDirect(Name,Devices["gpu",entity],SDown)
             timer("shutdownpost",100)
         } else {
             shutdownpost(Name,SDown+1)
         }
     } elseif (SDown==3) {
-        if (E2_SPU:isValid()) {
-            dsSendDirect(Name,E2_SPU,SDown)
+        if (Devices["spu",entity]:isValid()) {
+            dsSendDirect(Name,Devices["spu",entity],SDown)
             timer("shutdownpost",100)
         } else {
             shutdownpost(Name,SDown+1)
@@ -149,20 +251,38 @@ function shutdownpost(Name:string,SDown) {
             dsSendDirect(Name,HDD,SDown)
         } else {
             shutdownpost(Name,SDown+1)
-        } ]#
+        } ]
     #} elseif (SDown>=ShutMax) {
     } elseif (SDown==4) {
-        for (I=1,HDD_MAX) {
-            dsSendDirect("SHUTDOWN",HDDS[I,table]["ent",entity],entity())
-        }
-        if (HDD_IO) {
+        #for (I=1,HDD_MAX) {
+        #    dsSendDirect("SHUTDOWN",HDDS[I,table]["ent",entity],entity())
+        #}
+        if (HDD_IO_C) {
             HDDInd = 1
-            dsSendDirect(Name,HDD_IO:entity(),SDown)
+            for (I=1,HDD_IO_C) {
+                dsSendDirect(Name,Devices["hdd_io",table][I,table][1,wirelink]:entity(),SDown)
+            }
             timer("shutdownpost",100)
         } else {
             shutdownpost(Name,SDown+1)
         }
     } elseif (SDown==5) {
+        for (I=0,MaxPCIE-1) {
+            local Ent = ioGetInputNumber("PCIE_SOCKET"+I)
+            if (Ent) {
+                dsSendDirect("SHUTDOWN",entity(Ent),entity())
+            }
+        }
+        timer("shutdownpost",50)
+    } elseif (SDown==6) {
+        for (I=0,MaxPCI-1) {
+            local Ent = ioGetInputNumber("PCI_SOCKET"+I)
+            if (Ent) {
+                dsSendDirect("SHUTDOWN",entity(Ent),entity())
+            }
+        }
+        timer("shutdownpost",50)
+    } elseif (SDown==7) {
         Shutdown = 0
         INIT = 0
         POST = 0
@@ -175,15 +295,82 @@ function shutdownpost(Name:string,SDown) {
             PowerInd = 0
         }
     }    
-}
+}]#
 
 function init_send(ID:string) {
-    if (ID=="hdd") {
-        dsSendDirect("init",HDD_IO:entity(),table(NB,entity(),Reload,TickQuota))
+    if (!checkPerf(4000)) {
+        BiosData["init_send",string] = ID
+        timer("init_send",50)
+        return   
+    }
+    if (ID=="cpu_socket") {
+        dsSendDirect(ID,Devices["cpu",entity],BIOS)
+    } elseif (ID=="key_socket") {
+        dsSendDirect(ID,Devices["keyboard",table][1,entity],1)
+    } elseif (ID=="pcie" | ID=="pci") {
+        local Sock = BiosData[1,number]
+        local Max = (ID=="pcie" ? MaxPCIE : MaxPCI)
+        if (Sock<Max) {
+            local Ent = entity(ioGetInputNumber(ID:upper()+"_SOCKET"+Sock))
+            if (Ent) {
+                dsSendDirect(ID,Ent,BIOS)
+            } else {
+                BiosData[1,number] = Sock+1
+                init_send(ID)
+            }
+        } else {
+            if (ID=="pcie") {
+                BiosData[1,number] = 0
+                BiosData[2,string] = "pci"
+                timer("preinit",250)
+                init_send("pci")
+            } else {
+                if (!Devices["gpu",entity]:isValid()) {
+                    stoptimer("preinit")
+                    ERR_N = 3
+                    timer("err",2500)
+                    exit()
+                }
+                stoptimer("preinit")
+                BiosData[1,number] = 0
+                BiosData[2,string] = "hdd"
+                init_send("hdd")
+                timer("postinit",250)
+            }
+        } 
+    } elseif (ID=="hdd") {
+        if (HDD_IO_C) {
+            HDDInd = 1
+            local Cur = BiosData[3,number]+1
+            dsSendDirect("init",Devices["hdd_io",table][Cur,table][1,wirelink]:entity(),table(NB,BIOS,Reload,TickQuota))
+        }
     } else {
-        local Ent = (ID=="cpu" ? E2_CPU : E2_GPU)
-        local Ent = (ID=="spu" ? E2_SPU : Ent)
-        dsSendDirect("init",Ent,table(NB,E2_CPU,E2_GPU,E2_SPU,array(Keyboard,->Keyboard),array(HDD_IO,->HDD_IO),BOOT_HDD,Reload,HDDS,HDD_MAX,FS_TYPES,TickQuota))
+        local Ent = Devices[ID,entity]
+        local Data = table(NB,Devices,BOOT_HDD,Reload,HDDS,FS_TYPES,TickQuota)
+        dsSendDirect("init",Ent,Data)   
+    }
+}
+
+function setboot(Info:table) {
+    BOOT_HDD = Info
+    ROM[0] = BOOT_HDD[1,number] # hdd id
+    
+    local Bus = 0
+    if (Info[2,string]=="pci") { Bus = 1 }    
+    ROM[1] = Bus # bus type (pcie/pci)
+    ROM[2] = Info[3,number] # bus id
+    
+    local Usb = -1
+    if (Info[4,string]!="") { Usb = Info[4,string]:right(1):toNumber() }    
+    ROM[3] = Usb # usb port id
+}
+
+function readboot() {
+    BOOT_HDD[1,number] = (ROM[0]==0 ? 1 : ROM[0])
+    BOOT_HDD[2,string] = (ROM[1]==1 ? "pci" : "pcie")
+    BOOT_HDD[3,number] = ROM[2]
+    if (ROM[3]!=-1) {
+        BOOT_HDD[4,string] = "USB_"+ROM[3] 
     }
 }
     
@@ -195,38 +382,68 @@ function init() {
         TickQuota = maxquota()
     
         if (!SndBl & !NoFanSound) {
+            #ifdef soundStop(number)
             soundStop(99)
             soundPlay(99,0,"ambient/machines/air_conditioner_cycle.wav")
             soundPitch(99,150)
             soundVolume(99,0.5)
+            #endif
             timer("snd",3800)
         }
         SndBl = 0
+        ERR = 0
         ERR_N = 0
         ERR_I = 0
         INIT = 1
         PowerInd = 1
         HDDInd = 0
+        BSOD = array()
+        
+        HDD_C = 0
+        
+        BIOS_ID = entity():id()
+        BiosData = table()
+        BiosData["old_hdds",table] = table()
+        
+        readboot()
+         
+        Devices["names",table] = table()
+        Devices["ids",table] = table()
+        Devices["keyboard",table] = table(getentity(KeyboardSocket),noentity()) #(->Keyboard ? Keyboard : nowirelink()) # bug - empty wirelink crash e2!
+        Devices["cpu",entity] = getentity(CPU_SOCKET)
+        Devices["gpu",entity] = noentity()
+        Devices["spu",entity] = noentity()
+        Devices["hdd_io",table] = table()
+        Devices["pcie_bus",table] = table()
+        Devices["pci_bus",table] = table()
+        HDD_IO_C = 0
+        Devices["usb",table] = table()
+        Devices["network",table] = table()
+        Devices["nw_connects",table] = table()
+        FS_TYPES = table()
+        
         if (!->ROM) {
             ERR_N = 0
             timer("err",2500)
             exit()
-        } elseif (!E2_CPU:isValid()) {
+        } elseif (!Devices["cpu",entity]:isValid()) {
             ERR_N = 1
             timer("err",2500)
             exit()
-        } elseif (!E2_GPU:isValid()) {
+        }#[ elseif (!E2_GPU:isValid()) {
             ERR_N = 3
             timer("err",2500)
             exit()
-        }
+        }]#
         HDDS = table()
-        NB = NullByte
-        BOOT_HDD = ROM[0]+1 
+        NB = (toByte(toChar(0))!=0 ? NullByte : toChar(0))
         POST = 0
         Reload = 0
-        init_send("hdd")
-        timer("postinit",250)
+        #init_send("hdd")
+        #timer("postinit",250)
+        BiosData[2,string] = "cpu_socket"
+        timer("preinit",250)
+        init_send("cpu_socket")
     }
 }
 
@@ -234,15 +451,212 @@ function ready() {
     INIT = 2
     POST = 4
     if (!Reload) {
-        dsSendDirect("ready",E2_CPU,1)
+        dsSendDirect("ready",Devices["cpu",entity],Devices["keyboard",table][2,entity])
     }
 }
 
+function table getdevice(Ent:entity) {
+    for(B=1,2) {
+        local Bus = (B==1 ? "pcie" : "pci")
+        local Keys = Devices[Bus+"_bus",table]:keys()
+        for(I=1,Devices[Bus+"_bus",table]:count()) {
+            local Entry = Devices[Bus+"_bus",table][Keys[I,number],array]
+            if (Ent==Entry[3,entity]) {
+                return table(Bus,Keys[I,number],Entry)    
+            }
+        }
+    }
+    return table()
+}
+
+function number hdd_onplug(THDD:table,Plug) {
+    if (Plug) {
+        local Old = BiosData["old_hdds",table][THDD["entid",number],number]
+        if (Old) {
+            HDDS:insertTable(Old,THDD)
+            BiosData["old_hdds",table]:unset(THDD["entid",number])
+        } else {
+            HDDS:pushTable(THDD)
+            HDD_C++
+            Old = HDD_C
+        } 
+        return Old
+    } else {
+        for(I=1,HDDS:count()) {
+            local HDD = HDDS[I,table]
+            if (HDD["entid",number]==THDD["entid",number]) {
+                BiosData["old_hdds",table][HDD["entid",number],number] = I
+                HDDS:removeTable(I)
+                HDD_C--
+                return I
+            }
+        }
+    }
+    return 0
+}
+
+function number findhddid(Ent:entity) {
+    for (I=1,HDDS:count()) {
+        local HDD = HDDS[I,table]
+        if (HDD["ent",entity]==Ent) {
+            return I   
+        }
+    }
+    return 0
+}
+
+function number findhddio(Ent) {
+    for (I=1,HDD_IO_C) {
+        if (Devices["hdd_io",table][I,table][2,number] == Ent) {
+            return I    
+        }
+    }
+    return 0
+}
+
+function number findusb(Ent) {
+    for (I=1,Devices["usb",table]:count()) {
+        if (Devices["usb",table][I,table][2,number] == Ent) {
+            return I    
+        }
+    }
+    return 0
+}
+
+function number findnw(Ent) {
+    for (I=1,Devices["network",table]:count()) {
+        if (Devices["network",table][I,table][2,number] == Ent) {
+            return I    
+        }
+    }
+    return 0
+}
+
+function reload(ID:string) {
+    if (!checkPerf(8000)) {
+        BiosData["reload",string] = ID
+        timer("reload",50)
+        return   
+    }
+    
+    BiosData:unset("reload")
+    Reload = 1
+    init_send(ID)
+    Reload = 0
+    
+    if (DEBUG) {
+        Reboot = 1
+        shutdown()
+    } else {
+        ERR = 1
+        BSOD = array(4)
+        shutdown()
+    } 
+}
+
+}
+
+if (last()) {
+    shutdownDevices()
+    exit()
 }
 
 if (dsClk()) {
+    if (ERR | !INIT) { exit() }
     local Name = dsClkName()
-    if (Name=="init") {
+    if (Name=="cpu_socket") {
+        stoptimer("preinit")
+        local Info = dsGetTable()
+        if (Info[1,string]=="cpu" & Devices["cpu",entity]==Info[2,entity]) {
+            Devices["names",table]["cpu",string] = Info[3,string]
+            Devices["ids",table]["cpu",number] = Info[2,entity]:id()
+            BiosData[2,string] = "key_socket"
+            timer("preinit",250)
+            init_send("key_socket")
+        } else {
+            ERR_N = 1
+            timer("err",2500)
+            exit()
+        }
+    } elseif (Name=="key_socket") {
+        local Info = dsGetTable()
+        Devices["keyboard",table][2,entity] = Info[1,entity]
+        Devices["names",table]["keyboard",string] = Info[3,string]
+        Devices["ids",table]["keyboard",number] = KeyboardSocket
+        if (Info[2,number]==1) {
+            BiosData[2,string] = "pcie"
+            timer("preinit",250)
+            init_send("pcie")
+        } else {
+            dsSendDirect("keyboard",Devices["keyboard",table][1,entity],table("User",Info[1,entity]))
+        }
+    } elseif (Name=="pcie" | Name=="pci") {
+        stoptimer("preinit")
+        local Info = dsGetTable()
+        local Sock = BiosData[1,number]
+        local ID = Info[1,string]
+        if ((ID=="gpu" | ID=="spu")) {
+            if (!Info[2,entity]:isValid()) { exit() }
+            local Active = 0
+            if (Devices[ID,entity]==noentity()) {
+                Devices[ID,entity] = Info[2,entity]
+                Devices["names",table][ID,string] = Info[3,string]
+                Devices["ids",table][ID,number] = Info[2,entity]:id()
+                Active = 1
+            }
+            Devices[Name+"_bus",table][Sock,array] = array(ID,Info[3,string],Info[2,entity],Info[2,entity]:id(),Active)
+        } elseif (ID=="hdd") {
+            if (!Info[2,wirelink]:entity():isValid()) { exit() }
+            HDD_IO_C++
+            Devices["hdd_io",table][HDD_IO_C,table] = table(Info[2,wirelink],Info[2,wirelink]:entity():id(),Info[3,string],Info[4,number],Info[5,table],Name,Sock)
+            #Devices["names",table]["hdd_io"+HDD_IO_C,string] = Info[3,string]
+            Devices[Name+"_bus",table][Sock,array] = array(ID,Info[3,string],Info[2,wirelink]:entity(),Info[2,wirelink]:entity():id(),1)
+        } elseif (ID=="usb") {
+            if (!Info[2,entity]:isValid()) { exit() }
+            local UsbDevices = Info[3,table]
+            Devices["usb",table]:pushTable(table(Info[2,entity],Info[2,entity]:id(),Info[4,string],UsbDevices))
+            #Devices["names",table]["usb"+Devices["usb",table]:count(),string] = Info[4,string]
+            Devices[Name+"_bus",table][Sock,array] = array(ID,Info[3,string],Info[2,entity],Info[2,entity]:id(),1)
+            foreach(K,V:table=UsbDevices) {
+                if (!V[2,entity]:isValid()) { continue }
+                if (V[1,string]=="hdd") {
+                    HDD_IO_C++
+                    #Devices["names",table]["hdd_io"+HDD_IO_C,string] = V[4,string]
+                    Devices["hdd_io",table][HDD_IO_C,table] = table(V[3,wirelink],V[3,wirelink]:entity():id(),V[4,string],V[5,table][1,number],V[5,table][2,table],Name,Sock,K,V[2,entity]:id())
+                } elseif (V[1,string]=="spu" & Devices["spu",entity]==noentity()) {
+                    Devices["spu",entity] = V[3,wirelink]:entity()
+                    Devices["names",table]["spu",string] = V[4,string]
+                    Devices["ids",table]["spu",number] = V[6,number]
+                } elseif (V[1,string]=="keyboard" & !Devices["keyboard",table][1,entity]:isValid()) {
+                    Devices["keyboard",table][1,entity] = V[3,wirelink]:entity()
+                    Devices["keyboard",table][2,entity] = V[5,table][1,entity]
+                    Devices["names",table]["keyboard",string] = V[4,string]
+                    Devices["ids",table]["keyboard",number] = V[6,number]
+                } elseif (V[1,string]=="network") {
+                    local NWDevices = V[5,table]
+                    local NWEnt = V[3,wirelink]:entity()
+                    Devices["network",table]:pushTable(table(NWEnt,NWEnt:id(),V[4,string],NWDevices))
+                    for(I=1,NWDevices:count()) {
+                        Devices["nw_connects",table][NWDevices[I,array][1,number],table] = table(NWDevices[I,array],I,NWEnt,NWEnt:id(),V[4,string])
+                    }
+                }
+            }
+        } elseif (ID=="network") {
+            if (!Info[2,entity]:isValid()) { exit() }
+            local NWDevices = Info[3,table]
+            Devices["network",table]:pushTable(table(Info[2,entity],Info[2,entity]:id(),Info[4,string],NWDevices))
+            Devices[Name+"_bus",table][Sock,array] = array(ID,Info[3,string],Info[2,entity],Info[2,entity]:id(),1)
+            for(I=1,NWDevices:count()) {
+                Devices["nw_connects",table][NWDevices[I,array][1,number],table] = table(NWDevices[I,array],I,Info[2,entity],Info[2,entity]:id(),Info[4,string])
+            }
+        } elseif (ID!="") {
+            if (!Info[2,entity]:isValid()) { exit() }
+            Devices[Name+"_bus",table][Sock,array] = array(ID,Info[3,string],Info[2,entity],Info[2,entity]:id(),1)
+        }
+        BiosData[1,number] = Sock+1
+        timer("preinit",250)
+        init_send(Name)
+    } elseif (Name=="init") {
         stoptimer("postinit")
         local ID = dsGetString()
         if (POST==0) {
@@ -254,7 +668,7 @@ if (dsClk()) {
             timer("postinit",100)
         } elseif (POST==2) {
             if (ID!="gpu") { timer("postinit",1) exit() }
-            if (E2_SPU:isValid()) {
+            if (Devices["spu",entity]:isValid()) {
                 init_send("spu")
                 timer("postinit",100)
             } else {
@@ -270,46 +684,62 @@ if (dsClk()) {
         }
         POST++
     } elseif (Name=="HDDInd") {
+        if (!INIT) { exit() }
         HDDInd = dsGetNumber()
     } elseif (Name=="gethdds") {
-        dsSendDirect(Name,dsGetEntity(),table(HDDS,HDD_MAX,FS_TYPES))
+        dsSendDirect(Name,dsGetEntity(),table(HDDS,FS_TYPES))
     } elseif (Name=="hddinfo") {
-        #stoptimer("postinit")
+        stoptimer("postinit")
         local Tbl = dsGetTable()
-        HDDS = Tbl[1,table]
-        HDD_MAX = Tbl[2,number]
-        FS_TYPES = Tbl[3,table]
+        local HDDT = Tbl[1,table]
+        local Entries = HDDT:keys()
+        for(K=1,HDDT:count()) {
+            local ID = Entries[K,number]
+            local Entry = HDDT[ID,table]
+            HDDS:pushTable(Entry)
+            HDD_C++
+        }
+        #HDD_MAX += Tbl[2,number]
+        local FST = Tbl[3,table]
+        local Entries = FST:keys()
+        for(K=1,FST:count()) {
+            local ID = Entries[K,number]
+            local Entry = FST[ID,string]
+            FS_TYPES[ID,string] = Entry
+        }
         #ready()
-        init_send("cpu")
-        POST++
-        timer("postinit",100)
+        local HDD_IOS = BiosData[3,number]+1
+        Devices["hdd_io",table][HDD_IOS,table][5,table] = HDDT
+        BiosData[3,number] = HDD_IOS
+        if (HDD_IOS==HDD_IO_C) {
+            init_send("cpu")
+            POST++
+            timer("postinit",100)
+        } else {
+            init_send("hdd")
+            timer("postinit",250)
+        }
     } elseif (Name=="reload") {
         if (!INIT) { exit() }
         local ID = dsGetString()
-        Reload = 1
-        init_send(ID)
-        Reload = 0
-        if (DEBUG) {
-            Reboot = 1
-            shutdown()
-        }
+        reload(ID)
     } elseif (Name=="SHUTDOWN") {
-        local End = dsGetNumber()
+        if (!INIT) { exit() }
+        #[local End = dsGetNumber()
         if (End>0) {
             local Shutdown = End+1
             shutdownpost(Name,Shutdown) 
-        } else {
+        } else {]#
             if (Shutdown) { exit() }
             shutdown()
-        }
+        #}
     } elseif (Name=="REBOOT") {
         if (Reboot) { exit() }
         Reboot = 1
         shutdown()
     } elseif (Name=="SAVE") {
         if (Shutdown) { exit() }
-        BOOT_HDD = dsGetNumber()
-        ROM[0] = BOOT_HDD-1
+        setboot(dsGetTable())
         Reboot = 1
         shutdown()
     } elseif (Name=="err") {
@@ -317,8 +747,122 @@ if (dsClk()) {
         INIT = 2
         err()
     } elseif (Name=="setboothdd") {
-        BOOT_HDD = dsGetNumber()
-        ROM[0] = BOOT_HDD-1
+        setboot(dsGetTable())
+    } elseif (Name=="keyboard") {
+        local Info = dsGetTable()
+        if (Info[1,string]=="Kick") {
+            dsSendDirect("Kick",Devices["keyboard",entity],1)
+            exit()
+        } elseif (Info[1,string]=="User") {
+            Devices["keyboard",table][2,entity] = Info[2,entity]
+        }
+        dsSendDirect("keyboard",Devices["cpu",entity],Info)
+    } elseif (Name=="nwdata") {
+        local Info = dsGetTable()
+        dsSendDirect("nwdata",Devices[Info[4,string],entity],Info)
+    #[} elseif (Name=="nwsend") {
+        local Info = dsGetTable()
+        local NWInfo = Devices["nw_connects",table][Info[1,number],table]
+        Info[1,number] = NWInfo[2,number] # global nwid to local
+        dsSendDirect("nwsend",NWInfo[3,entity],Info)]#
+    } elseif (Name=="usb_onplug") {
+        local Info = dsGetTable()
+        if (!Info[1,entity]:isValid()) { exit() }
+        local USB_Device = Info[4,table]
+        local Plug = Info[3,number]
+        local DInfo = getdevice(Info[1,entity])
+        if (!DInfo:count()) { exit() }
+        if (USB_Device[1,string]=="hdd") {
+            if (Plug) {
+                local Name = DInfo[1,string]
+                local Sock = DInfo[2,number]
+                local K = Info[2,string]
+                HDD_IO_C++
+                #Devices["names",table]["hdd_io"+HDD_IO_C,string] = USB_Device[4,string]
+                Devices["hdd_io",table][HDD_IO_C,table] = table(USB_Device[3,wirelink],USB_Device[3,wirelink]:entity():id(),USB_Device[4,string],USB_Device[5,table][1,number],USB_Device[5,table][2,table],Name,Sock,K,USB_Device[6,number])
+                dsSendDirect("usbpost",USB_Device[3,wirelink]:entity(),BIOS)
+            } else {
+                for(I=1,HDD_IO_C) {
+                    local Entry = Devices["hdd_io",table][I,table]
+                    if (Entry[9,number]==USB_Device[6,number]) {
+                        Devices["hdd_io",table]:remove(I)
+                        HDD_IO_C--
+                        local ID = hdd_onplug(Entry[5,table][1,table],0)
+                        dsSendDirect("sata_onplug",Devices["cpu",entity],table(Info[1,entity],1,0,Entry[5,table][1,table],ID))
+                        break
+                    }
+                }
+            }
+        } elseif (USB_Device[1,string]=="spu") {
+            if (Plug) {
+                if (Devices["spu",entity]==noentity()) {
+                    Devices["spu",entity] = USB_Device[3,wirelink]:entity()
+                    Devices["names",table]["spu",string] = USB_Device[4,string]
+                    Devices["ids",table]["spu",number] = Devices["spu",entity]:id()
+                }
+            } else {
+                if (Devices["ids",table]["spu",number]==USB_Device[7,number]) {
+                    Devices["spu",entity] = noentity()
+                    Devices["names",table]:unset("spu")
+                    Devices["ids",table]:unset("spu")
+                }
+            }
+        } elseif (USB_Device[1,string]=="keyboard") {
+            if (Plug) {
+                if (Devices["keyboard",table][1,entity]==noentity()) {
+                    Devices["keyboard",table][1,entity] = USB_Device[3,wirelink]:entity()
+                    Devices["keyboard",table][2,entity] = USB_Device[5,table][1,entity]
+                    Devices["names",table]["keyboard",string] = USB_Device[4,string]
+                    Devices["ids",table]["keyboard",number] = USB_Device[3,wirelink]:entity():id()
+                }
+            } else {
+                if (Devices["ids",table]["keyboard",number]==USB_Device[7,number]) {
+                    Devices["keyboard",table][1,entity] = noentity()
+                    Devices["keyboard",table][2,entity] = noentity()
+                    Devices["names",table]:unset("keyboard")
+                    Devices["ids",table]:unset("keyboard")
+                }
+            }
+        } elseif (USB_Device[1,string]=="network") {
+            if (Plug) {
+                local NWDevices = USB_Device[5,table]
+                local NWEnt = USB_Device[3,wirelink]:entity()
+                Devices["network",table]:pushTable(table(NWEnt,NWEnt:id(),USB_Device[4,string],NWDevices))
+                for(I=1,NWDevices:count()) {
+                    Devices["nw_connects",table][NWDevices[I,array][1,number],table] = table(NWDevices[I,array],I,NWEnt,NWEnt:id(),USB_Device[4,string])
+                }
+            } else {
+                local NW = findnw(USB_Device[7,number])
+                if (NW) {
+                    local NwDevice = Devices["network",table][NW,table]
+                    for(I=1,NwDevice[4,table]:count()) {
+                        Devices["nw_connects",table]:unset(NwDevice[4,table][I,array][1,number])
+                    }
+                    Devices["network",table]:removeTable(NW)
+                    dsSendDirect("network_unplug",Devices["cpu",entity],NwDevice)
+                }
+            }
+        }
+    } elseif (Name=="sata_onplug") {
+        local Info = dsGetTable()
+        if (!Info[1,entity]:isValid()) { exit() }
+        local ID = hdd_onplug(Info[4,table],Info[3,number])
+        Info[5,number] = ID
+        dsSendDirect(Name,Devices["cpu",entity],Info)
+    } elseif (Name=="cd_newdisc") {
+        local Info = dsGetTable()
+        if (Info[1,entity]) {
+            local ID = findhddid(Info[1,entity])
+            if (ID) {
+                Info[4,table] = HDDS[ID,table]
+                Info[5,number] = ID
+                dsSendDirect(Name,Devices["cpu",entity],Info)
+            }
+        }
+    } elseif (Name=="BSOD") {
+        ERR = 1
+        BSOD = dsGetArray()
+        shutdown()
     }
     exit()
 }
@@ -327,6 +871,24 @@ if (clk("init")) {
     Reboot = 0 
     SndBl = 1
     init() 
+    exit()
+}
+
+if (clk("preinit")) {
+    local Sock = BiosData[1,number]
+    local Name = BiosData[2,string]
+    if (Name=="cpu_socket") {
+        ERR_N = 1
+        timer("err",2500)
+    } elseif (Name=="key_socket") {
+        BiosData[2,string] = "pcie"
+        timer("preinit",250)
+        init_send("pcie")
+    } else {
+        BiosData[1,number] = Sock+1
+        timer("preinit",250)
+        init_send(Name)
+    }
     exit()
 }
 
@@ -351,6 +913,16 @@ if (clk("err")) {
     err()
 }
 
+if (clk("init_send")) {
+    local ID = BiosData["init_send",string]
+    BiosData:unset("init_send")
+    init_send(ID) 
+}
+
+if (clk("shutdownDevices")) {
+    shutdownDevices()    
+}
+
 if (clk("shutdownpost")) {
     local End = ShutStep+1
     shutdownpost("SHUTDOWN",End) 
@@ -358,25 +930,34 @@ if (clk("shutdownpost")) {
 
 if (clk("block")) {
     Block = 0   
+    #BIOS_ID = 0
+}
+
+if (clk("reload")) {
+    reload(BiosData["reload",string])
 }
 
 if (clk("snd")) {
+    #ifdef soundStop(number)
     soundStop(99)
     soundPlay(99,0,"ambient/machines/air_conditioner_loop_1.wav")   
     soundPitch(99,150)
     soundVolume(99,0.5)
+    #endif
     SndBl = 0
 }
 
 if (inputClk()) {
     
-    if (changed(Power)&Power) {
+    local Name = inputClkName()
+    
+    if (~Power&Power) {
         if (Reboot|Shutdown) { exit() }
         init()
         exit()
     }
     
-    if (changed(Reset)&Reset) {
+    if (~Reset&Reset) {
         if (INIT!=0) { Reboot = 1 }
         Shutdown = 0
         HardReset = 1
@@ -384,9 +965,87 @@ if (inputClk()) {
         exit()
     }
     
-    local Name = inputClkName()
-    if (Name=="KeyboardUser") {
-        dsSendDirect("keyboard",E2_CPU,KeyboardUser)
+    if (!INIT | ERR) { exit() } 
+    
+    if (~CPU_SOCKET & !ERR) {
+        ERR_N = 1
+        err()
+        exit()
+    }
+    
+    if (Name:find("_SOCKET") & !ERR) {
+        local Type = Name:left(4)
+        local ID = Name:right(1):toNumber()
+        local Device = Devices[(Type=="PCIE" ? "pcie" : "pci")+"_bus",table][ID,array]
+        if (!Device:count()) { exit() } # no plug and play here
+        if (Device[1,string]=="gpu" & Device[4,number]==Devices["ids",table]["gpu",number]) {
+            ERR_N = 3
+            err()
+            shutdownDevices()
+            exit()
+        } elseif(Device[1,string]=="spu" & Device[4,number]==Devices["ids",table]["spu",number]) {
+            Devices["spu",entity] = noentity()
+            Devices["ids",table]:unset("spu")
+            Devices["names",table]:unset("spu")
+        } elseif(Device[1,string]=="hdd") {
+            local HDD_IO = findhddio(Device[4,number])
+            if (HDD_IO) {
+                dsSendDirect("hddio_unplug",Devices["cpu",entity],Devices["hdd_io",table][HDD_IO,table])
+            }
+            Devices["hdd_io",table]:removeTable(HDD_IO)
+            HDD_IO_C--
+        } elseif(Device[1,string]=="usb") {
+            local USB = findusb(Device[4,number])
+            if (USB) {
+                local UsbDevices = Devices["usb",table][USB,table]
+                foreach(K,V:table=UsbDevices[4,table]) {
+                    if (V[1,string]=="hdd") {
+                        local HDD_IO = findhddio(V[7,number])
+                        if (HDD_IO) {
+                            dsSendDirect("hddio_unplug",Devices["cpu",entity],Devices["hdd_io",table][HDD_IO,table])
+                        }
+                        Devices["hdd_io",table]:removeTable(HDD_IO)
+                        HDD_IO_C--
+                    } elseif (V[1,string]=="spu") {
+                        if (V[7,number]==Devices["ids",table]["spu",number]) {
+                            Devices["spu",entity] = noentity()
+                            Devices["ids",table]:unset("spu")
+                            Devices["names",table]:unset("spu")
+                        }
+                    } elseif (V[1,string]=="keyboard") {
+                        if (V[7,number]==Devices["ids",table]["keyboard",number]) {
+                            Devices["keyboard",table] = table(noentity(),noentity())
+                            Devices["ids",table]:unset("keyboard")
+                            Devices["names",table]:unset("keyboard")
+                        }
+                    }
+                }
+                Devices["usb",table]:removeTable(USB)
+                dsSendDirect("usbcont_unplug",Devices["cpu",entity],UsbDevices)
+            }
+        } elseif (Device[1,string]=="network") {
+            local NW = findnw(Device[4,number])
+            if (NW) {
+                local NwDevice = Devices["network",table][NW,table]
+                for(I=1,NwDevice[4,table]:count()) {
+                    Devices["nw_connects",table]:unset(NwDevice[4,table][I,array][1,number])
+                }
+                Devices["network",table]:removeTable(NW)
+                dsSendDirect("network_unplug",Devices["cpu",entity],NwDevice)
+            }
+        }
+        Devices[(Type=="PCIE" ? "pcie" : "pci")+"_bus",table]:unset(ID)
+        dsSendDirect("SHUTDOWN",Device[3,entity],array(0))
+    }
+    
+    if (~KeyboardSocket) {
+        local Ent = Devices["keyboard",table][1,entity]
+        if (!Ent | Ent==noentity() | !KeyboardSocket) {
+            local KEnt = getentity(KeyboardSocket)
+            Devices["ids",table]["keyboard",number] = KEnt:id()
+            Devices["keyboard",table] = table(KEnt,noentity())
+            dsSendDirect("key_socket",Devices["keyboard",table][1,entity],2)
+        }
     }
     
     exit()

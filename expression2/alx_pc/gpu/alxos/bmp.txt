@@ -13,13 +13,11 @@
     - Very slow... :(
 ]#
 
-if (INCLUDE) {
-
 #include "alx_pc/gpu/alxos/_main_"
 
 function alxos_bmp_init(Args:table) {
-    if (!->DS) {
-        "alxos_explorer_error"("Digital screen not connected! Rendering canceled.")
+    if (!DS:entity():isValid()) {
+        "alxos_explorer_error"("Digital screen not connected! Rendering canceled.",420)
         return
     }
 
@@ -27,7 +25,8 @@ function alxos_bmp_init(Args:table) {
     local ExplorerFS = Args[2,table]
     DsHandler = "alxos_bmp_ds"
     #KeyHandler = "alxos_bmp_key"
-    dsSendDirect("fs_readfile",HDD_IO:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(ExplorerFS,FInfo,0,66)))
+    ExplorerCurTask = "bmp"
+    dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(ExplorerFS,FInfo,0,66)))
 
     local Parent = "alxos_explorer_dialog"("Opening file",400,80,"progress","alxos_bmp_clear")[number]
     
@@ -51,6 +50,11 @@ function alxos_bmp_draw(Data:string) {
     local Size = GpuData[5,number]
     local ExplorerFS = GpuData[1,table]
     local FInfo = GpuData[2,table]
+    if (!ExplorerFS["hddinfo",table]:count() | ExplorerFS["start_sector",number]==-1) {
+        #"alxos_bmp_finish"("The HDD was disconnected.")
+        #"alxos_explorer_handlers"()
+        exit()   
+    }
     if (Size==0) {
         #local Data = HTTPData:left(54)
         local Format = Data:sub(1,2)
@@ -185,9 +189,9 @@ function alxos_bmp_draw(Data:string) {
                 GpuData[29,number] = Offset
                 GpuData[8,number] = 14+HSize+1
                 GpuData[30,number] = 0
-                dsSendDirect("fs_readfile",HDD_IO:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(ExplorerFS,FInfo,14+HSize+1,Bytes)))
+                dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(ExplorerFS,FInfo,14+HSize+1,Bytes)))
             } else {
-                dsSendDirect("fs_readfile",HDD_IO:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(ExplorerFS,FInfo,Offset,Bytes)))
+                dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(ExplorerFS,FInfo,Offset,Bytes)))
             }
 
         } else {
@@ -267,7 +271,7 @@ function alxos_bmp_draw(Data:string) {
                 GpuData[24,number] = 2
                 GpuData[9,number] = 0
                 GpuData[8,number] = GpuData[29,number]
-                dsSendDirect("fs_readfile",HDD_IO:entity(),
+                dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),
                     table(entity(),ExplorerFS["fs_str_id",string],table(ExplorerFS,FInfo,GpuData[8,number],GpuData[10,number])
                 ))
             } else {
@@ -277,7 +281,7 @@ function alxos_bmp_draw(Data:string) {
                     local Next = I+Bytes
                     GpuData[8,number] = Next
                     GpuData[9,number] = 0
-                    dsSendDirect("fs_readfile",HDD_IO:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(ExplorerFS,FInfo,Next,Bytes)))
+                    dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(ExplorerFS,FInfo,Next,Bytes)))
                 } else {
                     GpuData[9,number] = SI
                     GpuData[11,string] = Data
@@ -415,7 +419,7 @@ function alxos_bmp_draw(Data:string) {
             GpuData[9,number] = 0
 
             #print(I+" "+Next+" | "+Bytes)
-            dsSendDirect("fs_readfile",HDD_IO:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(ExplorerFS,FInfo,Next,Bytes)))
+            dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(ExplorerFS,FInfo,Next,Bytes)))
         }
 
     }
@@ -431,9 +435,21 @@ function number alxos_bmp_clear() {
         runCmd("alxos_bmp_clear",1)
         return 0
     }
-    stoptimer("cmd")
     "alxos_explorer_handlers"()
     "alxos_explorer_listcurdir"()
+    return 0
+}
+
+function number alxos_bmp_finish(Err:string) {
+    local Parent = "alxos_explorer_dialog"("BMP Reader"+(Err!="" ? " Error" : ""),440,60,"ok","alxos_bmp_clear")[number]
+
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,(Err!="" ? Err : "Opening BMP file success finished."),vec2(0,-12))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+
+    "alxos_explorer_handlers"()
     return 0
 }
 
@@ -442,17 +458,7 @@ function number alxos_bmp_finish() {
         runCmd("alxos_bmp_finish",1)
         return 0
     }
-
-    local Parent = "alxos_explorer_dialog"("BMP Reader",440,60,"ok","alxos_bmp_clear")[number]
-
-    DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Opening BMP file success finished.",vec2(0,-12))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpAlign(LAST_I,1)
-    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
-
-    "alxos_explorer_handlers"()
-    return 0
+    return alxos_bmp_finish("")
 }
 
 function alxos_bmp_ds(Name:string) {
@@ -470,8 +476,7 @@ function alxos_bmp_ds(Name:string) {
 function alxos_bmp_key(Key:string,Pressed) {
     if (!Pressed) { return }
     if (Key=="f8") {
-        dsSendDirect("clear",HDD_IO:entity(),entity())
+        stoptimer("cmd")
+        dsSendDirect("clear",GpuData[1,table]["hdd_io",wirelink]:entity(),entity())
     }
-}
-
 }

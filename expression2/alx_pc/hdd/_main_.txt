@@ -1,8 +1,9 @@
 @name Main hdd func
-@inputs BIOS:entity HDD_0:wirelink HDD_1:wirelink HDD_2:wirelink HDD_3:wirelink
-@outputs HDD_IO:wirelink CurTask:table
-@persist HDDS:table HDD_MAX FS_Delay DsTbl:table DsFunc:table
-@persist FS_TYPES:table FS_TBL_SIZE HDD_MAX_ADDR
+@inputs Board:wirelink InA SATA_0 SATA_1 SATA_2 SATA_3
+@outputs CurTask:table EntID Ind Busy
+@persist HDDS:table FS_Delay DsTbl:table DsFunc:table HDD_MAX Reload
+@persist FS_TYPES:table FS_TBL_SIZE HDD_MAX_ADDR Init InitPost:table
+@persist BIOS:entity HDD_IO:entity USB_NAME:string USB_Device:entity Device_Name:string
 
 #[
 	ALX Wiremod E2 FS
@@ -16,10 +17,14 @@
 ]#
 
 if (first()|duped()) {
-    
+
 #include "alx_pc/shared/_main_"
+#include "alx_pc/shared/cmdqueue"
     
 function hddload(Num) {
+    if (!Num & CmdLastQueue>1) { return }
+    if (!Num) { Busy = 0 }
+    Ind = Num
     dsSendDirect("HDDInd",BIOS,Num) 
 }
     
@@ -143,6 +148,7 @@ function number addfs2tbl(HDD:table,FsTbl:table,N,A,T,Sz) {
     Tmp["total",number] = Ts
     Tmp["type",number] = T
     Tmp["end",number] = St+Sz 
+    Tmp["hddinfo",table] = HDD
     return St   
 }
 
@@ -164,8 +170,9 @@ function table readfstbl(HDD:table) {
             Tmp["type",number] = readCell(HDD,O+1) && 0xFF
             Tmp["type_str",string] = FS_TYPES[Tmp["type",number],string]:lower()
             Tmp["end",number] = Tmp["start",number]+Tmp["total",number]
+            Tmp["hddinfo",table] = HDD
             FsTbl[F,table] = Tmp
-        }   
+        }
         #FsTbl["hddinfo",table] = HDD
         return FsTbl
     } elseif (Type==1) {
@@ -174,6 +181,7 @@ function table readfstbl(HDD:table) {
         Tmp["type",number] = 3
         Tmp["type_str",string] = FS_TYPES[3,string]:lower()
         Tmp["active",number] = 1
+        Tmp["hddinfo",table] = HDD
         FsTbl[0,table] = Tmp        
         return FsTbl
     }

@@ -1,0 +1,188 @@
+@name Network Controller
+@inputs Board:wirelink InA NetSocket_0:wirelink NetSocketC_0 NetSocket_1:wirelink NetSocketC_1
+@outputs EntID NetSocketIndG_0 NetSocketIndY_0 NetSocketIndG_1 NetSocketIndY_1
+@persist BIOS:entity NW_MAX Init Devices:table Device_Name:string NWData:table USB_NAME:string USB_Device:entity
+
+#[
+    ALX Wiremod E2 PC
+    Created by AlexALX
+    -------------------
+    Network PCI controller
+]#
+
+if (first()|duped()) {
+    
+#include "alx_pc/shared/_main_"
+
+BIOS = getentity(InA)
+Board["A",number] = entity():id()
+if (!duped()) {
+    dsSendDirect("reload",BIOS,"network")
+}
+Init = 0
+
+NW_MAX = 2
+
+EntID = 0
+Device_Name = "Network Controller"
+
+function nwIndY(ID,Act) {
+    if (Act) {
+        if (!NWData["nwIndY_"+ID,number]) {
+            NWData["nwIndY_"+ID,number] = 1
+            timer("nwIndY_"+ID,100)
+        }
+    } else {
+        NWData:unset("nwIndY_"+ID)
+        stoptimer("nwIntY_"+ID)
+    }
+    ioSetOutput("NetSocketIndY_"+ID,Act)
+}
+
+function nwShutdown() {
+    Init = 0
+    Devices = table()
+    for (I=0,NW_MAX-1) {
+        ioSetOutput("NetSocketIndG_"+I,0)
+        local WL = ioGetInputWirelink("NetSocket_"+I)
+        WL["B",number] = 0
+        nwIndY(I,0)
+    }
+    EntID = 0
+    NWData = table()
+}
+
+function nwinit() {
+    for (I=1,NW_MAX) {
+        local ID = I-1
+        local Ent = entity(ioGetInputNumber("NetSocketC_"+ID))
+        local Act = Ent ? 1 : 0
+        local WL = ioGetInputWirelink("NetSocket_"+ID)
+        if (!WL["B",number]) { Act = 0 }
+        WL["B",number] = WL:entity():id()
+        Devices[I,array] = array(ioInputEntity("NetSocketC_"+ID):id(),Act)
+        ioSetOutput("NetSocketIndG_"+ID,Act)
+        nwIndY(ID,Act)
+    }
+    EntID = entity():id()
+    
+    if (USB_NAME!="") {
+        dsSendDirect("usbcontroller",USB_Device,table("network",wirelink(),Devices))
+    } else {
+        dsSendDirect("pci",BIOS,table("network",entity(),Devices,Device_Name))
+    }
+}
+
+function pci_init() {
+    if (BIOS!=dsGetEntity()) { return }
+    NWData = table() 
+    Devices = table()
+    Init = 1
+    nwinit()
+}
+
+function usb_init() {
+    NWData = table() 
+    Devices = table()
+    Init = 1
+    local Info = dsGetTable()
+    NW_MAX = 1
+    USB_NAME = Info[1,string]
+    USB_Device = Info[2,entity]
+    Device_Name = USB_NAME
+    nwinit()
+}
+
+function number nwinterface(ID) {
+    if (ID==0) { return 0 }
+    for (I=1,NW_MAX) {
+        if (Devices[I,array][1,number]==ID & entity(Devices[I,array][1,number])) {
+            return I
+        }
+    }
+    return 0
+}
+
+}
+
+if (dupefinished()) {
+    Board["A",number] = entity():id()
+    BIOS = getentity(InA)
+}
+
+if (~InA) {
+    local New_BIOS = getentity(InA)
+    if (BIOS!=New_BIOS & Init) {
+        nwShutdown()
+    }
+    BIOS = New_BIOS
+}
+
+if (inputClk()) {
+    if (!Init) { exit() }
+    local Name = inputClkName()
+    if (Name:find("NetSocket")) {
+        local ID = Name:right(1):toNumber()
+        local Ent = entity(ioGetInputNumber("NetSocketC_"+ID))
+        local Act = Ent ? 1 : 0
+        local WL = ioGetInputWirelink("NetSocket_"+ID)
+        if (!WL["B",number]) { Act = 0 }
+        WL["B",number] = WL:entity():id()
+        Devices[ID+1,array][1,number] = WL:entity():id()
+        Devices[ID+1,array][2,number] = Act
+        ioSetOutput("NetSocketIndG_"+ID,Act)
+        nwIndY(ID,Act)
+    }
+    exit()
+}
+
+if (clk(clkName())) {
+    if (!Init) { exit() }
+    local Name = clkName()
+    if (Name:find("nwIndY_")) {
+        local ID = Name:right(1):toNumber()
+        nwIndY(ID,0)
+    }
+    exit()
+}
+
+if (!BIOS:isValid()) { exit() }
+
+if (dsClk()) {
+    local Name = dsClkName()
+    
+    if (Name=="pci") {
+        pci_init()    
+    } elseif (Name=="usbcontroller") {
+        usb_init()
+    } elseif (Name=="SHUTDOWN") {
+        nwShutdown()
+    } 
+    
+    if (!Init) { exit() }
+    
+    if (Name=="nwsend") {
+        local Info = dsGetTable()
+        local ID = Info[1,number]
+        local Interface = nwinterface(ID)
+        if (Interface) {
+            if (Info[2,number]==0 | Info[2,number]<-1) { exit() } # drop packets to non-exists devices
+            local WL = ioGetInputWirelink("NetSocket_"+(Interface-1))
+            if (!WL:entity():id() | !WL["B",number]) { exit() }
+            Info[0,number] = WL["B",number]
+            #Info[1,number] = Devices[ID,array][1,number]
+            dsSendDirect("nwdata",entity(WL["C",number]),Info)
+            nwIndY(ID-1,1)
+        }
+    } elseif (Name=="nwdata") {
+        local Info = dsGetTable()
+        local Interface = nwinterface(Info[0,number])
+        if (Interface & (Info[2,number]==-1 | Info[2,number]==Info[0,number])) {
+            Info:unset(0)
+            dsSendDirect("nwdata",BIOS,Info)
+            nwIndY(Interface-1,1)
+        }
+    }
+    
+    exit()
+}

@@ -8,13 +8,11 @@
 	Custom gpu programs
 ]#
 
-if (INCLUDE) {
- 
 #include "alx_pc/gpu/alxos/_main_"
 
 function alxos_execute(Name:string) {
     if (ALXOS_PROGS:exists(Name)) {
-        Name()   
+        Name(table())   
     } else {
         "alxos_explorer_error"("Function "+Name+" is missing.")
     }
@@ -29,27 +27,37 @@ function alxos_execute(Name:string,Args:table) {
 }
 
 ALXOS_PROGS["alxos_explorer",number] = 1
-function alxos_explorer() {
-    INCLUDE = 1
+function alxos_explorer(Args:table) {
     #include "alx_pc/gpu/alxos/explorer"
-    INCLUDE = 0
-    alxos_explorer_init()
+    alxos_explorer_init(Args)
 }   
 
 ALXOS_PROGS["alxos_bmp_reader",number] = 1
 function alxos_bmp_reader(Args:table) {
-    INCLUDE = 1
     #include "alx_pc/gpu/alxos/bmp"
-    INCLUDE = 0
     alxos_bmp_init(Args)
-}   
+}
 
 ALXOS_PROGS["alxos_cd_burner",number] = 1
 function alxos_cd_burner(Args:table) {
-    INCLUDE = 1
     #include "alx_pc/gpu/alxos/cdburn"
-    INCLUDE = 0
     alxos_burner_init(Args)
 }
-    
+
+ALXOS_PROGS["alxos_console",number] = 1
+function alxos_console(Args:table) {
+    #include "alx_pc/gpu/alxos/cmd"
+    alxos_console_init(Args)
+}
+
+ALXOS_PROGS["alxos_partitions",number] = 1
+function alxos_partitions(Args:table) {
+    #include "alx_pc/gpu/alxos/installos"
+    alxos_partitions_init(Args)
+}
+
+ALXOS_PROGS["alxos_network_chat",number] = 1
+function alxos_network_chat(Args:table) {
+    #include "alx_pc/gpu/alxos/nwchat"
+    alxos_nwchat_init(Args)
 }

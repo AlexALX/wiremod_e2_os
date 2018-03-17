@@ -1,0 +1,153 @@
+@name USB Controller
+@inputs Board:wirelink InA USB_0 USB_1
+@outputs EntID
+@persist BIOS:entity USB_MAX Init Devices:table UsbData:table Device_Name:string
+
+#[
+    ALX Wiremod E2 PC
+    Created by AlexALX
+    -------------------
+    USB Controller
+    Handle USB Devices
+]#
+
+if (first()|duped()) {
+    
+#include "alx_pc/shared/_main_"
+
+setColor(172,172,255)
+
+BIOS = getentity(InA)
+Board["A",number] = entity():id()
+if (!duped()) {
+    dsSendDirect("reload",BIOS,"usbcont")
+}
+
+USB_MAX = 2
+Init = 0
+
+EntID = entity():id()
+Device_Name = "USB Controller"
+
+function usbShutdown() {
+    UsbData = table()
+    Init = 0
+    foreach(K,V:table = Devices) {
+        dsSendDirect("SHUTDOWN",V[2,entity],entity())
+    }
+    Devices = table()
+}
+
+function usbinit() {
+    local Cur = UsbData[1,number]
+    
+    if (Cur<USB_MAX) {
+        local Ent = entity(ioGetInputNumber("USB_"+Cur))
+        UsbData[1,number] = Cur+1
+        if (Ent) {
+            dsSendDirect("usbinit",Ent,BIOS:id())
+            timer("usbinit",100)
+        } else {
+            Devices["USB_"+Cur,table] = table()
+            usbinit()
+        }
+    } else {
+        dsSendDirect("pci",BIOS,table("usb",entity(),Devices,Device_Name))
+    }
+}
+
+function pci_init() {
+    UsbData = table()
+    Devices = table()
+    Init = 1
+    UsbData["postinit",table] = table()
+    usbinit()
+}
+
+}
+
+if (dupefinished()) {
+    Board["A",number] = entity():id()
+    BIOS = getentity(InA)
+}
+
+if (~InA) {
+    local New_BIOS = getentity(InA)
+    if (BIOS!=New_BIOS & Init) {
+        usbShutdown()
+    }
+    BIOS = New_BIOS
+}
+
+if (inputClk()) {
+    local Name = inputClkName()
+    if (Name:find("USB_")) {
+        #local ID = Name:right(1):toNumber()+1
+        #local Info = Devices[Name,table]
+        #dsSendDirect("unlink",Info["ent",entity],entity())
+        if (Init) {
+            local ID = Name:right(1):toNumber()
+            local Ent = entity(ioGetInputNumber(Name))
+            if (Ent) {
+                UsbData["postinit",table][Ent:id(),string] = Name
+                dsSendDirect("usbinit",Ent,BIOS:id())
+                timer("usbpost_"+Ent:id(),100)
+            } else {
+                local USB_Device = Devices[Name,table]:clone()
+                dsSendDirect("usb_onplug",BIOS,table(entity(),Name,0,USB_Device))
+                Devices[Name,table]:clear()
+            }
+        }
+    }
+    exit()
+}
+
+if (!BIOS:isValid()) { exit() }
+
+if (clk("usbinit")) {
+    local Cur = UsbData[1,number]
+    Devices["USB_"+(Cur-1),table] = table()
+    usbinit()
+    exit()   
+} elseif (clk(clkName())) {
+    local Name = clkName()
+    if (Name:find("usbpost_")) {
+        local ID = Name:right(Name:length()-Name:find("_"))
+        local Post = UsbData["postinit",table][ID,string]
+        if (Post!="") {
+            local USB_Device = Devices[Post,table]:clone()
+            dsSendDirect("usb_onplug",BIOS,table(entity(),Post,0,USB_Device))
+            Devices[Post,table]:clear()
+        }
+    }
+    exit()
+}
+
+if (dsClk()) {
+    local Name = dsClkName()
+    
+    if (Name=="pci") {
+        pci_init()    
+    } elseif (Name=="usbdevice") {
+        local Data = dsGetTable()
+        if (!Data[2,entity]:isValid()) { exit() }
+        local Post = UsbData["postinit",table][Data[2,entity]:id(),string]
+        if (Post!="") {
+            stoptimer("usbpost_"+Data[2,entity]:id())
+            Devices[Post,table] = Data
+            UsbData["postinit",table]:unset(Data[2,entity]:id())
+            dsSendDirect("usb_onplug",BIOS,table(entity(),Post,1,Data))
+        } else {
+            stoptimer("usbinit")
+            local Cur = UsbData[1,number]
+            Devices["USB_"+(Cur-1),table] = Data   
+            usbinit()
+        }      
+    } elseif (Name=="SHUTDOWN") {
+        usbShutdown()
+    } #[ elseif (Name=="init") {
+        dsSendDirect("usbinit",BIOS,table(entity(),Devices))
+    }]#
+    
+    exit()
+}

@@ -5,9 +5,6 @@
 	Created by AlexALX
 ]#
 
-if (INCLUDE) {
-
-#include "alx_pc/cpu/alxos/_main_"
 #include "alx_pc/cpu/alxos/_prog_"
 
 function alxos_init() {
@@ -19,10 +16,10 @@ function alxos_init() {
     dsSendDirect("alxos_msg",E2_GPU,"Initialization...")
     "alxos_readhdds"()
 }
-
+#[
 function alxos_volumes_send(Args:table) {
     dsSendDirect("fs_readfs",HDD_IO:entity(),Args)        
-}
+}]#
 
 function alxos_volumes() {
     local IsProcess = CpuData[1,number]
@@ -31,26 +28,29 @@ function alxos_volumes() {
         local CurFs = CpuData[3,number]
         local CurFS = ValidFs[CurFs+1,table] 
         local Letter = CpuData[4,number]
-        
+        local Ds = CpuData[5,number]
+
         if (CurFs>0) {
-            local ReadFs = dsGetTable()
-            if (
-                ReadFs["volume_serial",number]==SysFs["volume_serial",number] 
-                & ReadFs["hddinfo",table]["ent",entity]==SysFs["hddinfo",table]["ent",entity]
-            ) {
-                Letter = 67
-            } else {
-                CpuData[4,number] = Letter+1
-            }
-            ReadFs["letter",string] = toChar(Letter)
-            AllFs[toChar(Letter),table] = ReadFs
-            if (ReadFs["err_msg",string]=="") {
-                dsSendDirect("alxos_msgup",E2_GPU,array("[OK]"))
-                dsSendDirect("alxos_msg",E2_GPU,array("[OK]",toChar(Letter)+": ["+ReadFs["volume_name",string]+"]"))
-            } else {
-                dsSendDirect("alxos_msgup",E2_GPU,array("[ERR]"))
-                dsSendDirect("alxos_msg",E2_GPU,ReadFs["err_msg",string])
-                dsSendDirect("alxos_msg",E2_GPU,toChar(Letter)+": ["+ReadFs["volume_name",string]+"]")
+            local ReadFs = (Ds ? dsGetTable() : table())
+            if (ReadFs:count()) { 
+                if (
+                    ReadFs["volume_serial",number]==SysFs["volume_serial",number] 
+                    & ReadFs["hddinfo",table]["ent",entity]==SysFs["hddinfo",table]["ent",entity]
+                ) {
+                    Letter = 67
+                } else {
+                    CpuData[4,number] = Letter+1
+                }
+                ReadFs["letter",string] = toChar(Letter)
+                AllFs[toChar(Letter),table] = ReadFs
+                if (ReadFs["err_msg",string]=="") {
+                    dsSendDirect("alxos_msgup",E2_GPU,array("[OK]"))
+                    dsSendDirect("alxos_msg",E2_GPU,array("[OK]",toChar(Letter)+": ["+ReadFs["volume_name",string]+"]"))
+                } else {
+                    dsSendDirect("alxos_msgup",E2_GPU,array("[ERR]"))
+                    dsSendDirect("alxos_msg",E2_GPU,ReadFs["err_msg",string])
+                    dsSendDirect("alxos_msg",E2_GPU,toChar(Letter)+": ["+ReadFs["volume_name",string]+"]")
+                }
             }
         } else {
             dsSendDirect("alxos_msgup",E2_GPU,array("[OK]"))
@@ -62,19 +62,45 @@ function alxos_volumes() {
                 dsSendDirect("alxos_msg",E2_GPU,CurFS["hdd",table]["name",string]+" - Initializating disc...")
             }
             #runCmd("alxos_volumes_send",1,table(entity(),"wm1",table(CurFS["hdd",table],CurFS)))
-            dsSendDirect("fs_readfs",HDD_IO:entity(),table(entity(),CurFS["type_str",string],table(CurFS["hdd",table],CurFS)))       
+            if (!CurFS["hdd_io",wirelink]) {
+                CpuData[5,number] = 0
+                alxos_volumes()
+            } else {
+                CpuData[5,number] = 1
+                dsSendDirect("fs_readfs",CurFS["hdd_io",wirelink]:entity(),table(entity(),CurFS["type_str",string],table(CurFS["hdd",table],CurFS)))
+            }
         } else {
-            for(I=1,HDD_MAX) {
+            for(I=1,HDDS:count()) {
                 local HDD = HDDS[I,table]
                 if (HDD["type",number]==1) {
                     dsSendDirect("stopdiskrot",HDD["ent",entity],1)
                 }
             }
-            dsSendDirect("alxos_msg",E2_GPU,"Loading shell...")
-            dsSendDirect("fs_listdir",HDD_IO:entity(),table(entity(),SysFs["fs_str_id",string],table(SysFs,SysDir["cluster",number],SysDir["data_sector",number])))
+            
+            local DELAY = 0
+                        
+            #ifndef soundPlay(number,number,string)
+            dsSendDirect("alxos_msg",E2_GPU,"E2 Sound Extension is not enabled! Sounds are disabled.")
+            dsSendDirect("alxos_msgup",E2_GPU,array("[WARN]"))
+            DELAY = 1
+            #endif
+            
+            #ifndef runOnHTTP(number)
+            dsSendDirect("alxos_msg",E2_GPU,"E2 HTTP Extension is not enabled!"+NL+"Http operations are disabled.")
+            dsSendDirect("alxos_msgup",E2_GPU,array("[WARN]"))
+            DELAY = 1
+            #endif
+            
+            if (DELAY==1 & !DEBUG) {
+                runCmd("alxos_delayload",2000)
+            } else {
+                dsSendDirect("alxos_msg",E2_GPU,"Loading shell...")
+                dsSendDirect("fs_listdir",SysFs["hdd_io",wirelink]:entity(),table(entity(),SysFs["fs_str_id",string],table(SysFs,SysDir["cluster",number],SysDir["data_sector",number])))
+            }
         }
     } else {
         local ValidFs = table()
+        
         for (I=1,FsTbls:count()) {
             local C = FsTbls[I,table]:count()
             if (!C) { continue }
@@ -82,21 +108,32 @@ function alxos_volumes() {
                 local FS = FsTbls[I,table][F,table]
                 if (FS["type",number]==2 | FS["type",number]==3) {
                     FS["hdd",table] = HDDS[I,table]
+                    FS["hdd_io",wirelink] = HDDS[I,table]["hdd_io",wirelink]
                     ValidFs:pushTable(FS)
-                }   
+                }
             }
         }
+        
+        FsTbls = table()
         cpuClear()
         CpuData[1,number] = 1
         CpuData[2,table] = ValidFs
+        CpuData[3,number] = 0
         CpuData[4,number] = 68 # D
+        CpuData[5,number] = 0
         dsSendDirect("alxos_msg",E2_GPU,"Initializating HDD Volumes...")
         alxos_volumes()
     }
 }
 
+function alxos_delayload() {
+    dsSendDirect("alxos_msg",E2_GPU,"Loading shell...")
+    dsSendDirect("fs_listdir",SysFs["hdd_io",wirelink]:entity(),table(entity(),SysFs["fs_str_id",string],table(SysFs,SysDir["cluster",number],SysDir["data_sector",number])))
+}
+
 function alxos_loadshell() {
     local Load = CpuData[1,number]
+    cpuClear()
     if (!Load) {
         local ListDir = dsGetTable()
         for(I=0,ListDir:count()-1) {
@@ -104,7 +141,7 @@ function alxos_loadshell() {
             local FullName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
             if (FullName=="explorer.e2e") {
                 CpuData[1,number] = 1
-                dsSendDirect("fs_readfile",HDD_IO:entity(),table(entity(),SysFs["fs_str_id",string],table(SysFs,Entry)))
+                dsSendDirect("fs_readfile",SysFs["hdd_io",wirelink]:entity(),table(entity(),SysFs["fs_str_id",string],table(SysFs,Entry)))
                 return   
             }
         }
@@ -118,7 +155,7 @@ function alxos_loadshell() {
             dsSendDirect("alxos_msgup",E2_GPU,array("[ERR]"))
             dsSendDirect("alxos_fail",E2_GPU,"Function "+Data+" is missing. Press F1 to reboot.")
         }
-    }       
+    }
 }
 
 function number alxos_loadshell_post(Args:table) {
@@ -131,8 +168,9 @@ function alxos_readhdds() {
     local CurHDD = CpuData[1,number]
     local Data = CpuData[2,number]
     if (Data) {
-        FsTbls[CurHDD,table] = dsGetTable()
-        if (HDD_MAX>CurHDD) {
+        local Ds = CpuData[3,number]
+        FsTbls[CurHDD,table] = (Ds ? dsGetTable() : table())
+        if (HDDS:count()>CurHDD) {
             local HDD = HDDS[CurHDD+1,table]
             CpuData[1,number] = CurHDD+1
             local PrevHDD = HDDS[CurHDD,table]
@@ -142,7 +180,13 @@ function alxos_readhdds() {
                 dsSendDirect("alxos_msgup",E2_GPU,array("[OK]","- None"))
             } 
             dsSendDirect("alxos_msg",E2_GPU,"Check HDD"+CurHDD+" ")
-            dsSendDirect("readfstbl",HDD_IO:entity(),table(entity(),HDD))  
+            if (!HDD["hdd_io",wirelink]) {
+                CpuData[3,number] = 0
+                alxos_readhdds()
+            } else {
+                CpuData[3,number] = 1
+                dsSendDirect("readfstbl",HDD["hdd_io",wirelink]:entity(),table(entity(),HDD))  
+            }
         } else {
             local HDD = HDDS[CurHDD,table]
             if (HDD:count()) {
@@ -159,35 +203,226 @@ function alxos_readhdds() {
         CpuData[2,number] = 1
         dsSendDirect("alxos_msgup",E2_GPU,array("[OK]"))
         dsSendDirect("alxos_msg",E2_GPU,"Check HDD"+CurHDD+" ")
-        dsSendDirect("readfstbl",HDD_IO:entity(),table(entity(),HDD))    
+        if (!HDD["hdd_io",wirelink]) {
+            CpuData[3,number] = 0
+            alxos_readhdds()
+        } else {
+            CpuData[3,number] = 1
+            dsSendDirect("readfstbl",HDD["hdd_io",wirelink]:entity(),table(entity(),HDD))    
+        }
     }
 }
 
+function number alxos_findfreeletter(Char) {
+    local Sym = toChar(Char)
+    local I = Char
+    while(AllFs[toChar(I),table]:count()) {
+        I++    
+    }
+    return I
+}
+
+function alxos_readnextvol(EntID,CurFs,CurFS:table,CpuData:table,FsTbl:table,Info:table) {
+    if (CurFs>CpuData[7,number]) {
+        if (CurFS["hddinfo",table]["type",number]==1) {
+            dsSendDirect("stopdiskrot",CurFS["hddinfo",table]["ent",entity],1)
+        }
+
+        cpuClear()
+        Info[6,array] = CpuData[8,array]
+        dsSendDirect("sata_onplug",E2_GPU,Info)
+        removeTimers("voltimeout_"+EntID)
+    } else {
+        local CurFS = FsTbl[CurFs,table]
+        dsSendDirect("fs_readfs",CurFS["hddinfo",table]["hdd_io",wirelink]:entity(),table(entity(),CurFS["type_str",string],table(CurFS["hddinfo",table],CurFS)))
+        timer("voltimeout_"+EntID,50)
+    }
+}
+
+function alxos_readhddvol(Name:string) {
+    local DsInfo = dsGetTable()
+    local EntID = 0
+    if (Name=="readfstbl") {
+        EntID = DsInfo[0,table]["hddinfo",table]["entid",number]
+    } else {
+        EntID = DsInfo["hddinfo",table]["entid",number]
+    }
+    local CpuData = CpuData[EntID,table]
+    if (!CpuData:count()) { return }
+    local Info = CpuData[1,table]
+    if (Name=="fs_emptyfs") {
+        tbl_merge(AllFs[CpuData[1,string],table],DsInfo)
+        AllFs[CpuData[1,string],table] = DsInfo
+        dsSendDirect("cd_newdisc",E2_GPU,CpuData[2,table])
+        return
+    }    
+    local Step = CpuData[2,number]
+    local CurHDD = Info[5,number]
+    if (!Step) {
+        local FsTbl = DsInfo
+        CpuData[2,number] = 1
+        CpuData[3,number] = 1
+        CpuData[4,number] = 68 # D
+        CpuData[5,number] = 0
+        
+        local ValidFs = table()
+        
+        for (I=0,FsTbl:count()-1) {
+            local FS = FsTbl[I,table]
+            if (FS["type",number]==2 | FS["type",number]==3) {
+                ValidFs:pushTable(FS)
+            }
+        }
+        
+        registerTimers("voltimeout_"+EntID,"alxos_updvol_timeout")
+        
+        CpuData[6,table] = ValidFs
+        CpuData[7,number] = ValidFs:count()
+        CpuData[8,array] = array()
+        if (CpuData[7,number]) {
+            local CurFS = CpuData[6,table][1,table]
+            dsSendDirect("fs_readfs",CurFS["hddinfo",table]["hdd_io",wirelink]:entity(),table(entity(),CurFS["type_str",string],table(CurFS["hddinfo",table],CurFS)))
+            timer("updvol_timeout"+EntID,50)
+        } else {
+            dsSendDirect("voltimeout_",E2_GPU,Info)
+        }
+    } else {
+        local CurFs = CpuData[3,number]
+        local FsTbl = CpuData[6,table]
+        local CurFS = FsTbl[CurFs,table]
+        local ReadFs = DsInfo
+        
+        if (ReadFs:count()) {
+            local Letter = alxos_findfreeletter(CpuData[4,number])
+            ReadFs["letter",string] = toChar(Letter)
+            AllFs[toChar(Letter),table] = ReadFs
+            CpuData[4,number] = Letter+1
+            CpuData[8,array]:pushString(toChar(Letter))
+        }
+        
+        CurFs++
+        CpuData[3,number] = CurFs
+        
+        alxos_readnextvol(EntID,CurFs,CurFS,CpuData,FsTbl,Info)
+    }
+}
+
+function alxos_updvol_timeout() {
+    local Name = clkName()
+    local EntID = Name:right(Name:length()-Name:find("_")):toNumber()
+    
+    local CpuData = CpuData[EntID,table]
+    if (!CpuData:count()) { return }
+    local Info = CpuData[1,table]
+    
+    local CurFs = CpuData[3,number]+1
+    CpuData[3,number] = CurFs
+    
+    local FsTbl = CpuData[6,table]
+    local CurFS = FsTbl[CurFs,table]
+    
+    alxos_readnextvol(EntID,CurFs,CurFS,CpuData,FsTbl,Info)
+}
+
 function alxos_execute(Name:string) {
-    if (ALXOS_PROGS:exists(Name)) {
-        Name(table())   
+    if (ALXOS_PROGS[Name,number]==1) {
+        Name(table())  
     } else {
         dsSendDirect("alxos_fail",E2_GPU,"Function "+Name+" is missing. Press F1 to reboot.")
     }
 }
 
 function alxos_ds(Name:string) {
-    if (ALXOS_DsH!="") {
-        ALXOS_DsH(Name)
-    } elseif (Name=="readfstbl") {
-        alxos_readhdds()  
+    if (Name=="readfstbl") {
+        if (ALXOS_DsH!="") {
+            ALXOS_DsH(Name)    
+        } else {
+            alxos_readhdds()
+        }
     } elseif (Name=="fs_readfs") {
-        alxos_volumes()
+        if (ALXOS_DsH!="") {
+            ALXOS_DsH(Name)    
+        } else {
+            alxos_volumes()
+        }
     } elseif (Name=="fs_listdir") {
         cpuClear()
         alxos_loadshell()
     } elseif (Name=="fs_readfile") {
-        alxos_loadshell()
+        if (ALXOS_DsH!="") {
+            ALXOS_DsH(Name)    
+        } else {
+            alxos_loadshell()
+        }
+    } elseif (Name=="fs_emptyfs") {
+        if (ALXOS_DsH!="") {
+            ALXOS_DsH(Name)    
+        }
     } elseif (Name=="alxos_openfile") {
         alxos_openfile_ds()
     } elseif (Name=="alxos_execute") {
         alxos_execude_ds()
+    } elseif (Name=="sata_onplug") {
+        local Info = dsGetTable()
+        if (!SysFs["hddinfo",table]["entid",number]) {
+            stopAllTimers()
+            alxos_clear()
+            cpuClear()
+            dsSendDirect("BSOD",BIOS,array(1))
+        } else {
+            local THDD = Info[4,table]
+            #printTable(Info)
+            if (Info[3,number]) {
+                CpuData[THDD["entid",number],table] = table(Info,0)
+                ALXOS_DsH = "alxos_readhddvol"
+                dsSendDirect("readfstbl",THDD["hdd_io",wirelink]:entity(),table(entity(),THDD))
+            } else {
+                local Arr = array()
+                foreach(K,V:table=AllFs) {
+                    if (!V["hddinfo",table]["entid",number]) {
+                        AllFs:unset(K)
+                        Arr:pushString(K)
+                    }
+                }
+                Info[6,array] = Arr
+                dsSendDirect(Name,E2_GPU,Info)
+            }        
+        }
+    } elseif (Name=="hddio_unplug") {
+        local HDD_IO = dsGetTable()
+        if (!SysFs["hddinfo",table]["entid",number]) {
+            stopAllTimers()
+            alxos_clear()
+            cpuClear()
+            dsSendDirect("BSOD",BIOS,array(1))
+        } else {
+            local Arr = array()
+            foreach(K,V:table=AllFs) {
+                if (!V["hddinfo",table]["entid",number]) {
+                    AllFs:unset(K)
+                    Arr:pushString(K)
+                }
+            }
+            dsSendDirect(Name,E2_GPU,Arr)
+        }
+    } elseif (Name=="usb_onplug" | Name=="usbcont_unplug" | Name=="network_unplug") {
+        local Info = dsGetTable()
+        dsSendDirect(Name,E2_GPU,Info)
+    } elseif (Name=="cd_newdisc") {
+        local Info = dsGetTable()
+        if (!Info[3,entity]) {
+            local THDD = Info[4,table]
+            foreach(K,V:table = AllFs) {
+                local EntID = V["hddinfo",table]["entid",number]
+                if (EntID==THDD["entid",number]) {
+                    CpuData[EntID,table] = table(K,Info)
+                    ALXOS_DsH = "alxos_readhddvol"
+                    dsSendDirect("fs_emptyfs",THDD["hdd_io",wirelink]:entity(),table(entity(),THDD,V))
+                    break
+                }
+            }            
+        } else {
+            dsSendDirect(Name,E2_GPU,Info)
+        }
     }
-}
-
 }

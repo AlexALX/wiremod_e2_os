@@ -1,6 +1,6 @@
 @name cdburner.e2e
 @persist BurnerFS:table BurnerAllFs:table BurnerDir:table BurnerPath:table BurnerPathCD:table
-@persist BurnerKeyH:string BurnerDsH:string BurnerFtTbl:table WCD_Rsv
+@persist BurnerKeyH:string BurnerDsH:string BurnerFtTbl:table WCD_Rsv BurnerCurTask:string
 @persist BurnerDisk:table BurnerDiskSize BurnerDiskCDir BurnerDiskBoot:string BurnerStructSize
 @persist BurnerDiskType:table BurnerBookType BurnerDrive:table BurnerDiskName:string BurnerDriveLetter:string
 
@@ -10,8 +10,6 @@
     -------------------
     CD Burner GUI
 ]#
-
-if (INCLUDE) {
 
 #include "alx_pc/gpu/alxos/_main_"
 
@@ -166,6 +164,9 @@ function number alxos_burner_listdir_draw(Info:table) {
     local CmdRun = GpuData[-5,number]
     
     if (CmdRun==0) {
+        
+        BurnerDir[3,table] = Info
+        BurnerCurTask = "listdir"
     
         if (Info:count()<=1) {
             EGP:egpSetText(LAST_I,"Directory is empty.") LAST_I++
@@ -176,7 +177,6 @@ function number alxos_burner_listdir_draw(Info:table) {
         LAST_I++
         
         GpuData[2,table] = Info
-        BurnerDir[3,table] = Info
         GpuData[6,table] = table()
         GpuData[8,number] = 1
         
@@ -517,7 +517,7 @@ function alxos_burner_listdir(FS:table,Dir,Sd,SaveIndex) {
     GpuData[17,number] = IndexR
     GpuData[18,number] = CurTab
 
-    dsSendDirect("fs_listdir",HDD_IO:entity(),table(entity(),BurnerFS["fs_str_id",string],table(FS,Dir,Sd)))
+    dsSendDirect("fs_listdir",FS["hdd_io",wirelink]:entity(),table(entity(),FS["fs_str_id",string],table(FS,Dir,Sd)))
     
     BurnerKeyH = "listdir"
     alxos_burner_ft(array())
@@ -525,18 +525,6 @@ function alxos_burner_listdir(FS:table,Dir,Sd,SaveIndex) {
     EGP:egpText(LAST_I,"Loading...",vec2(12,LAST_Y))
     EGP:egpColor(LAST_I,128,255,255,255)
     
-}
-
-function alxos_burner_listdir(FS:table,Dir,Sd) {
-    alxos_burner_listdir(FS,Dir,Sd,0)
-}
-
-function alxos_burner_listcurdir() {
-    alxos_burner_listdir(BurnerFS,BurnerDir[1,number],BurnerDir[2,number],0)     
-}
-
-function alxos_burner_listcurdir(SaveIndex) {
-    alxos_burner_listdir(BurnerFS,BurnerDir[1,number],BurnerDir[2,number],SaveIndex)     
 }
 
 function alxos_burner_closemenu() {
@@ -553,6 +541,19 @@ function alxos_burner_closedialog() {
     GpuData[-101,number] = 0
     alxos_burner_ft(GpuData[-104,array])
     GpuData:removeArray(-104)
+}
+
+function alxos_burner_listdir(FS:table,Dir,Sd) {
+    alxos_burner_closedialog()
+    alxos_burner_listdir(FS,Dir,Sd,0)
+}
+
+function alxos_burner_listcurdir() {
+    alxos_burner_listdir(BurnerFS,BurnerDir[1,number],BurnerDir[2,number],0)     
+}
+
+function alxos_burner_listcurdir(SaveIndex) {
+    alxos_burner_listdir(BurnerFS,BurnerDir[1,number],BurnerDir[2,number],SaveIndex)     
 }
 
 function number alxos_burner_dialog(Title:string,Width,Height,Type:string,Callback:string) {
@@ -598,7 +599,7 @@ function alxos_burner_info() {
     EGP:egpLine(LAST_I,vec2(8,LAST_Y),vec2(252,LAST_Y))
     EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ LAST_Y += 5
     
-    EGP:egpText(LAST_I,"Version 1.0, 8 February 2017",vec2(128,LAST_Y))
+    EGP:egpText(LAST_I,"Version 1.1, 15 March 2018",vec2(128,LAST_Y))
     EGP:egpAlign(LAST_I,1)
     EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ LAST_Y += 25
     
@@ -785,13 +786,18 @@ function alxos_burner_renamepre() {
     }
     
     local FNameT = DialogData[10,table][0,table]
-    local FNameE = DialogData[10,table][1,table]
-    local FName = FNameT[2,string]+(FNameE[2,string]!=""?"."+FNameE[2,string] : "")
+    local FNameF = FNameT[2,string]
+    local FName = FNameF
+    local FNameE = ""
+    if (FNameF:find(".")) {
+        FName = FNameF:sub(0,FNameF:find(".")-1)
+        FNameE = FNameF:sub(FNameF:find(".")+1,FNameF:length())
+    }
     local Tbl = BurnerDisk[BurnerDiskCDir,table]
     for(I=0,Tbl:count()) {
         local Entry = Tbl[I,table]
         local FullName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
-        if (FullName==FName) {
+        if (FullName==FNameF) {
             local Parent = alxos_burner_dialog("Error",400,60,"ok","alxos_burner_closedialog")
             DialogData[-10,table]:pushNumber(LAST_I)
             EGP:egpText(LAST_I,"Folder or file with this name already exists.",vec2(-180,-12))
@@ -801,7 +807,7 @@ function alxos_burner_renamepre() {
         }
     } 
     
-    if (FNameT[2,string]=="") {
+    if (FNameF=="") {
         local Parent = alxos_burner_dialog("Error",250,60,"ok","alxos_burner_closedialog")
         DialogData[-10,table]:pushNumber(LAST_I)
         EGP:egpText(LAST_I,"File name cannot be empty.",vec2(0,-12))
@@ -812,9 +818,21 @@ function alxos_burner_renamepre() {
     }
     
     local Entry = DialogData[1,table]
-    Entry["name",string] = FNameT[2,string]
-    Entry["ext",string] = FNameE[2,string]
+    Entry["name",string] = FName
+    Entry["ext",string] = FNameE
     alxos_burner_listcurdir(1)
+}
+
+function number alxos_burner_fnamefilter(Char:string,Text:string) {
+    local Dot = Text:find(".")
+    if (Dot) {
+        if (Char==".") { return 0 }
+        local Ext = Text:sub(Dot,Text:length())
+        if (Ext:length()>3) { return 0 }
+    } elseif (Text:length()>9 & Char!=".") {
+        return 0
+    }
+    return 1
 }
 
 function alxos_burner_rename(Entry:table) {
@@ -826,7 +844,7 @@ function alxos_burner_rename(Entry:table) {
     local Is_Dir = alxos_wm1_isdir(Entry)
     
     local Str = (Is_Dir ? "Folder name:" : "File name:")
-    local Sz = (Is_Dir ? 360 : 310)
+    local Sz = 360
     DialogData[-10,table]:pushNumber(LAST_I)
     EGP:egpText(LAST_I,Str,vec2(-180,-22))
     EGP:egpParent(LAST_I,Parent)
@@ -838,28 +856,16 @@ function alxos_burner_rename(Entry:table) {
     EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    Entries[0,table] = table(LAST_I,Entry["name",string],"^[A-Za-z0-9_ -]$",10)
-    EGP:egpText(LAST_I,Entry["name",string]+"_",vec2(-178,-4))
+    local FName = Entry["name",string]
+    if (!Is_Dir) {
+        FName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
+        Entries[0,table] = table(LAST_I,FName,"^[A-Za-z0-9_!@#$^ .-]$",14,"alxos_burner_fnamefilter")
+    } else {
+        Entries[0,table] = table(LAST_I,FName,"^[A-Za-z0-9_!@#$^ -]$",10)
+    }
+    EGP:egpText(LAST_I,FName+"_",vec2(-178,-4))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
-    
-    if (!Is_Dir) {
-        DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpBox(LAST_I,vec2(140,-4),vec2(40,20))
-        EGP:egpParent(LAST_I,Parent)
-        EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
-        
-        DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,".",vec2(133,-4))
-        EGP:egpParent(LAST_I,Parent)
-        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
-        
-        DialogData[-10,table]:pushNumber(LAST_I)
-        Entries[1,table] = table(LAST_I,Entry["ext",string],"^[A-Za-z0-9]$",3)
-        EGP:egpText(LAST_I,Entry["ext",string],vec2(142,-4))
-        EGP:egpParent(LAST_I,Parent)
-        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
-    }
     
     DialogData[10,table] = Entries
     DialogData[11,number] = 0
@@ -1016,10 +1022,12 @@ function alxos_burner_chtype(Info:table) {
     local CurType = (Info[1,table]:count() ? Info[1,table] : BurnerDiskType)
     
     local DiskTypes = BurnerDrive["disk_types",table]
+    local Supported = BurnerDrive["supported_discs",table]
     local ID = 1
     local MenuTree = table()
     for(I=1,DiskTypes:count()) {
         local Type = DiskTypes[I,table]
+        if (!Supported[Type["type",string],number]) { continue }
         MenuTree:pushTable(
             table(0,Type["type",string]+" ["+alxos_nicesize(Type["size",number])+"]","alxos_burner_chtype",table(Type))
         )
@@ -1027,6 +1035,18 @@ function alxos_burner_chtype(Info:table) {
             ID = I
         }
     }
+    
+    if (!MenuTree:count()) {
+        alxos_burner_closemenu()
+        local Parent = alxos_burner_dialog("Error",360,60,"ok","alxos_burner_closedialog")
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"This drive does not support writting!",vec2(0,-12))
+        EGP:egpAlign(LAST_I,1)
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+        return   
+    }
+    
     local Keys = table()
     Keys["f1",string] = "alxos_burner_chtype_info"
     
@@ -1091,6 +1111,7 @@ function alxos_burner_chbook(Info:table) {
 function alxos_burner_chvolume(Info:table) {
     local CurSerial = BurnerFS["volume_serial",number]
     if (Info[6,table]:count()) {
+        alxos_burner_closemenu()
         local Entry = Info[6,table]
         BurnerFS = Entry[1,table]
         BurnerPath = table(Entry[2,string])
@@ -1124,6 +1145,7 @@ function alxos_burner_chvolume(Info:table) {
     }
     
     DialogData[-4,number] = CurVolI
+    BurnerCurTask = "chvolume"
 
     local BoxID = DialogData[-2,number]
     local Info = DialogData[-3,table][CurVolI,table]    
@@ -1220,7 +1242,7 @@ function alxos_burner_format_pre() {
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
-    dsSendDirect("read_disk",HDD_IO:entity(),table("init",entity(),BurnerDrive,"",1))
+    dsSendDirect("read_disk",BurnerFS["hdd_io",wirelink]:entity(),table("init",entity(),BurnerDrive,"",1))
     
     BurnerDsH = "alxos_burner_format_ds"
     BurnerKeyH = "alxos_burner_start_key"
@@ -1260,7 +1282,7 @@ function alxos_burner_progress_format() {
         runCmd("alxos_burner_progress_format",1)
         return
     }
-    local CurTask = HDD_IO["CurTask",table]
+    local CurTask = BurnerFS["hdd_io",wirelink]["CurTask",table]
     local I = CurTask[2,number]
     local Max = DialogData[2,number]
     local Last = DialogData[4,number]
@@ -1316,7 +1338,7 @@ function alxos_burner_format_drive(Info:table) {
     
     DialogData[2,number] = CurDisk["max_addr",number]
     
-    dsSendDirect("clearDiskBuffer",HDD_IO:entity(),table(entity(),0,BurnerDrive))
+    dsSendDirect("clearDiskBuffer",BurnerFS["hdd_io",wirelink]:entity(),table(entity(),0,BurnerDrive))
 }
 
 function alxos_burner_format_ds(Name:string) {
@@ -1352,7 +1374,7 @@ function alxos_burner_format_ds(Name:string) {
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     } elseif (Name=="clearDiskBuffer") {
-        dsSendDirect("format_cd_disk",HDD_IO:entity(), table(entity(),BurnerDrive,DialogData[2,number]))
+        dsSendDirect("format_cd_disk",BurnerFS["hdd_io",wirelink]:entity(), table(entity(),BurnerDrive,DialogData[2,number]))
         alxos_burner_progress_format()
     }
 }
@@ -1512,8 +1534,8 @@ function alxos_burner_prestart() {
     }
 }
 
-function alxos_burner_error(Msg:string,Width) {
-    local Parent = alxos_burner_dialog("Error",Width,60,"ok","alxos_burner_closedialog")
+function alxos_burner_error(Msg:string,Width,Callback:string) {
+    local Parent = alxos_burner_dialog("Error",Width,60,"ok",Callback)
     DialogData[-10,table]:pushNumber(LAST_I)
     EGP:egpText(LAST_I,Msg,vec2(0,-12))
     EGP:egpAlign(LAST_I,1)
@@ -1522,10 +1544,19 @@ function alxos_burner_error(Msg:string,Width) {
     dsSendDirect("playgmsound",E2_SPU,table(0,0.2,"buttons/button10.wav")) 
 }
 
+function alxos_burner_error(Msg:string,Width) {
+    alxos_burner_error(Msg,Width,"alxos_burner_closedialog")
+}
+
 function alxos_burner_start_post() {
     local Burn = (DialogData[-5,number]==1 ? 1 : 0 )
     if (!Burn) {
         alxos_burner_closedialog()
+        return
+    }
+    
+    if (!BurnerDrive["supported_discs",table][BurnerDiskType["type",string],number]) {
+        alxos_burner_error("This drive cannot write to this disc!",340)
         return
     }
 
@@ -1545,7 +1576,7 @@ function alxos_burner_start_post() {
     DialogData[2,number] = 0
     DialogData[3,number] = 0
     
-    dsSendDirect("read_disk",HDD_IO:entity(),table("init",entity(),BurnerDrive,"",1))
+    dsSendDirect("read_disk",BurnerFS["hdd_io",wirelink]:entity(),table("init",entity(),BurnerDrive,"",1))
     
     BurnerDsH = "alxos_burner_start_ds"
     BurnerKeyH = "alxos_burner_start_key"
@@ -1622,8 +1653,10 @@ function alxos_burner_start_drive(Info:table) {
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
-    dsSendDirect("clearDiskBuffer",HDD_IO:entity(),table(entity(),0,BurnerDrive))
-    #[dsSendDirect("fs_mkfs",HDD_IO:entity(),
+    BurnerCurTask = "burn"
+    
+    dsSendDirect("clearDiskBuffer",BurnerFS["hdd_io",wirelink]:entity(),table(entity(),0,BurnerDrive))
+    #[dsSendDirect("fs_mkfs",BurnerFS["hdd_io",wirelink]:entity(),
         table(entity(),"wcd",table(BurnerDrive,BurnerDiskSize,BurnerDiskName,BurnerBookType,1,BurnerDiskBoot))
     )]#
 }
@@ -1726,7 +1759,7 @@ function alxos_burner_progress() {
         runCmd("alxos_burner_progress",1)
         return
     }
-    local CurTask = HDD_IO["CurTask",table]
+    local CurTask = BurnerFS["hdd_io",wirelink]["CurTask",table]
     local I = CurTask[2,number]
     local Max = CurTask[1,number]
     local Task = CurTask[3,number]
@@ -1785,7 +1818,7 @@ function alxos_burner_refresh() {
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     BurnerDsH = "alxos_burner_refresh_ds"
-    dsSendDirect("read_disk",HDD_IO:entity(),table("reinit",entity(),BurnerFS["hddinfo",table],0,BurnerFS))
+    dsSendDirect("read_disk",BurnerFS["hdd_io",wirelink]:entity(),table("reinit",entity(),BurnerFS["hddinfo",table],0,BurnerFS))
 }
 
 function alxos_burner_refresh_close() {
@@ -1820,7 +1853,7 @@ function alxos_burner_start_ds(Name:string) {
     if (Name=="read_disk") {
         local Ret = dsGetTable()
         if (Ret[1,string]=="OK") {
-            "alxos_burner_start_drive"(Ret[2,table])
+            alxos_burner_start_drive(Ret[2,table])
         } else {
             local Arr = Ret[1,string]:explode(NL)
             local Parent = alxos_burner_dialog("Error",400,40+(20*Arr:count()),"ok","alxos_burner_closedialog")
@@ -1838,7 +1871,7 @@ function alxos_burner_start_ds(Name:string) {
         }
     } elseif (Name=="fs_mkfs") {
     
-        dsSendDirect("fs_add2dir",HDD_IO:entity(),table(entity(),"wcd",
+        dsSendDirect("fs_add2dir",BurnerFS["hdd_io",wirelink]:entity(),table(entity(),"wcd",
             table(BurnerDrive,14,BurnerDisk[0,table],BurnerDisk,BurnerStructSize)
         ))
         
@@ -1847,11 +1880,11 @@ function alxos_burner_start_ds(Name:string) {
     
         #local CurDisk = BurnerDrive["wirelink",wirelink]["CurDiskInfo",table][0,table]
         #local Track = CurDisk["first_track",number]
-        #dsSendDirect("writeDiskIO",HDD_IO:entity(),table(entity(),0,BurnerDrive,0,Track,0))
+        #dsSendDirect("writeDiskIO",BurnerFS["hdd_io",wirelink]:entity(),table(entity(),0,BurnerDrive,0,Track,0))
     } elseif (Name=="fs_add2dir") {
         #[local CurDisk = BurnerDrive["wirelink",wirelink]["CurDiskInfo",table][0,table]
         local Track = CurDisk["first_track",number]
-        dsSendDirect("writeDiskIO",HDD_IO:entity(),table(entity(),0,BurnerDrive,0,Track,0))]#
+        dsSendDirect("writeDiskIO",BurnerFS["hdd_io",wirelink]:entity(),table(entity(),0,BurnerDrive,0,Track,0))]#
     #} elseif (Name=="writeDiskIO") {
         alxos_burner_closedialog()    
         stopCmd()
@@ -1865,7 +1898,7 @@ function alxos_burner_start_ds(Name:string) {
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     } elseif (Name=="clearDiskBuffer") {
-        dsSendDirect("fs_mkfs",HDD_IO:entity(),
+        dsSendDirect("fs_mkfs",BurnerFS["hdd_io",wirelink]:entity(),
             table(entity(),"wcd",table(BurnerDrive,BurnerDiskSize,BurnerDiskName,BurnerBookType,1,BurnerDiskBoot,BurnerStructSize))
         )
     }
@@ -1878,7 +1911,7 @@ function alxos_burner_start_key(Key:string,Pressed) {
     }
 }
 
-function alxos_burner_init(Args:table) {
+function alxos_burner_init(Args:table) {    
     egpClear()    
     BurnerFS = Args[2,table]
     BurnerAllFs = Args[3,table]
@@ -1891,6 +1924,8 @@ function alxos_burner_init(Args:table) {
     BurnerDiskSize = 0
     BurnerDiskCDir = 0
     BurnerStructSize = 0
+    
+    BurnerCurTask = ""
     
     BurnerDrive = table()
     if (!BurnerDrive:count()) {
@@ -2062,6 +2097,7 @@ function alxos_burner_key(Key:string,Pressed) {
                     BurnerDiskCDir = Entry["dir",number]
                     alxos_burner_listcurdir(2)
                 } else {
+                    if (BurnerFS["hdd_io",wirelink]["Busy",number]) { return }
                     if (Entry["name",string]!="..") {
                         BurnerPath:pushString(Entry["name",string])
                     } else {
@@ -2129,7 +2165,7 @@ function alxos_burner_key(Key:string,Pressed) {
         if (BurnerDsH!="") { return }
         local Index = DialogData[-5,number]
         local Type = DialogData[-2,string]
-        if (alxos_dialog_key(Key)) {
+        if (alxos_dialog_key(Key,Pressed)) {
             return
         }
     }
@@ -2143,4 +2179,47 @@ function alxos_burner_ds(Name:string) {
     }   
 }
 
+function alxos_burner_unplug(Name:string) {
+    if (!BurnerFS["hddinfo",table]:count() | BurnerFS["start_sector",number]==-1) {
+        BurnerFS = BurnerAllFs["C",table]
+        BurnerPath = table("C:")
+        
+        BurnerDir = table(BurnerFS["root_dir_cluster",number],0)
+        if (BurnerCurTask=="listdir" | BurnerCurTask=="chvolume") {
+            alxos_burner_error("Disk was unplugged.",200,"alxos_burner_listcurdir")     
+        }
+    } elseif (BurnerCurTask=="burn") {
+        dsSendDirect("BSOD",BIOS,array(2))
+    }
+}
+
+function alxos_explorer_onplug(Name:string) {
+    if (Name=="sata_onplug") {
+        local Info = dsGetTable()
+        
+        if (BurnerCurTask=="chvolume") {
+            alxos_burner_chvolume(table())
+        }
+        
+        if (!Info[3,number]) {
+            alxos_burner_unplug(Name)
+        } else {
+            if (Info[4,table]["type",number]==1 & !BurnerDrive:count()) {
+                BurnerDrive = Info[4,table]
+                local CurCD = BurnerDrive["wirelink",wirelink]["CurDiskInfo",table][0,table]
+                local Index = CurCD["type_id",number]
+                if (!Index) { Index = 1 }
+                BurnerDiskType = BurnerDrive["disk_types",table][Index,table]
+                BurnerBookType = (CurCD["disc_ent",entity]:getSkin()==3 ? 1 : 0)
+                BurnerDriveLetter = Info[6,array][1,string]
+            }
+        }
+    } elseif (Name=="hddio_unplug" | Name=="cd_newdisc") {
+    
+        if (BurnerCurTask=="chvolume") {
+            alxos_burner_chvolume(table())
+        }
+    
+        alxos_burner_unplug(Name)
+    }
 }

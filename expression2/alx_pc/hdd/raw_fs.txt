@@ -8,8 +8,6 @@
 	Used for debug file system table functions
 ]#
 
-if (INCLUDE) {
-
 #include "alx_pc/hdd/_main_"
 
 FS_TYPES[1,string] = "RAW"
@@ -24,8 +22,13 @@ function number raw_mkfs(Args:table) {
     local FsTbl = Args[2,table]
     local Index = Args[3,number]
     local Size = Args[4,number]
+    
+    if (!FsTbl:count()) {
+        mkfstbl(HDD)
+        FsTbl = readfstbl(HDD)
+    }
+    if (Index==-1) { Index = findfreetbl(FsTbl) }
+    
     addfs2tbl(HDD,FsTbl,Index,0,1,Size)
     return 1
-}
-   
 }

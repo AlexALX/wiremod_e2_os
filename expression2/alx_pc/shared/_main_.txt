@@ -1,7 +1,7 @@
 @name Main shared func
 #@inputs NB:string
 @persist SharedTimers:table SharedTimerIndex SharedDS:array SharedDSIndex
-@persist NB:string NL:string TickQuota DEBUG INCLUDE
+@persist NB:string NL:string TickQuota DEBUG
 
 #[
 	ALX Wiremod E2 PC
@@ -14,15 +14,19 @@ if (first()|duped()) {
 
 if (TickQuota==0) { TickQuota = maxquota() }
 
-DEBUG = 0
+dsSetScope(2) # allow signals from any e2 in mp
 
-INCLUDE = 0
+DEBUG = 0
 
 NL = toChar(10) # new line char
 
 function registerTimers(Name:string,FName:string) {
     #SharedTimerIndex++
     SharedTimers[Name,string] = FName
+}
+
+function removeTimers(Name:string) {
+    SharedTimers:unset(Name)    
 }
 
 function registerDS(Name:string) {
@@ -105,6 +109,20 @@ function tbl_merge(Tbl:table,Tbl2:table) {
         Tbl[K,string] = V
     }
 }
+
+# small wrapper to fix issue with NULL entity
+function entity getentity(ID) {
+    local Ent = entity(ID)
+    if (Ent) {
+        return Ent
+    }    
+    return noentity()
+}
+#[
+function wirelink getwirelink(WL:wirelink) {
+    if (WL) { return WL }    
+    return nowirelink()
+}]#
 
 #trailingZeros(3840)
 
