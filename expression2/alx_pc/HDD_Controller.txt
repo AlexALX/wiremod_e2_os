@@ -24,6 +24,8 @@ Busy = 0
 Reload = (first() ? 1 : 0)
 Init = 0
 
+CurTask = table() # fix crash
+
 Device_Name = "HDD Controller"
 
 FS_TYPES = table()

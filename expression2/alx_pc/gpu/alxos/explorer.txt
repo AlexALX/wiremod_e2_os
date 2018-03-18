@@ -588,7 +588,7 @@ function alxos_explorer_paste_progress() {
         EGP:egpSetText(PercID,CalcP+"%")
         if (Step!=Last) {
             EGP:egpSetText(DialogData[5,number],"Writing file, please wait...")
-            DialogData[4,number] = 2  
+            DialogData[3,number] = 2  
         }
     }
     
