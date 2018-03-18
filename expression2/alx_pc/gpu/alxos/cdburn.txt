@@ -1025,6 +1025,7 @@ function alxos_burner_chtype(Info:table) {
     local Supported = BurnerDrive["supported_discs",table]
     local ID = 1
     local MenuTree = table()
+    local CurI = 1
     for(I=1,DiskTypes:count()) {
         local Type = DiskTypes[I,table]
         if (!Supported[Type["type",string],number]) { continue }
@@ -1032,8 +1033,9 @@ function alxos_burner_chtype(Info:table) {
             table(0,Type["type",string]+" ["+alxos_nicesize(Type["size",number])+"]","alxos_burner_chtype",table(Type))
         )
         if (CurType["type_id",number]==Type["type_id",number]) {
-            ID = I
+            ID = CurI
         }
+        CurI++
     }
     
     if (!MenuTree:count()) {
