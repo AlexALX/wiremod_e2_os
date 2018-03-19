@@ -1,14 +1,11 @@
 ALX Wiremod E2 PC & OS
 =========================  
-[![image](https://i.imgur.com/mEg4Fgl.jpg)](https://imgur.com/a/eUHZQ)  
-More screenshots: *[ coming soon ]*
-<br>Video: *[ coming soon ]*
+[![image](https://i.imgur.com/mEg4Fgl.jpg)](https://imgur.com/a/eUHZQ)
+More screenshots: https://imgur.com/a/eUHZQ
+<br>Video: https://youtu.be/jfFnVnX7Kwg
+<br>Video in russian: https://youtu.be/ciM0uYEN5yw
 
 **Description and wiki is not yet fully updated.**
-
-**Old Screenshots and video (v1.1):**
-More screenshots: http://imgur.com/a/Bils2/
-<br>Video: https://www.youtube.com/watch?v=98HriO_Dc68
 
 This is an Wiremod Expression2 OS for Garry's Mod Game.  
 Written in in-game Expression2 Language (wiremod addon).  
@@ -32,6 +29,7 @@ Main features:
 * Simple networking between PC's.
 * Satellite internet device, what provides access to real internet (http e2 extension) for files downloading.
 * Switch/router network system, also with laser transferer and two-way radio devices.
+* And some other features and devices!
 
 Also includes PHP version of WM1 File System.
 
