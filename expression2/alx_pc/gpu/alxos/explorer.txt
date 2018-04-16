@@ -2557,31 +2557,63 @@ function alxos_explorer_stopsound() {
     #alxos_explorer_listcurdir()
 }
 
+function alxos_explorer_soundplay_conf(Arr:array) {
+    local Parent = alxos_explorer_dialog("Playing sound",400,60,"ok","alxos_explorer_stopsound")
+    
+    ExplorerCurTask = "sound"
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Playing sound file, press OK to stop.",vec2(0,-12))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+
+    #ifdef soundDuration(string)
+        local Dur = soundDuration(Arr[2,string])
+        if (Arr[3,string]=="1") { Dur = 0 } # loop
+        dsSendDirect("playgmsound",Devices["spu",entity],table(0,Dur,Arr[2,string]))
+    #endif
+}
+
+function alxos_explorer_soundplay_conf() {
+    local Act = (DialogData[-5,number]==1 ? 1 : 0 )
+    if (Act) {
+        alxos_explorer_soundplay_conf(DialogData[100,array])
+    } else {
+        alxos_explorer_closedialog()
+    }   
+}
+
 function alxos_explorer_soundplay_ds(Data:string) {
     local Arr = Data:explode("|")
     ExplorerDsH = ""
+    
     if (Arr:count()<2 | Arr[1,string]!="GMS") {
         alxos_explorer_error("This is not Garry's Mod Sound file!",400)    
     #ifdef soundDuration(string)
     } elseif (!soundDuration(Arr[2,string])) {
-        alxos_explorer_error("Sound file not found on server!",400)    
-    #endif
-    } else {
-        local Parent = alxos_explorer_dialog("Playing sound",400,60,"ok","alxos_explorer_stopsound")
+        #alxos_explorer_error("Sound file not found on server!",400)    
         
-        ExplorerCurTask = "sound"
+        local Parent = alxos_explorer_dialog("Warning",340,80,"yesno","alxos_explorer_soundplay_conf")
+        local Entries = table()
         
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"Playing sound file, press OK to stop.",vec2(0,-12))
-        EGP:egpParent(LAST_I,Parent)
+        EGP:egpText(LAST_I,"Sound file not found on server!",vec2(0,-22))
         EGP:egpAlign(LAST_I,1)
+        EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
-    
-        #ifdef soundDuration(string)
-            local Dur = soundDuration(Arr[2,string])
-            if (Arr[3,string]=="1") { Dur = 0 } # loop
-            dsSendDirect("playgmsound",Devices["spu",entity],table(0,Dur,Arr[2,string]))
-        #endif
+        
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Do you want try to play it anyway?",vec2(0,-2))
+        EGP:egpAlign(LAST_I,1)
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+        
+        DialogData[100,array] = Arr
+        
+    #endif
+    } else {
+        alxos_explorer_soundplay_conf(Arr)
     }
 }
 
