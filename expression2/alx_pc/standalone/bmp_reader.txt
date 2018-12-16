@@ -1,6 +1,6 @@
 @name Standalone BMP Reader
 @inputs DS:wirelink
-@outputs Percent
+@outputs Percent RenderTime
 @persist BMP_NoKeepAR BmpData:table
 
 #ifndef httpClk()
@@ -24,33 +24,24 @@ function dsClear() {
     DS[1048574] = 0
     DS[1048575] = 1
     Percent = 0
-}
-
-function number str2byte(Str:string) {
-    if (Str=="") { return 0 } 
-    local Str = Str:sub(1,4) 
-    local Ret = 0
-    for(I=1,Str:length()) {
-        local Byte = toByte(Str,I)
-        #if (Byte==-1) { Byte = 0 }
-        Ret += (Byte << 8*(I-1))
-    }
-    return Ret
+    RenderTime = 0
 }
 
 function number trailingZeros(N) {
-    if(N==0) { return 32 }
-    local S = 0
-    while (N>0) {
-        local Rest=mod(N,2)
-        if (Rest==0) {
-            S++   
-        } else {
-            break
-        }
-        N=(N-Rest)/2
-    }
-    return S
+    return N ? log2(N&&-N) : 32
+}
+
+function number string:read_uint8(Offset) { 
+    return toByte(This, Offset) 
+}
+
+function number string:read_uint16(Offset) {
+    return (toByte(This, Offset+1) << 8)+toByte(This, Offset) 
+}
+
+function number string:read_uint32(Offset) {
+    #return toByte(This, Offset+3)*16777216+toByte(This, Offset+2)*65536+toByte(This, Offset+1)*256+toByte(This, Offset) 
+    return (toByte(This, Offset+3) << 24) + (toByte(This, Offset+2) << 16) + (toByte(This, Offset+1) << 8) + toByte(This, Offset) 
 }
 
 function alxos_bmp_draw() {
@@ -59,28 +50,29 @@ function alxos_bmp_draw() {
     if (Size==0) {
         local Format = Data:sub(1,2)
         if (Format=="BM") {
+            BmpData["time",number] = curtime()
             local Size = BmpData["size",number]
-            local Offset = str2byte(Data:sub(11,14))+1
-            local HSize = str2byte(Data:sub(15,18))
+            local Offset = Data:read_uint32(11)+1
+            local HSize = Data:read_uint32(15)
             
-            local Width = str2byte(Data:sub(19,22))
-            local Height = str2byte(Data:sub(23,26))
+            local Width = Data:read_uint32(19)
+            local Height = Data:read_uint32(23)
+            
+            local Compression = Data:read_uint32(31)
 
-            local Compression = str2byte(Data:sub(31,34))
+            local Colors = Data:read_uint32(47)
 
-            local Colors = str2byte(Data:sub(47,50))
-
-            local BitCount = str2byte(Data:sub(29,30))
+            local BitCount = Data:read_uint16(29)
             local ColorsB = 4
             
             if (HSize==12) { # OS/2 BMP
-                Width = str2byte(Data:sub(19,20))   
-                Height = str2byte(Data:sub(21,22))  
+                Width = Data:read_uint16(19)   
+                Height = Data:read_uint16(21)  
                 Compression = 0
                 Colors = 0
-                BitCount = str2byte(Data:sub(25,26))  
+                BitCount = Data:read_uint16(25)  
                 ColorsB = 3    
-            }
+            }            
             BmpData[5,number] = ColorsB
             
             if (Height<0) { # flip row order checkbox
@@ -116,9 +108,9 @@ function alxos_bmp_draw() {
                     BmpData[18,number] = 0x1F
                     BmpData[19,number] = 0x1F
                 } else {
-                    local RM = str2byte(Data:sub(55,58))
-                    local GM = str2byte(Data:sub(59,62))
-                    local BM = str2byte(Data:sub(63,66))
+                    local RM = Data:read_uint32(55)
+                    local GM = Data:read_uint32(59)
+                    local BM = Data:read_uint32(63)
 
                     local RS = trailingZeros(RM)
                     local GS = trailingZeros(GM)
@@ -179,6 +171,7 @@ function alxos_bmp_draw() {
             if (BitCount<=8) {
                 Bytes = (Colors>32 ? 32*ColorsB : Colors*ColorsB)
                 BmpData[28,number] = Bytes
+                BmpData[10,number] = Bytes 
                 BmpData[29,number] = Offset
                 BmpData[8,number] = 14+HSize+1
                 BmpData[30,number] = 0
@@ -201,7 +194,6 @@ function alxos_bmp_draw() {
         local SI = BmpData[9,number]
 
         local Bytes = BmpData[10,number]
-        local HTTPData = Data
         local Data = Data:sub(I,I+Bytes-1)
 
         #if (X==0 & Y==Height-1) {
@@ -225,7 +217,7 @@ function alxos_bmp_draw() {
             local Colors = BmpData[23,number]
             local CTbl = BmpData[22,table]
             local CTblI = BmpData[30,number]
-            local ColorsB = BmpData[5,number] 
+            local ColorsB = BmpData[5,number]
             
             while(perf(90)) {
                 if (CTblI>=Colors) {
@@ -233,7 +225,10 @@ function alxos_bmp_draw() {
                     break
                 }
 
-                local Sub = str2byte(Data:sub(SI+1,SI+ColorsB))
+                local Sub = 0
+                if (ColorsB == 4) { Sub = Data:read_uint32(SI+1) }
+                elseif (ColorsB == 2) { Sub = Data:read_uint16(SI+1) }
+                else { Sub = Data:read_uint8(SI+1) }
                 local R = floor((Sub >> 16) && 0xFF)
                 local G = floor((Sub >> 8) && 0xFF)
                 local B = floor(Sub && 0xFF)
@@ -295,7 +290,7 @@ function alxos_bmp_draw() {
             }
 
             if (BitCount<=4) {
-                local Sub = str2byte(Data:sub(SI+1,SI+1))
+                local Sub = Data:read_uint8(SI+1)
                 local YF = Y
                 if (FY==-1) {
                     YF = Height-Y
@@ -317,7 +312,14 @@ function alxos_bmp_draw() {
                 continue
             }
 
-            local Sub = str2byte(Data:sub(SI+1,SI+II))
+            local Sub = 0
+            if (II==3) {
+                Sub = Data:read_uint32(SI+1)
+            } elseif (II==2) {
+                Sub = Data:read_uint16(SI+1)
+            } else {
+                Sub = Data:read_uint8(SI+1)
+            }
 
             local YF = Y
             if (FY==-1) {
@@ -363,6 +365,7 @@ function alxos_bmp_draw() {
         local End = BmpData[12,number]
 
         if (Y<0 | End==1) {    
+            RenderTime = curtime() - BmpData["time",number]
             print(_HUD_PRINTTALK,"BMP successfully parsed.")        
             return
         }
