@@ -39,6 +39,10 @@ function number string:read_uint16(Offset) {
     return (toByte(This, Offset+1) << 8)+toByte(This, Offset) 
 }
 
+function number string:read_uint24(Offset) {
+    return (toByte(This, Offset+2) << 16) + (toByte(This, Offset+1) << 8) + toByte(This, Offset) 
+}
+
 function number string:read_uint32(Offset) {
     #return toByte(This, Offset+3)*16777216+toByte(This, Offset+2)*65536+toByte(This, Offset+1)*256+toByte(This, Offset) 
     return (toByte(This, Offset+3) << 24) + (toByte(This, Offset+2) << 16) + (toByte(This, Offset+1) << 8) + toByte(This, Offset) 
@@ -227,8 +231,7 @@ function alxos_bmp_draw() {
 
                 local Sub = 0
                 if (ColorsB == 4) { Sub = Data:read_uint32(SI+1) }
-                elseif (ColorsB == 2) { Sub = Data:read_uint16(SI+1) }
-                else { Sub = Data:read_uint8(SI+1) }
+                else { Sub = Data:read_uint24(SI+1) }
                 local R = floor((Sub >> 16) && 0xFF)
                 local G = floor((Sub >> 8) && 0xFF)
                 local B = floor(Sub && 0xFF)
@@ -314,7 +317,7 @@ function alxos_bmp_draw() {
 
             local Sub = 0
             if (II==3) {
-                Sub = Data:read_uint32(SI+1)
+                Sub = Data:read_uint24(SI+1)
             } elseif (II==2) {
                 Sub = Data:read_uint16(SI+1)
             } else {
