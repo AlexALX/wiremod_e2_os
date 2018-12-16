@@ -316,7 +316,7 @@ function alxos_bmp_draw() {
             }
 
             local Sub = 0
-            if (II==3) {
+            if (II==3 || II==4) {
                 Sub = Data:read_uint24(SI+1)
             } elseif (II==2) {
                 Sub = Data:read_uint16(SI+1)
