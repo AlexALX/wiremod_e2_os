@@ -237,8 +237,9 @@ if (clk("bmp")) {
 }
 
 if (dsClk("BMP_MULTI_INIT")) {
-    if (BMP_MAIN!=noentity()) { exit() } # busy
+    #if (BMP_MAIN!=noentity()) { exit() } # busy
     BMP_MAIN = dsGetEntity()    
+    BmpData = table()
     local Global = gTable("BMP_MULTI")
     Global["MULTI_E2",table]:pushWirelink(wirelink())
     #dsSendDirect("BMP_MULTI_INIT",BMP_MAIN,wirelink())

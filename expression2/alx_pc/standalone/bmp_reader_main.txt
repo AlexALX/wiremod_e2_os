@@ -307,13 +307,18 @@ function alxos_bmp_draw() {
                 local Global = gTable("BMP_MULTI")
                 BmpData["MULTI_E2",table] = Global["MULTI_E2",table]
                 ChildE2s = BmpData["MULTI_E2",table]:count()
+                
+                if (MaxThreads>0 & ChildE2s > MaxThreads) { ChildE2s = MaxThreads }
+                if (ChildE2s>Height) { ChildE2s = Height }
+                
+                Threads = ChildE2s
+                
                 BmpData["MULTI_E2_COUNT",number] = ChildE2s
                 BmpData["MULTI_INIT",number] = 2
             }
             if (!ChildE2s) {
                 print(_HUD_PRINTTALK,"FATAL ERROR: no child e2 spawned.") 
             } else {
-                Threads = ChildE2s
                 #local Lines = (Width > Height ? Width : Height)
                 local SubLines = ceil(Height / ChildE2s)
                 if (SubLines==0) { SubLines = 1 }
