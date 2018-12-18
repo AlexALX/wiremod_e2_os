@@ -17,6 +17,7 @@ dsJoinGroup("BMP_SUB")
 runOnLast(1)
 
 BmpData = table()
+BMP_MAIN = noentity()
 
 function number trailingZeros(N) {
     return N ? log2(N&&-N) : 32
@@ -40,6 +41,13 @@ function number string:read_uint32(Offset) {
 }
 
 function alxos_bmp_draw() {
+    local Global = gTable("BMP_MULTI")
+    if (Global["BMP_STOP",number]==1) {
+        stopAllTimers()
+        BMP_MAIN = noentity()
+        exit()   
+    } 
+    
     local Data = BmpData["data",string]
     local Size = BmpData[5,number]
 
@@ -229,13 +237,11 @@ if (clk("bmp")) {
 }
 
 if (dsClk("BMP_MULTI_INIT")) {
-    BMP_MAIN = dsGetEntity()
-    dsSendDirect("BMP_MULTI_INIT",BMP_MAIN,wirelink())
-}
-
-if (dsClk("BMP_MULTI_STOP")) {
-    stopAllTimers()
-    BmpData = table()
+    if (BMP_MAIN!=noentity()) { exit() } # busy
+    BMP_MAIN = dsGetEntity()    
+    local Global = gTable("BMP_MULTI")
+    Global["MULTI_E2",table]:pushWirelink(wirelink())
+    #dsSendDirect("BMP_MULTI_INIT",BMP_MAIN,wirelink())
 }
 
 if (dsClk("BMP_MULTI_START")) {

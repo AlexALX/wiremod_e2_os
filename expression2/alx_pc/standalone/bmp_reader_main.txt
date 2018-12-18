@@ -1,5 +1,5 @@
 @name Standalone BMP Reader Multithreaded Main Process
-@inputs DigitalScreen:wirelink
+@inputs DigitalScreen:wirelink LongURL:string
 @outputs Percent Threads RenderTime RenderRealTime
 @persist BMP_NoKeepAR BmpData:table MaxThreads
 
@@ -20,7 +20,14 @@
     
     Chat commands:
     !bmp http://url_with_bmp_file - open bmp file
-    !bmpabort - abort rendering
+    !bmp abort - abort rendering
+    Note: long url may be cut, use input LongURL instead for such case (via string value) 
+    
+    If you have own web server with PHP, then you can place 
+    img2bmp.php from https://github.com/AlexALX/wiremod_e2_os/blob/master/php/img2bmp.php
+    and then use it to convert any image to BMP (with auto resize) in url:
+    http://path_to_file/img2bmp.php?http://any_image_path/image.jpg
+    
 ]#
 
 #ifndef httpClk()
@@ -40,7 +47,9 @@ Percent = 0
 MaxThreads = 0 # maximum threads, 0 - unlimited (may crash)
 
 function dsClear() {
-    dsSend("BMP_MULTI_STOP","BMP_SUB",entity())
+    local Global = gTable("BMP_MULTI")
+    Global["BMP_STOP",number] = 1
+    #dsSend("BMP_MULTI_STOP","BMP_SUB",entity())
     BmpData = table()
     DigitalScreen[1048569] = 2
     DigitalScreen[1048574] = 0
@@ -295,6 +304,8 @@ function alxos_bmp_draw() {
         if (BmpData["MULTI_INIT",number] > 0) {
             local ChildE2s = BmpData["MULTI_E2_COUNT",number]
             if (BmpData["MULTI_INIT",number] == 1) {
+                local Global = gTable("BMP_MULTI")
+                BmpData["MULTI_E2",table] = Global["MULTI_E2",table]
                 ChildE2s = BmpData["MULTI_E2",table]:count()
                 BmpData["MULTI_E2_COUNT",number] = ChildE2s
                 BmpData["MULTI_INIT",number] = 2
@@ -304,9 +315,9 @@ function alxos_bmp_draw() {
             } else {
                 Threads = ChildE2s
                 #local Lines = (Width > Height ? Width : Height)
-                local SubLines = floor(Height / ChildE2s)
+                local SubLines = ceil(Height / ChildE2s)
                 if (SubLines==0) { SubLines = 1 }
-                local LineDiff = (Height - SubLines * ChildE2s)
+                local LineDiff = (SubLines * ChildE2s - Height)
                 local StartLine = BmpData["StartLine",number]
                 local C = BmpData["C",number]
                 BmpData["DS",wirelink] = DigitalScreen
@@ -316,7 +327,7 @@ function alxos_bmp_draw() {
                         break
                     }
                     if (LineDiff > 0 & C==ChildE2s) {
-                        SubLines += LineDiff
+                        SubLines -= LineDiff
                     }
                     BmpDataClone = BmpData:clone()
                     
@@ -333,7 +344,7 @@ function alxos_bmp_draw() {
                     StartLine += SubLines
                     C++
                 }
-                if (C<ChildE2s) {
+                if (C<=ChildE2s) {
                     BmpData["C",number] = C
                     BmpData["StartLine",number] = StartLine
                     timer("bmp",1)
@@ -344,7 +355,11 @@ function alxos_bmp_draw() {
             return
         }
         
-        BmpData["MULTI_E2",table] = table()
+        local Global = gTable("BMP_MULTI")
+        Global["MULTI_E2",table] = table()
+        Global["BMP_STOP",number] = 0
+        
+        BmpData["MULTI_E2_COUNT",number] = 0
         BmpData["MULTI_DONE",number] = 0
         BmpData["MULTI_INIT",number] = 1
         BmpData["C",number] = 1
@@ -363,19 +378,30 @@ if (chatClk(owner())) {
     local Find = Said:find(" ")
     local Cmd = Said:left(Find-1)
     local Url = Said:sub(Find+1) 
-    if (Cmd=="!bmp") {
+    if (Cmd=="!bmp" && Said!="!bmp abort") {
         if (!checkDS()) { exit() }
         if (!httpCanRequest()) {
-            print(_HUD_PRINTTALK,"HTTP Request Canceled - Please wait a bit...")    
+            print(_HUD_PRINTTALK,"HTTP Request Canceled - Please wait a bit...")   
             exit()
         }
         httpRequest(Url)    
-    } elseif (Cmd=="!bmpabort" | Cmd=="!bmpstop") {
+    } elseif (Cmd=="!bmpabort" | Cmd=="!bmpstop" | Said=="!bmp abort") {
         print(_HUD_PRINTTALK,"BMP rendering canceled.")     
         stopAllTimers()
-        dsSend("BMP_MULTI_STOP","BMP_SUB",entity())
+        #dsSend("BMP_MULTI_STOP","BMP_SUB",entity())
+        local Global = gTable("BMP_MULTI")
+        Global["BMP_STOP",number] = 1
     }
     exit()
+}
+
+if (~LongURL & LongURL!="") {
+    if (!checkDS()) { exit() }
+    if (!httpCanRequest()) {
+        print(_HUD_PRINTTALK,"HTTP Request Canceled - Please wait a bit...")   
+        exit()
+    }
+    httpRequest(LongURL) 
 }
 
 if (httpClk()) {
@@ -403,13 +429,15 @@ if (clk("bmp_stage")) {
     exit()   
 }
 
+#[
 if (dsClk("BMP_MULTI_INIT")) {
     local Count = BmpData["MULTI_E2",table]:count()
     if (MaxThreads>0 & Count >= MaxThreads) { exit() }
     local Height = BmpData[4,number]
     if (Count>=Height) { exit() }
     BmpData["MULTI_E2",table]:pushWirelink(dsGetWirelink())
-}
+    exit()
+}]#
 
 if (dsClk("BMP_MULTI_FINISH")) {
     BmpData["MULTI_DONE",number] = BmpData["MULTI_DONE",number]+1
@@ -420,10 +448,13 @@ if (dsClk("BMP_MULTI_FINISH")) {
         Percent = 100
         stopAllTimers()   
     }
+    exit()
 }
 
 if (last()) {
-    dsSend("BMP_MULTI_STOP","BMP_SUB",entity())
+    #dsSend("BMP_MULTI_STOP","BMP_SUB",entity())
+    local Global = gTable("BMP_MULTI")
+    Global["BMP_STOP",number] = 1
 }
 
 #endif
