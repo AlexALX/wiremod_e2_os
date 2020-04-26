@@ -1,0 +1,15 @@
+{
+	"title"		:	"Wiremod ALX E2 PC & OS",
+	"type"		:	"model",
+	"tags"		:	[ "build", "roleplay" ],
+    "ignore"    :
+    [
+        "*.psd",
+		"*.jpg",
+        "*.vcproj",
+        "*.svn*",
+		"*.ini",
+		"addon.json",
+		"*.gma"
+    ]
+}
