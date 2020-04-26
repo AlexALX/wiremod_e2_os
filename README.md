@@ -5,6 +5,8 @@ More screenshots: https://imgur.com/a/eUHZQ
 <br>Video: https://youtu.be/jfFnVnX7Kwg
 <br>Video in russian: https://youtu.be/ciM0uYEN5yw
 
+**[Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=2075107429)**
+
 **Description and wiki is not yet fully updated.**
 
 This is an Wiremod Expression2 OS for Garry's Mod Game.  
