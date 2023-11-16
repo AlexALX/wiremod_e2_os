@@ -1305,6 +1305,8 @@ function number cmd_wm1_rawwritefile(Args:table) {
         CurTask[1,number] = Max
         return 1
     }
+
+    return 0
 }
 
 function number cmd_wm1_rawwritefile_helper(CmdData:table) {
