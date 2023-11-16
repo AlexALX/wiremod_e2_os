@@ -1,5 +1,5 @@
 @name BIOS / Chipset
-@inputs ROM:wirelink Speaker:entity CPU_SOCKET PCIE_SOCKET0 PCIE_SOCKET1 PCI_SOCKET0 PCI_SOCKET1 PCI_SOCKET2
+@inputs ROM:wirelink Speaker:entity CPU_SOCKET PCIE_SOCKET0 PCIE_SOCKET1 PCI_SOCKET0 PCI_SOCKET1 PCI_SOCKET2 PCI_SOCKET3
 @inputs KeyboardSocket Power Reset NoFanSound NullByte:string
 @outputs BIOS:entity BIOS_ID PowerInd HDDInd
 @persist INIT POST ERR ERR_N ERR_I HDDS:table HDD_C FS_TYPES:table Shutdown ShutStep ShutMax Block SndBl
@@ -47,7 +47,7 @@ Block = 0
 SndBl = 0
 BiosData = table()
 MaxPCIE = 2
-MaxPCI = 3
+MaxPCI = 4
 
 Shutdown = 0
 ShutStep = 0
@@ -622,7 +622,7 @@ if (dsClk()) {
                 if (V[1,string]=="hdd") {
                     HDD_IO_C++
                     #Devices["names",table]["hdd_io"+HDD_IO_C,string] = V[4,string]
-                    Devices["hdd_io",table][HDD_IO_C,table] = table(V[3,wirelink],V[3,wirelink]:entity():id(),V[4,string],V[5,table][1,number],V[5,table][2,table],Name,Sock,K,V[2,entity]:id())
+                    Devices["hdd_io",table][HDD_IO_C,table] = table(V[3,wirelink],V[3,wirelink]:entity():id(),V[4,string]+" ["+V[5,table][1,string]+"]",V[5,table][2,number],V[5,table][3,table],Name,Sock,K,V[2,entity]:id())
                 } elseif (V[1,string]=="spu" & Devices["spu",entity]==noentity()) {
                     Devices["spu",entity] = V[3,wirelink]:entity()
                     Devices["names",table]["spu",string] = V[4,string]
@@ -779,7 +779,7 @@ if (dsClk()) {
                 local K = Info[2,string]
                 HDD_IO_C++
                 #Devices["names",table]["hdd_io"+HDD_IO_C,string] = USB_Device[4,string]
-                Devices["hdd_io",table][HDD_IO_C,table] = table(USB_Device[3,wirelink],USB_Device[3,wirelink]:entity():id(),USB_Device[4,string],USB_Device[5,table][1,number],USB_Device[5,table][2,table],Name,Sock,K,USB_Device[6,number])
+                Devices["hdd_io",table][HDD_IO_C,table] = table(USB_Device[3,wirelink],USB_Device[3,wirelink]:entity():id(),USB_Device[4,string]+" ["+USB_Device[5,table][1,string]+"]",USB_Device[5,table][2,number],USB_Device[5,table][3,table],Name,Sock,K,USB_Device[6,number])
                 dsSendDirect("usbpost",USB_Device[3,wirelink]:entity(),BIOS)
             } else {
                 for(I=1,HDD_IO_C) {

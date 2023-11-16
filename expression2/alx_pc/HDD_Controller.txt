@@ -538,7 +538,7 @@ function usb_init() {
     HDD_MAX = 1
     USB_NAME = Info[1,string]
     USB_Device = Info[2,entity]
-    dsSendDirect("usbcontroller",USB_Device,table("hdd",wirelink(),table(HDD_MAX,HDDS)))
+    dsSendDirect("usbcontroller",USB_Device,table("hdd",wirelink(),table(Device_Name,HDD_MAX,HDDS)))
 }
 
 function usb_onplug(Name:string) {

@@ -86,6 +86,25 @@ function number trailingZeros(N) {
     }
     return S
 }
+#[
+function number trailingZeros(I) {
+    return I ? log2(I&&-I) : 32
+}
+
+function number string:read_uint8(Offset) { 
+    return toByte(This, Offset) 
+}
+
+function number string:read_uint16(Offset) {
+  return toByte(This, Offset+1)*256+toByte(This, Offset) 
+}
+
+function number string:read_uint32(Offset) {
+  return toByte(This, Offset+3)*16777216
+        +toByte(This, Offset+2)*65536
+        +toByte(This, Offset+1)*256
+        +toByte(This, Offset)
+}]#
 
 function number checkPerf(Min) {
     #local Quota = (softQuota()>TickQuota ? TickQuota-(10000-Min) : softQuota() )
