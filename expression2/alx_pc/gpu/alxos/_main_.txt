@@ -286,10 +286,10 @@ function alxos_menubg(Title:string,Width,Height,Col:table) {
         EGP:egpPos(Parent+2,vec2((256+11)-(Width/2),(256+11)-(Height/2)))
         
         local Sz = Title:length()*12
-        EGP:egpPos(Parent+3,vec2(0-Sz/2,0-Height/2))
+        EGP:egpPos(Parent+3,vec2(Width/2-Sz/2,0))
         EGP:egpSize(Parent+3,vec2(Sz,22))
         
-        EGP:egpText(Parent+4,Title,vec2(0,0-Height/2))
+        EGP:egpText(Parent+4,Title,vec2(Width/2,0))
         
         return   
     }
@@ -303,11 +303,11 @@ function alxos_menubg(Title:string,Width,Height,Col:table) {
     EGP:egpColor(LAST_I,Col[2,vector4]) LAST_I++
     
     local Sz = Title:length()*12
-    EGP:egpBox(LAST_I,vec2(0-Sz/2,0-Height/2),vec2(Sz,22))
+    EGP:egpBox(LAST_I,vec2(Width/2-Sz/2,0),vec2(Sz,22))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,Col[1,vector4]) LAST_I++
     
-    EGP:egpText(LAST_I,Title,vec2(0,0-Height/2))
+    EGP:egpText(LAST_I,Title,vec2(Width/2,0))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpAlign(LAST_I,1)
     EGP:egpColor(LAST_I,Col[2,vector4]) LAST_I++
@@ -328,8 +328,8 @@ function alxos_menu(Title:string,MenuTree:table,Width,Keys:table) {
     alxos_menubg(Title,Width,Height)
     
     local Parent = DialogData[-1,number]
-    local LAST_Y = 20-Height/2
-    local LeftPos = 20-Width/2
+    local LAST_Y = 20 #-Height/2
+    local LeftPos = 20 #-Width/2
 
     if (ReDraw) {
         local Tbl = DialogData[-3,table]
@@ -411,7 +411,7 @@ function number alxos_dialog(Title:string,Width,Height,Type:string,Callback:stri
             Add = Info["Yes",array][3,number]
         }
         
-        EGP:egpBox(LAST_I,vec2((Sz/2)+Add,(Height/2)-22),vec2(Sz,20))
+        EGP:egpBox(LAST_I,vec2((Sz/2)+Add+Width/2,Height-22),vec2(Sz,20))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
         
@@ -432,7 +432,7 @@ function number alxos_dialog(Title:string,Width,Height,Type:string,Callback:stri
             Add = Info["No",array][3,number]
         }
         
-        EGP:egpBox(LAST_I,vec2((Sz/2)+Add,(Height/2)-22),vec2(Sz,20))
+        EGP:egpBox(LAST_I,vec2((Sz/2)+Add+Width/2,Height-22),vec2(Sz,20))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,168,0,255) LAST_I++
         
@@ -459,7 +459,7 @@ function number alxos_dialog(Title:string,Width,Height,Type:string,Callback:stri
             Add = Info["OK",array][3,number]
         }
         
-        EGP:egpBox(LAST_I,vec2((Sz/2)+Add,(Height/2)-22),vec2(Sz,20))
+        EGP:egpBox(LAST_I,vec2((Sz/2)+Add+Width/2,Height-22),vec2(Sz,20))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
         
@@ -480,7 +480,7 @@ function number alxos_dialog(Title:string,Width,Height,Type:string,Callback:stri
             Add = Info["Cancel",array][3,number]
         }
         
-        EGP:egpBox(LAST_I,vec2((Sz/2)+Add,(Height/2)-22),vec2(Sz,20))
+        EGP:egpBox(LAST_I,vec2((Sz/2)+Add+Width/2,Height-22),vec2(Sz,20))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,168,0,255) LAST_I++
         
@@ -505,7 +505,7 @@ function number alxos_dialog(Title:string,Width,Height,Type:string,Callback:stri
             Add = Info["OK",array][3,number]
         }
         
-        EGP:egpBox(LAST_I,vec2(0-(Sz/2)+Add,(Height/2)-22),vec2(Sz,20))
+        EGP:egpBox(LAST_I,vec2(0-(Sz/2)+Add+Width/2,Height-22),vec2(Sz,20))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,168,0,255) LAST_I++
         

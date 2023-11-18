@@ -198,7 +198,7 @@ function number installos(Args:table) {
     
     if (!Args[2,number]) {
         local Size = EGP:egpSize(Parent)
-        Spos = vec2(Size[1]/2*(-1)+10,Size[2]/2*(-1))
+        Spos = vec2(10, 0) #vec2(Size[1]/2*(-1)+10,Size[2]/2*(-1))
         GpuData[2,number] = LAST_I
         GpuData[-2,number] = Spos[2]
         GpuData[-3,number] = Spos[2]

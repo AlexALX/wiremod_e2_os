@@ -1711,20 +1711,21 @@ function alxos_explorer_mkdir() {
     
     local Parent = alxos_explorer_dialog("Create Folder",400,80,"text","alxos_explorer_mkdirpre")
     local Entries = table()
+
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Folder name:",vec2(-180,-22))
+    EGP:egpText(LAST_I,"Folder name:",vec2(20,18))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpBox(LAST_I,vec2(-180,-4),vec2(360,20))
+    EGP:egpBox(LAST_I,vec2(20,36),vec2(360,20))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
     Entries[0,table] = table(LAST_I,"","^[A-Za-z0-9_ -]$",10)
-    EGP:egpText(LAST_I,"_",vec2(-178,-4))
+    EGP:egpText(LAST_I,"_",vec2(22,36))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
