@@ -1525,7 +1525,7 @@ function alxos_explorer_delete(Info:table) {
     DialogData[7,number] = LAST_I
     local FName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Are you sure want to delete '"+FName+"'?",vec2(-180,-12))
+    EGP:egpText(LAST_I,"Are you sure want to delete '"+FName+"'?",vec2(20,18))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
 }
@@ -1697,7 +1697,7 @@ function alxos_explorer_reboot() {
     local Entries = table()
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Are you sure want to exit and reboot?",vec2(0,-12))
+    EGP:egpText(LAST_I,"Are you sure want to exit and reboot?",vec2(170,18))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1791,74 +1791,74 @@ function alxos_explorer_mkfile() {
     local Entries = table()
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"File name:",vec2(-180,-67))
+    EGP:egpText(LAST_I,"File name:",vec2(20,13))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpBox(LAST_I,vec2(-180,-49),vec2(360,20))
+    EGP:egpBox(LAST_I,vec2(20,31),vec2(360,20))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
     Entries[0,table] = table(LAST_I,"","^[A-Za-z0-9_!@#$^ .-]$",14,"alxos_explorer_fnamefilter")
-    EGP:egpText(LAST_I,"_",vec2(-178,-49))
+    EGP:egpText(LAST_I,"_",vec2(22,31))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     #ifdef runOnHTTP(number)
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"File content or URL: (not necessary)",vec2(-180,-29))
+    EGP:egpText(LAST_I,"File content or URL: (not necessary)",vec2(20,51))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpBox(LAST_I,vec2(-180,-9),vec2(360,20))
+    EGP:egpBox(LAST_I,vec2(20,71),vec2(360,20))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
     Entries[1,table] = table(LAST_I,"","^[A-Za-z0-9_&$#?@!*()\"'^%%+;:.,|/\\ %[%]-]$",100)
-    EGP:egpText(LAST_I,Entries[2,table][2,string],vec2(-178,-9))
+    EGP:egpText(LAST_I,Entries[2,table][2,string],vec2(22,71))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Note: you can paste url here using command",vec2(-180,16))
+    EGP:egpText(LAST_I,"Note: you can paste url here using command",vec2(20,96))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"\"!url http://URL\" in chat",vec2(-180,36))
+    EGP:egpText(LAST_I,"\"!url http://URL\" in chat",vec2(20,116))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     #else
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"File content: (not necessary)",vec2(-180,-29))
+    EGP:egpText(LAST_I,"File content: (not necessary)",vec2(20,51))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpBox(LAST_I,vec2(-180,-9),vec2(360,20))
+    EGP:egpBox(LAST_I,vec2(20,51),vec2(360,20))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
     Entries[2,table] = table(LAST_I,"","^[A-Za-z0-9_&$#?@!*()\"'^%%+;:.,|/\\ %[%]-]$",100)
-    EGP:egpText(LAST_I,Entries[2,table][2,string],vec2(-178,-9))
+    EGP:egpText(LAST_I,Entries[2,table][2,string],vec2(22,71))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Note: http download is disabled due to missing",vec2(-180,16))
+    EGP:egpText(LAST_I,"Note: http download is disabled due to missing",vec2(20,96))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"E2 HTTP Extension, please enable it.",vec2(-180,36))
+    EGP:egpText(LAST_I,"E2 HTTP Extension, please enable it.",vec2(20,116))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
 
