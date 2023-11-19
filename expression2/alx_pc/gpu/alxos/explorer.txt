@@ -2379,11 +2379,10 @@ function alxos_explorer_reader_init(FInfo:table) {
     
     local LAST_SI = GpuData[100,number]
     if (LAST_SI>0) { LAST_I = LAST_SI } else { GpuData[100,number] = LAST_I }
-    
     local Parent = alxos_explorer_dialog("Opening file",400,80,"progress","alxos_explorer_listcurdir")
-    
+
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",vec2(0,-22))
+    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",vec2(200,22))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpAlign(LAST_I,1)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -2439,10 +2438,12 @@ function alxos_explorer_reader_move(Key:string) {
     local LAST_SI = GpuData[100,number]
     if (LAST_SI>0) { LAST_I = LAST_SI } else { GpuData[100,number] = LAST_I }
     
-    local Parent = alxos_explorer_dialog("Opening file",400,80,"progress","alxos_explorer_listcurdir")
+    GpuData[-101,number] = 1
     
+    local Parent = alxos_explorer_dialog("Opening file",400,80,"progress","alxos_explorer_listcurdir")
+
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",vec2(0,-22))
+    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",vec2(200,22))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpAlign(LAST_I,1)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -2525,7 +2526,7 @@ function alxos_explorer_reader(Data:string) {
             local CalcP = round(Count/24*100)
             BoxW = ceil(BoxW/100*CalcP)
             EGP:egpSize(BoxID,vec2(BoxW,20))
-            EGP:egpText(PercID,CalcP+"%",EGP:egpPos(PercID))
+            EGP:egpSetText(PercID,CalcP+"%")
         }
         GpuData[10,number] = Count
         #print(Start+Offset+" | "+End)
@@ -2564,7 +2565,7 @@ function alxos_explorer_soundplay_conf(Arr:array) {
     ExplorerCurTask = "sound"
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Playing sound file, press OK to stop.",vec2(0,-12))
+    EGP:egpText(LAST_I,"Playing sound file, press OK to stop.",vec2(200,18))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpAlign(LAST_I,1)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -2599,13 +2600,13 @@ function alxos_explorer_soundplay_ds(Data:string) {
         local Entries = table()
         
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"Sound file not found on server!",vec2(0,-22))
+        EGP:egpText(LAST_I,"Sound file not found on server!",vec2(170,20))
         EGP:egpAlign(LAST_I,1)
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
         
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"Do you want try to play it anyway?",vec2(0,-2))
+        EGP:egpText(LAST_I,"Do you want try to play it anyway?",vec2(170,38))
         EGP:egpAlign(LAST_I,1)
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -2632,7 +2633,7 @@ function alxos_explorer_soundplay(Info:table) {
     local Parent = alxos_explorer_dialog("Opening file",400,60,"none","alxos_explorer_listcurdir")
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",vec2(0,-12))
+    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",vec2(0,18))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpAlign(LAST_I,1)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++

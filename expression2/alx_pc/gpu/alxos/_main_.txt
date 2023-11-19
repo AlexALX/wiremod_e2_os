@@ -515,8 +515,8 @@ function number alxos_dialog(Title:string,Width,Height,Type:string,Callback:stri
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
         
     } elseif (Type=="progress") {
-        local LAST_Y = Height/2-40
-        local LeftPos = 20-Width/2
+        local LAST_Y = 40
+        local LeftPos = 20
         
         EntID:pushNumber(LAST_I)
         EGP:egpBox(LAST_I,vec2(LeftPos,LAST_Y),vec2(Width-40,20))
@@ -524,15 +524,15 @@ function number alxos_dialog(Title:string,Width,Height,Type:string,Callback:stri
         EGP:egpColor(LAST_I,125,125,125,255) LAST_I++
 
         DialogData[-5,number] = LAST_I
-        DialogData[-6,number] = Width-40
+        DialogData[-6,number] = 40
         EntID:pushNumber(LAST_I)
-        EGP:egpBox(LAST_I,vec2(LeftPos,LAST_Y),vec2(1,20))
-        EGP:egpParent(LAST_I,Parent)
+        EGP:egpBox(LAST_I,vec2(0,0),vec2(1,20))
+        EGP:egpParent(LAST_I,LAST_I-1)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
         
         DialogData[-4,number] = LAST_I
         EntID:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"0%",vec2(0,LAST_Y))
+        EGP:egpText(LAST_I,"0%",vec2(Width/2,LAST_Y))
         EGP:egpAlign(LAST_I,1)
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,200,200,200,255) LAST_I++
