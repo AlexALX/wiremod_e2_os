@@ -79,8 +79,8 @@ function alxos_bsod(Type:array) {
     EGP:egpBox(LAST_I,vec2(0,0),vec2(512,512))
     EGP:egpColor(LAST_I,0,0,130,255) LAST_I++    
     
-    local Rand = "0x"+toString(random(10000000,159999999),16)
-    local Rand2 = "0x"+toString(random(10000000,159999999),16)
+    local Rand = "0x"+toString(randint(10000000,159999999),16)
+    local Rand2 = "0x"+toString(randint(10000000,159999999),16)
     local ID = toString(Type[1,number],16)
     if (ID:length()<8) { ID = "0":repeat(8-ID:length())+ID }
     

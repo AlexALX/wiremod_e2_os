@@ -1915,6 +1915,7 @@ function alxos_burner_start_ds(Name:string) {
         KeyHandler = "alxos_burner_key"
         BurnerKeyH = "listdir"
         BurnerDsH = ""
+        BurnerCurTask = ""
         local Parent = alxos_burner_dialog("Success",330,60,"ok","alxos_burner_closedialog")
         DialogData[-10,table]:pushNumber(LAST_I)
         EGP:egpText(LAST_I,"Burning successfully finished.",alxos_dlgPos(0,-10))
