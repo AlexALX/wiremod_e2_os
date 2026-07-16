@@ -8,7 +8,7 @@
 ]#
 
 #ifndef httpClk()
-    error("HTTP e2 extension is required for this script.")
+    error("HTTP e2 extension is required for this script. Please enable via wire_expression2_extension_enable http.")
 #else
 
 if (first()|duped()) {

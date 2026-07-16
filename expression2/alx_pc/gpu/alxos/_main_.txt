@@ -524,7 +524,7 @@ function number alxos_dialog(Title:string,Width,Height,Type:string,Callback:stri
         EGP:egpColor(LAST_I,125,125,125,255) LAST_I++
 
         DialogData[-5,number] = LAST_I
-        DialogData[-6,number] = 40
+        DialogData[-6,number] = Width-40
         EntID:pushNumber(LAST_I)
         EGP:egpBox(LAST_I,vec2(0,0),vec2(1,20))
         EGP:egpParent(LAST_I,LAST_I-1)
@@ -543,6 +543,13 @@ function number alxos_dialog(Title:string,Width,Height,Type:string,Callback:stri
 
 function number alxos_dialog(Title:string,Width,Height,Type:string,Callback:string) {
     return alxos_dialog(Title,Width,Height,Type,Callback,table())
+}
+
+# this is helper function to fix dialog centering due to wiremod changes
+function vector2 alxos_dlgPos(X, Y) {
+    local Parent = DialogData[-1,number]
+    local Size = EGP:egpSize(Parent)
+    return vec2(X + Size[1]/2, Y + Size[2]/2)
 }
 
 }

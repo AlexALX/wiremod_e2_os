@@ -38,7 +38,8 @@ function alxos_openfile_ds() {
 function alxos_execude_ds() {
     local Info = dsGetTable()
     ALXOS_DsH = "alxos_execute_pre"
-    dsSendDirect("fs_readfile",Info[2,table]["hdd_io",wirelink]:entity(),table(entity(),"wm1",table(Info[2,table],Info[3,table])))        
+    local CurFs = Info[2,table]
+    dsSendDirect("fs_readfile",CurFs["hdd_io",wirelink]:entity(),table(entity(),CurFs["fs_str_id",string]:lower(),table(Info[2,table],Info[3,table])))        
 }
 
 function alxos_execute_pre(Name:string) {

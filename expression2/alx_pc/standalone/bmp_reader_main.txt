@@ -31,13 +31,12 @@
 ]#
 
 #ifndef httpClk()
-    error("HTTP e2 extension is required for this script.")
+    error("HTTP e2 extension is required for this script. Please enable via wire_expression2_extension_enable http.")
 #else
 
 if (first()|duped()) {
     
 runOnChat(1)
-runOnHTTP(1)
 runOnLast(1)
 
 BmpData = table()
@@ -409,11 +408,16 @@ if (~LongURL & LongURL!="") {
     httpRequest(LongURL) 
 }
 
-if (httpClk()) {
+event httpLoaded(Body:string, Size, Url:string) {
     dsClear()  
-    BmpData["data",string] = httpData()   
-    BmpData["size",number] = BmpData["data",string]:length()
+    BmpData["data",string] = Body   
+    BmpData["size",number] = Size
     alxos_bmp_draw()
+    exit()
+}
+
+event httpErrored(Error:string, Url:string) {
+    print(_HUD_PRINTTALK,"HTTP Request Failed - Error: "+Error)   
     exit()
 }
 

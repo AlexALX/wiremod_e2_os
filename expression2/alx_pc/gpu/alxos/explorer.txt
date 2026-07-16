@@ -517,7 +517,7 @@ function alxos_explorer_msg(Msg:string,Width,Title:string,Callback:string) {
     }
     local Parent = alxos_explorer_dialog(Title,Width,60,"ok",Callback)
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,Msg,vec2(0,-12))
+    EGP:egpText(LAST_I,Msg,alxos_dlgPos(0,-12))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpAlign(LAST_I,1)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -555,7 +555,7 @@ function alxos_explorer_paste_progress() {
         local EntID = DialogData[-10,table]
         EntID:pushNumber(LAST_I)
         DialogData[5,number] = LAST_I
-        EGP:egpText(LAST_I,"Reading file, please wait...",vec2(-180,-22))
+        EGP:egpText(LAST_I,"Reading file, please wait...",alxos_dlgPos(-180,-22))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
         
@@ -655,7 +655,7 @@ function alxos_explorer_paste_ds(Args:table) {
             DialogData[4,number] = 0
             local Parent = alxos_explorer_dialog("Copied",300,60,"ok","alxos_explorer_listcurdir")
             DialogData[-10,table]:pushNumber(LAST_I)
-            EGP:egpText(LAST_I,"File successfully copied.",vec2(0,-12))
+            EGP:egpText(LAST_I,"File successfully copied.",alxos_dlgPos(0,-12))
             EGP:egpParent(LAST_I,Parent)
             EGP:egpAlign(LAST_I,1)
             EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -681,7 +681,7 @@ function alxos_explorer_copy(Info:table) {
     }
     local Parent = alxos_explorer_dialog("Copied",250,60,"ok","alxos_explorer_closedialog")
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"File copied to clipboard.",vec2(0,-12))
+    EGP:egpText(LAST_I,"File copied to clipboard.",alxos_dlgPos(0,-12))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpAlign(LAST_I,1)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -692,7 +692,7 @@ function alxos_explorer_copy(Info:table) {
 function alxos_explorer_share_svs() {
     local Parent = alxos_explorer_dialog("Searching...",340,60,"none","")
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Please wait while establish connection...",vec2(0,-10))
+    EGP:egpText(LAST_I,"Please wait while establish connection...",alxos_dlgPos(0,-10))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -720,7 +720,7 @@ function number alxos_explorer_sharepost() {
     local Parent = alxos_explorer_dialog("Failed",360,60,"yesno","alxos_explorer_sharesretry")
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"No servers found. Do you want to retry?",vec2(0,-10))
+    EGP:egpText(LAST_I,"No servers found. Do you want to retry?",alxos_dlgPos(0,-10))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -736,7 +736,7 @@ function alxos_explorer_sharecl(Args:table) {
     Keys["OK",array] = array("Abort",55)
     local Parent = alxos_explorer_dialog("Information",350,70,"ok","alxos_explorer_sharestop",Keys)
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Waiting for confirmation of send request...",vec2(0,-10))
+    EGP:egpText(LAST_I,"Waiting for confirmation of send request...",alxos_dlgPos(0,-10))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -786,7 +786,7 @@ function alxos_explorer_sharename() {
     local EntID = DialogData[-10,table]
     EntID:pushNumber(LAST_I)
     DialogData[5,number] = LAST_I
-    EGP:egpText(LAST_I,"Receiving file, please wait...",vec2(-180,-22))
+    EGP:egpText(LAST_I,"Receiving file, please wait...",alxos_dlgPos(-180,-22))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
@@ -817,19 +817,19 @@ function alxos_explorer_presendsv(Info:table) {
         DialogData[1,table] = Entry
         
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"New send request from #"+Info[7,number]+", file name:",vec2(-180,-24))
+        EGP:egpText(LAST_I,"New send request from #"+Info[7,number]+", file name:",alxos_dlgPos(-180,-24))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
                 
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpBox(LAST_I,vec2(-180,-4),vec2(360,20))
+        EGP:egpBox(LAST_I,alxos_dlgPos(-180,-4),vec2(360,20))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
         
         DialogData[-10,table]:pushNumber(LAST_I)
         local FName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
         Entries[0,table] = table(LAST_I,FName,"^[A-Za-z0-9_!@#$^ .-]$",14,"alxos_explorer_fnamefilter")
-        EGP:egpText(LAST_I,FName+"_",vec2(-178,-4))
+        EGP:egpText(LAST_I,FName+"_",alxos_dlgPos(-178,-4))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
         
@@ -886,7 +886,7 @@ function alxos_explorer_nwsend_progress() {
         local EntID = DialogData[-10,table]
         EntID:pushNumber(LAST_I)
         DialogData[5,number] = LAST_I
-        EGP:egpText(LAST_I,"Reading file, please wait...",vec2(-180,-22))
+        EGP:egpText(LAST_I,"Reading file, please wait...",alxos_dlgPos(-180,-22))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
         
@@ -1052,7 +1052,7 @@ function alxos_explorer_nwsend_ds(Args:table) {
             DialogData[4,number] = 0
             local Parent = alxos_explorer_dialog("Sent",300,60,"ok","alxos_explorer_listcurdir")
             DialogData[-10,table]:pushNumber(LAST_I)
-            EGP:egpText(LAST_I,"File successfully received.",vec2(0,-12))
+            EGP:egpText(LAST_I,"File successfully received.",alxos_dlgPos(0,-12))
             EGP:egpParent(LAST_I,Parent)
             EGP:egpAlign(LAST_I,1)
             EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1095,19 +1095,19 @@ function alxos_explorer_sellocal() {
     DialogData[-10,table]:pushNumber(LAST_I)
     
     Txt = (GpuData["share_mode",number]==1 ? "Do you want to make an local server?" : "Where you want to find servers?" )    
-    EGP:egpText(LAST_I,Txt,vec2(-205,-32))
+    EGP:egpText(LAST_I,Txt,alxos_dlgPos(-205,-32))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     Txt = (GpuData["share_mode",number]==1 ? "Local server will be available only in home network." : "Local search will find local servers in home network." )  
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,Txt,vec2(-205,-12))
+    EGP:egpText(LAST_I,Txt,alxos_dlgPos(-205,-12))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     Txt = (GpuData["share_mode",number]==1 ? "Remote server will be available in all networks." : "Remove search will find remote servers in all networks." )  
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,Txt,vec2(-205,8))
+    EGP:egpText(LAST_I,Txt,alxos_dlgPos(-205,8))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
 }
@@ -1117,7 +1117,7 @@ function alxos_explorer_sharesv() {
     Keys["OK",array] = array("Stop Server",100)
     local Parent = alxos_explorer_dialog("Sharing Server #"+entity():id(),340,70,"ok","alxos_explorer_sharestop",Keys)
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Waiting for incoming connections...",vec2(0,-10))
+    EGP:egpText(LAST_I,"Waiting for incoming connections...",alxos_dlgPos(0,-10))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1143,7 +1143,7 @@ function alxos_explorer_local() {
 function alxos_explorer_internet_svs() {
     local Parent = alxos_explorer_dialog("Searching...",340,60,"none","")
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Please wait while establish connection...",vec2(0,-10))
+    EGP:egpText(LAST_I,"Please wait while establish connection...",alxos_dlgPos(0,-10))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1171,7 +1171,7 @@ function number alxos_explorer_searchpost() {
     local Parent = alxos_explorer_dialog("Failed",360,60,"yesno","alxos_explorer_serversretry")
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"No servers found. Do you want to retry?",vec2(0,-10))
+    EGP:egpText(LAST_I,"No servers found. Do you want to retry?",alxos_dlgPos(0,-10))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1187,7 +1187,7 @@ function alxos_explorer_httpdw(Args:table) {
     
     local Parent = alxos_explorer_dialog("Downloading...",340,60,"none","")
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Please wait while establish connection...",vec2(0,-10))
+    EGP:egpText(LAST_I,"Please wait while establish connection...",alxos_dlgPos(0,-10))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1230,7 +1230,7 @@ function alxos_explorer_nwinterface(Args:table) {
     if (!MenuTree:count()) {
         local Parent = alxos_explorer_dialog("Error",320,60,"ok","alxos_explorer_closedialog")
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"No active network interfaces found!",vec2(0,-10))
+        EGP:egpText(LAST_I,"No active network interfaces found!",alxos_dlgPos(0,-10))
         EGP:egpAlign(LAST_I,1)
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1384,7 +1384,7 @@ function alxos_explorer_dw_progress() {
         } else {
             local Parent = alxos_explorer_dialog("Saved",420,60,"ok","alxos_explorer_listcurdir")
             DialogData[-10,table]:pushNumber(LAST_I)
-            EGP:egpText(LAST_I,"File saved as "+FName+".",vec2(0,-12))
+            EGP:egpText(LAST_I,"File saved as "+FName+".",alxos_dlgPos(0,-12))
             EGP:egpParent(LAST_I,Parent)
             EGP:egpAlign(LAST_I,1)
             EGP:egpColor(LAST_I,0,0,0,255) LAST_I++ 
@@ -1460,7 +1460,7 @@ function alxos_explorer_dw(Info:table) {
     local LAST_Y = (-10*Strs:count())-2
     for (I=1,Strs:count()) {
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,Strs[I,string],vec2(-180,LAST_Y))
+        EGP:egpText(LAST_I,Strs[I,string],alxos_dlgPos(-180,LAST_Y))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++ LAST_Y += 20
     }
@@ -1469,7 +1469,7 @@ function alxos_explorer_dw(Info:table) {
 function alxos_explorer_refresh() {
     local Parent = alxos_explorer_dialog("Initializating...",330,60,"none","")
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Please wait for drive get ready...",vec2(0,-10))
+    EGP:egpText(LAST_I,"Please wait for drive get ready...",alxos_dlgPos(0,-10))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1498,7 +1498,7 @@ function alxos_explorer_refresh_ds() {
         GpuData[100,string] = Ret
         for (I=1,Arr:count()) {
             DialogData[-10,table]:pushNumber(LAST_I)
-            EGP:egpText(LAST_I,Arr[I,string],vec2(0,LAST_Y))
+            EGP:egpText(LAST_I,Arr[I,string],alxos_dlgPos(0,LAST_Y))
             EGP:egpAlign(LAST_I,1)
             EGP:egpParent(LAST_I,Parent)
             EGP:egpColor(LAST_I,0,0,0,255) LAST_I++ LAST_Y += 20
@@ -1525,7 +1525,7 @@ function alxos_explorer_delete(Info:table) {
     DialogData[7,number] = LAST_I
     local FName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Are you sure want to delete '"+FName+"'?",vec2(20,18))
+    EGP:egpText(LAST_I,"Are you sure want to delete '"+FName+"'?",alxos_dlgPos(-180,-12))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
 }
@@ -1542,7 +1542,7 @@ function alxos_explorer_delact() {
             local Parent = alxos_explorer_dialog("Removing file",400,80,"progress","")
         
             DialogData[-10,table]:pushNumber(LAST_I)
-            EGP:egpText(LAST_I,"Please wait, this can take few minutes...",vec2(0,-22))
+            EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
             EGP:egpParent(LAST_I,Parent)
             EGP:egpAlign(LAST_I,1)
             EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1613,12 +1613,12 @@ function alxos_explorer_rename(Info:table) {
     local Str = (Is_Dir ? "Folder name:" : "File name:")
     local Sz = 360
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,Str,vec2(-180,-22))
+    EGP:egpText(LAST_I,Str,alxos_dlgPos(-180,-22))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpBox(LAST_I,vec2(-180,-4),vec2(Sz,20))
+    EGP:egpBox(LAST_I,alxos_dlgPos(-180,-4),vec2(Sz,20))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
     
@@ -1630,7 +1630,7 @@ function alxos_explorer_rename(Info:table) {
     } else {
         Entries[0,table] = table(LAST_I,FName,"^[A-Za-z0-9_!@#$^ -]$",10)
     }
-    EGP:egpText(LAST_I,FName+"_",vec2(-178,-4))
+    EGP:egpText(LAST_I,FName+"_",alxos_dlgPos(-178,-4))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
@@ -1697,7 +1697,7 @@ function alxos_explorer_reboot() {
     local Entries = table()
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Are you sure want to exit and reboot?",vec2(170,18))
+    EGP:egpText(LAST_I,"Are you sure want to exit and reboot?",alxos_dlgPos(0,-12))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1711,21 +1711,20 @@ function alxos_explorer_mkdir() {
     
     local Parent = alxos_explorer_dialog("Create Folder",400,80,"text","alxos_explorer_mkdirpre")
     local Entries = table()
-
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Folder name:",vec2(20,18))
+    EGP:egpText(LAST_I,"Folder name:",alxos_dlgPos(-180,-22))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpBox(LAST_I,vec2(20,36),vec2(360,20))
+    EGP:egpBox(LAST_I,alxos_dlgPos(-180,-4),vec2(360,20))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
     Entries[0,table] = table(LAST_I,"","^[A-Za-z0-9_ -]$",10)
-    EGP:egpText(LAST_I,"_",vec2(22,36))
+    EGP:egpText(LAST_I,"_",alxos_dlgPos(-178,-4))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
@@ -1791,74 +1790,74 @@ function alxos_explorer_mkfile() {
     local Entries = table()
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"File name:",vec2(20,13))
+    EGP:egpText(LAST_I,"File name:",alxos_dlgPos(-180,-67))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpBox(LAST_I,vec2(20,31),vec2(360,20))
+    EGP:egpBox(LAST_I,alxos_dlgPos(-180,-49),vec2(360,20))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
     Entries[0,table] = table(LAST_I,"","^[A-Za-z0-9_!@#$^ .-]$",14,"alxos_explorer_fnamefilter")
-    EGP:egpText(LAST_I,"_",vec2(22,31))
+    EGP:egpText(LAST_I,"_",alxos_dlgPos(-178,-49))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     #ifdef runOnHTTP(number)
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"File content or URL: (not necessary)",vec2(20,51))
+    EGP:egpText(LAST_I,"File content or URL: (not necessary)",alxos_dlgPos(-180,-29))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpBox(LAST_I,vec2(20,71),vec2(360,20))
+    EGP:egpBox(LAST_I,alxos_dlgPos(-180,-9),vec2(360,20))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
     Entries[1,table] = table(LAST_I,"","^[A-Za-z0-9_&$#?@!*()\"'^%%+;:.,|/\\ %[%]-]$",100)
-    EGP:egpText(LAST_I,Entries[2,table][2,string],vec2(22,71))
+    EGP:egpText(LAST_I,Entries[2,table][2,string],alxos_dlgPos(-178,-9))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Note: you can paste url here using command",vec2(20,96))
+    EGP:egpText(LAST_I,"Note: you can paste url here using command",alxos_dlgPos(-180,16))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"\"!url http://URL\" in chat",vec2(20,116))
+    EGP:egpText(LAST_I,"\"!url http://URL\" in chat",alxos_dlgPos(-180,36))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     #else
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"File content: (not necessary)",vec2(20,51))
+    EGP:egpText(LAST_I,"File content: (not necessary)",alxos_dlgPos(-180,-29))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpBox(LAST_I,vec2(20,51),vec2(360,20))
+    EGP:egpBox(LAST_I,alxos_dlgPos(-180,-9),vec2(360,20))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
     Entries[2,table] = table(LAST_I,"","^[A-Za-z0-9_&$#?@!*()\"'^%%+;:.,|/\\ %[%]-]$",100)
-    EGP:egpText(LAST_I,Entries[2,table][2,string],vec2(22,71))
+    EGP:egpText(LAST_I,Entries[2,table][2,string],alxos_dlgPos(-178,-9))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Note: http download is disabled due to missing",vec2(20,96))
+    EGP:egpText(LAST_I,"Note: http download is disabled due to missing",alxos_dlgPos(-180,16))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"E2 HTTP Extension, please enable it.",vec2(20,116))
+    EGP:egpText(LAST_I,"E2 HTTP Extension, please enable it.",alxos_dlgPos(-180,36))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
 
@@ -1914,6 +1913,7 @@ function alxos_explorer_mkfilepre() {
         alxos_explorer_error("File name cannot be empty.",250)
         return
     }
+
     
     for(I=0,ExplorerDir[3,table]:count()) {
         local Entry = ExplorerDir[3,table][I,table]
@@ -1927,6 +1927,12 @@ function alxos_explorer_mkfilepre() {
     #ifdef runOnHTTP(number)
     local URL = DialogData[10,table][1,table][2,string]
     if (URL:left(7)=="http://" & URL!="http://" | URL:left(8)=="https://" & URL!="https://") {
+        
+        #[if (URL:find("localhost")) {
+            alxos_explorer_error("Requests to local resources are not allowed in Garry's Mod",480)
+            return
+        }]#
+        
         alxos_explorer_nwinterface(table(0,URL,FName,FNameE))
         return
     }
@@ -1936,14 +1942,19 @@ function alxos_explorer_mkfilepre() {
     dsSendDirect("fs_mkfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(ExplorerFS,FName,FNameE,0,ExplorerDir[1,number])))
 }
 
-function alxos_explorer_httpdwpost(Data:string) {
+function alxos_explorer_httpdwpost(Data:string, Size, IsError) {
     stopCmd()
-    if (Data=="") {
+    if (Data=="" | IsError) {
         GpuData:unset("http_dw")
         GpuData:unset("servers")
         GpuData:unset("server")
         GpuData:unset("dialogdata")
-        alxos_explorer_error("Response is empty.",300)
+        
+        if (IsError & Data!="") {
+            alxos_explorer_error(Data,450)
+        } else {        
+            alxos_explorer_error("Response is empty.",300)
+        }
         return  
     }
     local FName = GpuData["dialogdata",table][3,string]
@@ -1960,7 +1971,7 @@ function alxos_explorer_mkfilepost() {
         local Parent = alxos_explorer_dialog("Writing file",400,80,"progress","")
     
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"Please wait, this can take few minutes...",vec2(0,-22))
+        EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpAlign(LAST_I,1)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++    
@@ -2114,14 +2125,14 @@ function alxos_explorer_fileinfo(Info:table) {
     local Parent = alxos_explorer_dialog(FName,320,Height,"ok","alxos_explorer_closedialog")
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Is folder: "+(alxos_wm1_isdir(Entry) ? "Yes" : "No" ),vec2(XX,LAST_Y))
+    EGP:egpText(LAST_I,"Is folder: "+(alxos_wm1_isdir(Entry) ? "Yes" : "No" ),alxos_dlgPos(XX,LAST_Y))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++ 
     LAST_Y += 20
     
     if (!IsDir) {
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"File size: "+alxos_nicesize(Entry["size",number]),vec2(XX,LAST_Y))
+        EGP:egpText(LAST_I,"File size: "+alxos_nicesize(Entry["size",number]),alxos_dlgPos(XX,LAST_Y))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
         LAST_Y += 20
@@ -2129,7 +2140,7 @@ function alxos_explorer_fileinfo(Info:table) {
     local Date = Entry["time_create",number]
     local DateStr = alxos_wm1_date(Date)+" "+alxos_wm1_time(Date)
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Creation time: "+DateStr,vec2(XX,LAST_Y))
+    EGP:egpText(LAST_I,"Creation time: "+DateStr,alxos_dlgPos(XX,LAST_Y))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     LAST_Y += 20
@@ -2137,7 +2148,7 @@ function alxos_explorer_fileinfo(Info:table) {
     local Date = Entry["time_modify",number]
     local DateStr = alxos_wm1_date(Date)+" "+alxos_wm1_time(Date)
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Modify time: "+DateStr,vec2(XX,LAST_Y))
+    EGP:egpText(LAST_I,"Modify time: "+DateStr,alxos_dlgPos(XX,LAST_Y))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     LAST_Y += 20
@@ -2145,7 +2156,7 @@ function alxos_explorer_fileinfo(Info:table) {
     local Date = Entry["time_access",number]
     local DateStr = alxos_wm1_date(Date)+" "+alxos_wm1_time(Date)
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Last access: "+DateStr,vec2(XX,LAST_Y))
+    EGP:egpText(LAST_I,"Last access: "+DateStr,alxos_dlgPos(XX,LAST_Y))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
 }
@@ -2379,10 +2390,11 @@ function alxos_explorer_reader_init(FInfo:table) {
     
     local LAST_SI = GpuData[100,number]
     if (LAST_SI>0) { LAST_I = LAST_SI } else { GpuData[100,number] = LAST_I }
+
     local Parent = alxos_explorer_dialog("Opening file",400,80,"progress","alxos_explorer_listcurdir")
 
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",vec2(200,22))
+    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpAlign(LAST_I,1)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -2441,9 +2453,8 @@ function alxos_explorer_reader_move(Key:string) {
     GpuData[-101,number] = 1
     
     local Parent = alxos_explorer_dialog("Opening file",400,80,"progress","alxos_explorer_listcurdir")
-
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",vec2(200,22))
+    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpAlign(LAST_I,1)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -2565,7 +2576,7 @@ function alxos_explorer_soundplay_conf(Arr:array) {
     ExplorerCurTask = "sound"
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Playing sound file, press OK to stop.",vec2(200,18))
+    EGP:egpText(LAST_I,"Playing sound file, press OK to stop.",alxos_dlgPos(0,-12))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpAlign(LAST_I,1)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -2600,13 +2611,13 @@ function alxos_explorer_soundplay_ds(Data:string) {
         local Entries = table()
         
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"Sound file not found on server!",vec2(170,20))
+        EGP:egpText(LAST_I,"Sound file not found on server!",alxos_dlgPos(0,-22))
         EGP:egpAlign(LAST_I,1)
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
         
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"Do you want try to play it anyway?",vec2(170,38))
+        EGP:egpText(LAST_I,"Do you want try to play it anyway?",alxos_dlgPos(0,-2))
         EGP:egpAlign(LAST_I,1)
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -2633,7 +2644,7 @@ function alxos_explorer_soundplay(Info:table) {
     local Parent = alxos_explorer_dialog("Opening file",400,60,"none","alxos_explorer_listcurdir")
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",vec2(0,18))
+    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-12))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpAlign(LAST_I,1)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -2683,7 +2694,7 @@ function alxos_explorer_ds(Name:string) {
             GpuData["servers",table]:pushTable(table(Info[6,string],Info[1,number]))
         } elseif (Cmd=="internet_request") {
             if (Info[1,number]!=GpuData["server",table][2,number]) { return }
-            alxos_explorer_httpdwpost(Info[6,string])
+            alxos_explorer_httpdwpost(Info[6,string], Info[7, number], Info[8, number])
         } elseif (Cmd=="explorer_share") {
             if (GpuData["share_mode",number]==1) {
                 local Info = table(GpuData["nwinterface",number],Info[1,number],GpuData["share_local",number],"gpu","explorer_share","Sharing Server #"+entity():id())

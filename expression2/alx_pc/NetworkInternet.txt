@@ -54,9 +54,6 @@ function nwShutdown() {
     EntID = 0
     NWData = table()
     stopAllTimers()
-    #ifdef runOnHTTP(number)
-    runOnHTTP(0)
-    #endif
     BusyInd = 0
 }
 
@@ -75,9 +72,6 @@ function nwinit() {
 
     EntID = entity():id()
     Init = 1
-    #ifdef runOnHTTP(number)
-    runOnHTTP(1)
-    #endif
 }
         
 function number nwinterface(ID) {
@@ -87,11 +81,28 @@ function number nwinterface(ID) {
     }
     return 0
 }
+
+function nw_onHttpEvent(Body:string, Url:string, Size:number, IsError) {
+    if (!Init) { exit() }
+    local Requests = NWData["requests",table]
+    if (Requests:count()) {
+        local Info = Requests[1,table] # get first always
+        if (Info[6,string]!=Url) { exit() }
+        
+        local Send = table(NetSocket:entity():id(),Info[1,number],Info[3,number],Info[4,string],Info[5,string],Body,Size,IsError)
+        Send[0,number] = NetSocket["B",number]
+        dsSendDirect("nwdata",entity(NetSocketC),Send)
+        NWData["in_progress",number] = 0
+        Requests:removeTable(1)
+        stoptimer("httpRequestTimeout")
+        timer("httpRequest",250)
+    }    
+}
         
 }
 
 #ifndef httpCanRequest()
-    error("This device cannot work without e2 http extension.")
+    error("This device cannot work without e2 http extension. Please enable via wire_expression2_extension_enable http.")
     exit()
 #else
 
@@ -168,12 +179,21 @@ if (clk("httpRequestTimeout")) {
     timer("httpRequest",250)
 }
 
+event httpLoaded(Body:string, Size:number, Url:string) {
+    nw_onHttpEvent(Body, Url, Size, 0)
+}
+
+event httpErrored(Error:string, Url:string) {
+    nw_onHttpEvent(Error, Url, 0, 1)
+}
+
 if (httpClk()) {
     if (!Init) { exit() }
     local Requests = NWData["requests",table]
     if (Requests:count()) {
         local Info = Requests[1,table] # get first always
         if (Info[6,string]!=httpRequestUrl()) { exit() }
+        
         local Send = table(NetSocket:entity():id(),Info[1,number],Info[3,number],Info[4,string],Info[5,string],httpData())
         Send[0,number] = NetSocket["B",number]
         dsSendDirect("nwdata",entity(NetSocketC),Send)

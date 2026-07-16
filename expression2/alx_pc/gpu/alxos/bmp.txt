@@ -35,7 +35,7 @@ function alxos_bmp_init(Args:table) {
     GpuData[5,number] = 0
 
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",vec2(0,-22))
+    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpAlign(LAST_I,1)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -236,7 +236,7 @@ function alxos_bmp_draw(Data:string) {
         BoxW = ceil(BoxW/100*CalcP)
         if (BoxW<1) { BoxW = 1 }
         EGP:egpSize(BoxID,vec2(BoxW,20))
-        EGP:egpText(PercID,CalcP+"%",EGP:egpPos(PercID))
+        EGP:egpSetText(PercID,CalcP+"%")
 
         local RCol = GpuData[24,number]
         local BitCount = GpuData[26,number]
@@ -444,7 +444,7 @@ function number alxos_bmp_finish(Err:string) {
     local Parent = "alxos_explorer_dialog"("BMP Reader"+(Err!="" ? " Error" : ""),440,60,"ok","alxos_bmp_clear")[number]
 
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,(Err!="" ? Err : "Opening BMP file success finished."),vec2(0,-12))
+    EGP:egpText(LAST_I,(Err!="" ? Err : "Opening BMP file success finished."),alxos_dlgPos(0,-12))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpAlign(LAST_I,1)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++

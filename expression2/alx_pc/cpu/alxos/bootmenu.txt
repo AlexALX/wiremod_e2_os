@@ -12,7 +12,8 @@ function alxos_boot_init(CurFs:table) {
     cpuClear()
     CpuData[1,table] = CurFs
     DsHandler = "alxos_boot_ds"
-    dsSendDirect("fs_listdir",CurFs["hdd_io",wirelink]:entity(),table(entity(),"wm1",table(CurFs,CurFs["root_dir_cluster",number],0)))   
+    
+    dsSendDirect("fs_listdir",CurFs["hdd_io",wirelink]:entity(),table(entity(),CurFs["fs_str_id",string]:lower(),table(CurFs,CurFs["root_dir_cluster",number],0)))   
 }
  
 function alxos_boot_error(Str:string) {
@@ -29,7 +30,7 @@ function alxos_postboot(Step) {
             local FullName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
             if (FullName=="boot.ini") {
                 CpuData[3,string] = FullName
-                dsSendDirect("fs_readfile",CurFs["hdd_io",wirelink]:entity(),table(entity(),"wm1",table(CurFs,Entry)))
+                dsSendDirect("fs_readfile",CurFs["hdd_io",wirelink]:entity(),table(entity(),CurFs["fs_str_id",string]:lower(),table(CurFs,Entry)))
                 return   
             }
         }
@@ -62,14 +63,15 @@ function alxos_postboot(Step) {
             local Dir = Darr[2,string]
             
             local Path = Dir:explode("/")
-            if (CurFs["volume_serial",number]==Path[2,string]:toNumber()) {
+            # support livecd now!
+            if (CurFs["fs_str_id",string]=="WCD" || CurFs["volume_serial",number]==Path[2,string]:toNumber()) {
                 for(I=0,ListDir:count()-1) {
                     local Entry = ListDir[I,table]
                     local FullName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
                     if (FullName==Path[3,string]) {
                         CpuData["sysdir",table] = Entry
                         CpuData[3,string] = Path[4,string]
-                        dsSendDirect("fs_listdir",CurFs["hdd_io",wirelink]:entity(),table(entity(),"wm1",table(CurFs,Entry["cluster",number],Entry["data_sector",number])))
+                        dsSendDirect("fs_listdir",CurFs["hdd_io",wirelink]:entity(),table(entity(),CurFs["fs_str_id",string]:lower(),table(CurFs,Entry["cluster",number],Entry["data_sector",number])))
                         return
                     }
                 }    
@@ -87,7 +89,7 @@ function alxos_postboot(Step) {
             local Entry = SysDir[I,table]
             local FullName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
             if (FullName=="kernel.sys") {
-                dsSendDirect("fs_readfile",CurFs["hdd_io",wirelink]:entity(),table(entity(),"wm1",table(CurFs,Entry)))
+                dsSendDirect("fs_readfile",CurFs["hdd_io",wirelink]:entity(),table(entity(),CurFs["fs_str_id",string]:lower(),table(CurFs,Entry)))
                 return   
             }
         }

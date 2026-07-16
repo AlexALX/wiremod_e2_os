@@ -1,7 +1,7 @@
 @name Command Queue interface
 @persist CurrentCmd:string CmdQueue:table CmdLastQueue 
 @persist CmdResult:table CmdDelay CmdAdd2Queue QueueShift CmdQueueTmp CmdQueueTmpStr:string
-@persist CmdCallback:table CmdCompleteCallback:table CmdNextRun
+@persist CmdCallback:table CmdCompleteCallback:table CmdNextRun CmdStack
 
 #[
     ALX Wiremod E2 PC
@@ -35,13 +35,19 @@ function cmdNext() { #  & ops()<softQuota()*0.9
         CmdNextRun = 0
         timer(CurrentCmd,1)  
     }]#
-    if (checkPerf(12000) & !CmdDelay) {
+    if (checkPerf(12000) & !CmdDelay & CmdStack<900) {
+        CmdStack++
+        
         #stoptimer(CurrentCmd)
         "cmdHandler"()
         #CmdNextRun++
+        
+
+        
     } else {
         #CmdNextRun = 0
         timer(CurrentCmd,(CmdDelay ? CmdDelay : 33))
+        CmdStack = 0
     }
     #exit()
 }
@@ -74,6 +80,7 @@ function cmdEnd(Queue) {
         CurrentCmd = "" 
         #CmdData = table() 
         CmdLastQueue = 0
+        CmdStack = 0
         CmdQueue = table()
         "cmdComplete"(CmdComplete)
     }
@@ -125,6 +132,7 @@ function cmdShutdown() {
     QueueShift = 0
     CmdQueueTmp = 0
     CmdQueueTmpStr = ""
+    CmdStack = 0
     stopAllTimers()
 }
 

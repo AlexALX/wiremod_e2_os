@@ -350,7 +350,7 @@ function number alxos_nwchat_searchpost() {
         local MenuTree = table()
         
         for (I=1,NwChatData["servers",table]:count()) {
-            MenuTree:pushTable(table(0,NwChatData["servers",table][I,table][1,string]+"'s server","alxos_nwchat_selnick",NwChatData["servers",table]))    
+            MenuTree:pushTable(table(0,NwChatData["servers",table][I,table][1,string]+"'s server","alxos_nwchat_selnick",NwChatData["servers",table][I, table]))    
         }
         alxos_nwchat_menu("Servers",MenuTree,280)
         
@@ -360,7 +360,7 @@ function number alxos_nwchat_searchpost() {
     local Parent = alxos_nwchat_dialog("Failed",360,60,"yesno","alxos_nwchat_serversretry",table())
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"No servers found. Do you want to retry?",vec2(0,-10))
+    EGP:egpText(LAST_I,"No servers found. Do you want to retry?",alxos_dlgPos(0,-10))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -370,7 +370,7 @@ function number alxos_nwchat_searchpost() {
 function number alxos_nwchat_fail() {
     local Parent = alxos_nwchat_dialog("Failed",410,60,"yesno","alxos_nwchat_initcl",table())
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Connection to server failed. Do you want to retry?",vec2(0,-10))
+    EGP:egpText(LAST_I,"Connection to server failed. Do you want to retry?",alxos_dlgPos(0,-10))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -382,7 +382,7 @@ function alxos_nwchat_error(Msg:string) {
     if (Msg=="Nickname already in use.") { Callback = "alxos_nwchat_selnick" }
     local Parent = alxos_nwchat_dialog("Failed",380,60,"ok",Callback,table())
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,Msg,vec2(0,-10))
+    EGP:egpText(LAST_I,Msg,alxos_dlgPos(0,-10))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -398,7 +398,7 @@ function alxos_nwchat_initcl(Args:table) {
     
     local Parent = alxos_nwchat_dialog("Connecting...",340,60,"none","",table())
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Please wait while establish connection...",vec2(0,-10))
+    EGP:egpText(LAST_I,"Please wait while establish connection...",alxos_dlgPos(0,-10))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -417,7 +417,7 @@ function alxos_nwchat_initcl() {
 function alxos_nwchat_servers() {
     local Parent = alxos_nwchat_dialog("Searching...",340,60,"none","",table())
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Please wait while establish connection...",vec2(0,-10))
+    EGP:egpText(LAST_I,"Please wait while establish connection...",alxos_dlgPos(0,-10))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -439,25 +439,25 @@ function alxos_nwchat_serversretry() {
 function alxos_nwchat_selnick(Args:table) {
     if (Args:count()) {
         alxos_nwchat_closemenu()
-        NwChatData["server",table] = Args[6,table][1,table]
+        NwChatData["server",table] = Args[6,table]
     }
     
     local Parent = alxos_nwchat_dialog("Select Nickname",400,80,"text","alxos_nwchat_setnick",table())
     local Entries = table()
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Your Nickname:",vec2(-180,-22))
+    EGP:egpText(LAST_I,"Your Nickname:",alxos_dlgPos(-180,-22))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpBox(LAST_I,vec2(-180,-4),vec2(360,20))
+    EGP:egpBox(LAST_I,alxos_dlgPos(-180,-4),vec2(360,20))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
     Entries[0,table] = table(LAST_I,NwChatNick,"^[A-Za-z0-9_ -]$",10)
-    EGP:egpText(LAST_I,NwChatNick+"_",vec2(-178,-4))
+    EGP:egpText(LAST_I,NwChatNick+"_",alxos_dlgPos(-178,-4))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
@@ -498,7 +498,7 @@ function alxos_nwchat_setnick() {
     if (NickTbl[2,string]:trim()=="") {
         local Parent = alxos_nwchat_dialog("Error",280,60,"ok","alxos_nwchat_selnick",table())
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"Nickname cannot be empty!",vec2(0,-10))
+        EGP:egpText(LAST_I,"Nickname cannot be empty!",alxos_dlgPos(0,-10))
         EGP:egpAlign(LAST_I,1)
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -539,7 +539,7 @@ function alxos_nwchat_selmode() {
     NwChatData["clients",table] = table()
     DialogData[7,number] = LAST_I
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Do you want start server or use client?",vec2(-180,-12))
+    EGP:egpText(LAST_I,"Do you want start server or use client?",alxos_dlgPos(-180,-12))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
 }
@@ -557,19 +557,19 @@ function alxos_nwchat_sellocal() {
     DialogData[-10,table]:pushNumber(LAST_I)
     
     Txt = (NwChatMode==1 ? "Do you want to make an local server?" : "Where you want to find servers?" )    
-    EGP:egpText(LAST_I,Txt,vec2(-205,-32))
+    EGP:egpText(LAST_I,Txt,alxos_dlgPos(-205,-32))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     Txt = (NwChatMode==1 ? "Local server will be available only in home network." : "Local search will find local servers in home network." )  
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,Txt,vec2(-205,-12))
+    EGP:egpText(LAST_I,Txt,alxos_dlgPos(-205,-12))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     Txt = (NwChatMode==1 ? "Remote server will be available in all networks." : "Remove search will find remote servers in all networks." )  
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,Txt,vec2(-205,8))
+    EGP:egpText(LAST_I,Txt,alxos_dlgPos(-205,8))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
@@ -648,7 +648,7 @@ function alxos_nwchat_selnw() {
     if (!MenuTree:count()) {
         local Parent = alxos_nwchat_dialog("Error",320,60,"ok","alxos_nwchat_closedialog",table())
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"No active network interfaces found!",vec2(0,-10))
+        EGP:egpText(LAST_I,"No active network interfaces found!",alxos_dlgPos(0,-10))
         EGP:egpAlign(LAST_I,1)
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -727,7 +727,7 @@ function alxos_nwchat_quit() {
     local Parent = alxos_nwchat_dialog("Quit",400,60,"yesno","alxos_nwchat_quitpost",table())
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Do you want really want to exit?",vec2(-180,-12))
+    EGP:egpText(LAST_I,"Do you want really want to exit?",alxos_dlgPos(-180,-12))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
 }

@@ -734,7 +734,7 @@ function alxos_burner_addfile(Entry:table) {
     if (alxos_burner_exists(FullName,BurnerDiskCDir)) {
         local Parent = alxos_burner_dialog("Error",430,60,"ok","alxos_burner_closedialog")
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"Folder or file with this name already exists on disc.",vec2(0,-12))
+        EGP:egpText(LAST_I,"Folder or file with this name already exists on disc.",alxos_dlgPos(0,-12))
         EGP:egpAlign(LAST_I,1)
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -765,7 +765,7 @@ function alxos_burner_rmdir(EntryID,Entry:table) {
         local Parent = alxos_burner_dialog("Error",430,60,"ok","alxos_burner_closedialog")
         local FName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")        
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"Directory '"+FName+"' is not empty, cannot remove.",vec2(0,-12))
+        EGP:egpText(LAST_I,"Directory '"+FName+"' is not empty, cannot remove.",alxos_dlgPos(0,-12))
         EGP:egpAlign(LAST_I,1)
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -800,7 +800,7 @@ function alxos_burner_renamepre() {
         if (FullName==FNameF) {
             local Parent = alxos_burner_dialog("Error",400,60,"ok","alxos_burner_closedialog")
             DialogData[-10,table]:pushNumber(LAST_I)
-            EGP:egpText(LAST_I,"Folder or file with this name already exists.",vec2(-180,-12))
+            EGP:egpText(LAST_I,"Folder or file with this name already exists.",alxos_dlgPos(-180,-12))
             EGP:egpParent(LAST_I,Parent)
             EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
             return 
@@ -810,7 +810,7 @@ function alxos_burner_renamepre() {
     if (FNameF=="") {
         local Parent = alxos_burner_dialog("Error",250,60,"ok","alxos_burner_closedialog")
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"File name cannot be empty.",vec2(0,-12))
+        EGP:egpText(LAST_I,"File name cannot be empty.",alxos_dlgPos(0,-12))
         EGP:egpAlign(LAST_I,1)
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -846,12 +846,12 @@ function alxos_burner_rename(Entry:table) {
     local Str = (Is_Dir ? "Folder name:" : "File name:")
     local Sz = 360
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,Str,vec2(-180,-22))
+    EGP:egpText(LAST_I,Str,alxos_dlgPos(-180,-22))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpBox(LAST_I,vec2(-180,-4),vec2(Sz,20))
+    EGP:egpBox(LAST_I,alxos_dlgPos(-180,-4),vec2(Sz,20))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
     
@@ -863,7 +863,7 @@ function alxos_burner_rename(Entry:table) {
     } else {
         Entries[0,table] = table(LAST_I,FName,"^[A-Za-z0-9_!@#$^ -]$",10)
     }
-    EGP:egpText(LAST_I,FName+"_",vec2(-178,-4))
+    EGP:egpText(LAST_I,FName+"_",alxos_dlgPos(-178,-4))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
@@ -888,7 +888,7 @@ function alxos_burner_mkdirpre() {
         if (FullName==FName) {
             local Parent = alxos_burner_dialog("Error",400,60,"ok","alxos_burner_closedialog")
             DialogData[-10,table]:pushNumber(LAST_I)
-            EGP:egpText(LAST_I,"Folder or file with this name already exists.",vec2(-180,-12))
+            EGP:egpText(LAST_I,"Folder or file with this name already exists.",alxos_dlgPos(-180,-12))
             EGP:egpParent(LAST_I,Parent)
             EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
             return 
@@ -905,18 +905,18 @@ function alxos_burner_mkdir() {
     local Entries = table()
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Folder name:",vec2(-180,-22))
+    EGP:egpText(LAST_I,"Folder name:",alxos_dlgPos(-180,-22))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpBox(LAST_I,vec2(-180,-4),vec2(360,20))
+    EGP:egpBox(LAST_I,alxos_dlgPos(-180,-4),vec2(360,20))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
     Entries[0,table] = table(LAST_I,"","^[A-Za-z0-9_ -]$",10)
-    EGP:egpText(LAST_I,"_",vec2(-178,-4))
+    EGP:egpText(LAST_I,"_",alxos_dlgPos(-178,-4))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
@@ -944,7 +944,7 @@ function alxos_burner_chdrive(Info:table) {
         alxos_burner_closemenu()
         local Parent = alxos_burner_dialog("Error",200,60,"ok","alxos_burner_closedialog")
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"No CD Drives found!",vec2(0,-12))
+        EGP:egpText(LAST_I,"No CD Drives found!",alxos_dlgPos(0,-12))
         EGP:egpAlign(LAST_I,1)
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -994,7 +994,7 @@ function alxos_burner_chtype_info(Info:table) {
     local LAST_Y = (-10*Strs:count())-2
     for (I=1,Strs:count()) {
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,Strs[I,string],vec2(-180,LAST_Y))
+        EGP:egpText(LAST_I,Strs[I,string],alxos_dlgPos(-180,LAST_Y))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++ LAST_Y += 20
     }
@@ -1012,7 +1012,7 @@ function alxos_burner_chtype(Info:table) {
         alxos_burner_closemenu()
         local Parent = alxos_burner_dialog("Error",200,60,"ok","alxos_burner_closedialog")
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"No CD Drives found!",vec2(0,-12))
+        EGP:egpText(LAST_I,"No CD Drives found!",alxos_dlgPos(0,-12))
         EGP:egpAlign(LAST_I,1)
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1042,7 +1042,7 @@ function alxos_burner_chtype(Info:table) {
         alxos_burner_closemenu()
         local Parent = alxos_burner_dialog("Error",360,60,"ok","alxos_burner_closedialog")
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"This drive does not support writting!",vec2(0,-12))
+        EGP:egpText(LAST_I,"This drive does not support writting!",alxos_dlgPos(0,-12))
         EGP:egpAlign(LAST_I,1)
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1080,7 +1080,7 @@ function alxos_burner_chbook(Info:table) {
         alxos_burner_closemenu()
         local Parent = alxos_burner_dialog("Error",200,60,"ok","alxos_burner_closedialog")
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"No CD Drives found!",vec2(0,-12))
+        EGP:egpText(LAST_I,"No CD Drives found!",alxos_dlgPos(0,-12))
         EGP:egpAlign(LAST_I,1)
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1178,14 +1178,14 @@ function alxos_burner_fileinfo(Info:table) {
     local Parent = alxos_burner_dialog(FName,320,Height,"ok","alxos_burner_closedialog")
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Is folder: "+(alxos_wm1_isdir(Entry) ? "Yes" : "No" ),vec2(XX,LAST_Y))
+    EGP:egpText(LAST_I,"Is folder: "+(alxos_wm1_isdir(Entry) ? "Yes" : "No" ),alxos_dlgPos(XX,LAST_Y))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++ 
     LAST_Y += 20
     
     if (!IsDir) {
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"File size: "+alxos_nicesize(Entry["size",number]),vec2(XX,LAST_Y))
+        EGP:egpText(LAST_I,"File size: "+alxos_nicesize(Entry["size",number]),alxos_dlgPos(XX,LAST_Y))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
         LAST_Y += 20
@@ -1193,7 +1193,7 @@ function alxos_burner_fileinfo(Info:table) {
     local Date = Entry["time_create",number]
     local DateStr = alxos_wm1_date(Date)+" "+alxos_wm1_time(Date)
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Creation time: "+DateStr,vec2(XX,LAST_Y))
+    EGP:egpText(LAST_I,"Creation time: "+DateStr,alxos_dlgPos(XX,LAST_Y))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     LAST_Y += 20
@@ -1201,7 +1201,7 @@ function alxos_burner_fileinfo(Info:table) {
     local Date = Entry["time_modify",number]
     local DateStr = alxos_wm1_date(Date)+" "+alxos_wm1_time(Date)
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Modify time: "+DateStr,vec2(XX,LAST_Y))
+    EGP:egpText(LAST_I,"Modify time: "+DateStr,alxos_dlgPos(XX,LAST_Y))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     LAST_Y += 20
@@ -1209,7 +1209,7 @@ function alxos_burner_fileinfo(Info:table) {
     local Date = Entry["time_access",number]
     local DateStr = alxos_wm1_date(Date)+" "+alxos_wm1_time(Date)
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Last access: "+DateStr,vec2(XX,LAST_Y))
+    EGP:egpText(LAST_I,"Last access: "+DateStr,alxos_dlgPos(XX,LAST_Y))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
@@ -1237,9 +1237,14 @@ function alxos_burner_format_pre() {
         return
     }
     
+    if (!BurnerDrive:count()) {
+        "alxos_burner_error"("No CD Drives found!",200,1)
+        return
+    }
+    
     local Parent = alxos_burner_dialog("Initializating...",330,60,"none","")
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Please wait for drive get ready...",vec2(0,-10))
+    EGP:egpText(LAST_I,"Please wait for drive get ready...",alxos_dlgPos(0,-10))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1255,7 +1260,7 @@ function alxos_burner_format(Info:table) {
     local Parent = alxos_burner_dialog("Format disc",420,60,"yesno","alxos_burner_format_pre")
     DialogData[-10,table]:pushNumber(LAST_I)
     DialogData[1,table] = Info
-    EGP:egpText(LAST_I,"Do you want format RW disc? All data will be lost!",vec2(0,-12))
+    EGP:egpText(LAST_I,"Do you want format RW disc? All data will be lost!",alxos_dlgPos(0,-12))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++    
@@ -1270,13 +1275,13 @@ function alxos_burner_progress_format() {
         local Parent = alxos_burner_dialog("Formating...",Width,Height,"progress","")
         local EntID = DialogData[-10,table]
         EntID:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"Formating disc...",vec2(-180,-22))
+        EGP:egpText(LAST_I,"Formating disc...",alxos_dlgPos(-180,-22))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
         
         EntID:pushNumber(LAST_I)
         DialogData[3,number] = LAST_I
-        EGP:egpText(LAST_I,"",vec2(-50,-22))
+        EGP:egpText(LAST_I,"",alxos_dlgPos(-50,-22))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
         
@@ -1333,7 +1338,7 @@ function alxos_burner_format_drive(Info:table) {
     
     local Parent = alxos_burner_dialog("Preparing...",330,60,"none","")
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Preparing to erase, please wait...",vec2(0,-10))
+    EGP:egpText(LAST_I,"Preparing to erase, please wait...",alxos_dlgPos(0,-10))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1354,7 +1359,7 @@ function alxos_burner_format_ds(Name:string) {
             local LAST_Y = -2+(-10*Arr:count())
             for (I=1,Arr:count()) {
                 DialogData[-10,table]:pushNumber(LAST_I)
-                EGP:egpText(LAST_I,Arr[I,string],vec2(0,LAST_Y))
+                EGP:egpText(LAST_I,Arr[I,string],alxos_dlgPos(0,LAST_Y))
                 EGP:egpAlign(LAST_I,1)
                 EGP:egpParent(LAST_I,Parent)
                 EGP:egpColor(LAST_I,0,0,0,255) LAST_I++ LAST_Y += 20
@@ -1371,7 +1376,7 @@ function alxos_burner_format_ds(Name:string) {
         BurnerDsH = ""
         local Parent = alxos_burner_dialog("Success",330,60,"ok","alxos_burner_closedialog")
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"Formating successfully finished.",vec2(0,-10))
+        EGP:egpText(LAST_I,"Formating successfully finished.",alxos_dlgPos(0,-10))
         EGP:egpAlign(LAST_I,1)
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1410,7 +1415,7 @@ function alxos_burner_chboot(Info:table) {
     if (!BurnerDrive:count()) {
         local Parent = alxos_burner_dialog("Error",200,60,"ok","alxos_burner_closedialog")
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"No CD Drives found!",vec2(0,-12))
+        EGP:egpText(LAST_I,"No CD Drives found!",alxos_dlgPos(0,-12))
         EGP:egpAlign(LAST_I,1)
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1421,18 +1426,18 @@ function alxos_burner_chboot(Info:table) {
     local Entries = table()
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Boot function name:",vec2(-180,-22))
+    EGP:egpText(LAST_I,"Boot function name:",alxos_dlgPos(-180,-22))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpBox(LAST_I,vec2(-180,-4),vec2(360,20))
+    EGP:egpBox(LAST_I,alxos_dlgPos(-180,-4),vec2(360,20))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
     Entries[0,table] = table(LAST_I,BurnerDiskBoot,"^[A-Za-z0-9_ -]$",12)
-    EGP:egpText(LAST_I,BurnerDiskBoot+"_",vec2(-178,-4))
+    EGP:egpText(LAST_I,BurnerDiskBoot+"_",alxos_dlgPos(-178,-4))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
@@ -1454,7 +1459,7 @@ function alxos_burner_disknamepre() {
     if (FName=="") {
         local Parent = alxos_burner_dialog("Error",250,60,"ok","alxos_burner_closedialog")
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"Disc name cannot be empty!",vec2(0,-12))
+        EGP:egpText(LAST_I,"Disc name cannot be empty!",alxos_dlgPos(0,-12))
         EGP:egpAlign(LAST_I,1)
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1469,7 +1474,7 @@ function alxos_burner_diskname() {
     if (!BurnerDrive:count()) {
         local Parent = alxos_burner_dialog("Error",200,60,"ok","alxos_burner_closedialog")
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"No CD Drives found!",vec2(0,-12))
+        EGP:egpText(LAST_I,"No CD Drives found!",alxos_dlgPos(0,-12))
         EGP:egpAlign(LAST_I,1)
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1479,7 +1484,7 @@ function alxos_burner_diskname() {
     if (BurnerDiskSize<=(WCD_Rsv*4+32)) {
         local Parent = alxos_burner_dialog("Error",220,60,"ok","alxos_burner_closedialog")
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"Nothing to write!",vec2(0,-12))
+        EGP:egpText(LAST_I,"Nothing to write!",alxos_dlgPos(0,-12))
         EGP:egpAlign(LAST_I,1)
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1490,18 +1495,18 @@ function alxos_burner_diskname() {
     local Entries = table()
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Disc name:",vec2(-180,-22))
+    EGP:egpText(LAST_I,"Disc name:",alxos_dlgPos(-180,-22))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpBox(LAST_I,vec2(-180,-4),vec2(360,20))
+    EGP:egpBox(LAST_I,alxos_dlgPos(-180,-4),vec2(360,20))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
     Entries[0,table] = table(LAST_I,BurnerDiskName,"^[A-Za-z0-9_ -]$",12)
-    EGP:egpText(LAST_I,BurnerDiskName+"_",vec2(-178,-4))
+    EGP:egpText(LAST_I,BurnerDiskName+"_",alxos_dlgPos(-178,-4))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
@@ -1530,24 +1535,34 @@ function alxos_burner_prestart() {
     local LAST_Y = (-10*Strs:count())
     for (I=1,Strs:count()) {
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,Strs[I,string],vec2(-150,LAST_Y))
+        EGP:egpText(LAST_I,Strs[I,string],alxos_dlgPos(-150,LAST_Y))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++ LAST_Y += 20
     }
 }
 
-function alxos_burner_error(Msg:string,Width,Callback:string) {
+function alxos_burner_error(Msg:string,Width,Callback:string,NoSound) {
     local Parent = alxos_burner_dialog("Error",Width,60,"ok",Callback)
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,Msg,vec2(0,-12))
+    EGP:egpText(LAST_I,Msg,alxos_dlgPos(0,-12))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
-    dsSendDirect("playgmsound",E2_SPU,table(0,0.2,"buttons/button10.wav")) 
+    if (!NoSound) {
+        dsSendDirect("playgmsound",E2_SPU,table(0,0.2,"buttons/button10.wav")) 
+    }
+}
+
+function alxos_burner_error(Msg:string,Width,NoSound) {
+    alxos_burner_error(Msg,Width,"alxos_burner_closedialog",NoSound)
+}
+
+function alxos_burner_error(Msg:string,Width,Callback:string) {
+    alxos_burner_error(Msg,Width,Callback,0)
 }
 
 function alxos_burner_error(Msg:string,Width) {
-    alxos_burner_error(Msg,Width,"alxos_burner_closedialog")
+    alxos_burner_error(Msg,Width,"alxos_burner_closedialog",0)
 }
 
 function alxos_burner_start_post() {
@@ -1570,7 +1585,7 @@ function alxos_burner_start_post() {
     
     local Parent = alxos_burner_dialog("Initializating...",330,60,"none","")
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Please wait for drive get ready...",vec2(0,-10))
+    EGP:egpText(LAST_I,"Please wait for drive get ready...",alxos_dlgPos(0,-10))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1599,7 +1614,7 @@ function alxos_burner_start_drive(Info:table) {
         local Parent = alxos_burner_dialog("Error",350,60,"yesno","alxos_burner_prestart_drive")
         DialogData[-10,table]:pushNumber(LAST_I)
         DialogData[1,table] = Info
-        EGP:egpText(LAST_I,"Incorrect disc type! Try to burn anyway?",vec2(0,-12))
+        EGP:egpText(LAST_I,"Incorrect disc type! Try to burn anyway?",alxos_dlgPos(0,-12))
         EGP:egpAlign(LAST_I,1)
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1623,7 +1638,7 @@ function alxos_burner_start_drive(Info:table) {
                 DialogData[-10,table]:pushNumber(LAST_I)
                 DialogData[1,table] = Info
                 DialogData[4,number] = 1
-                EGP:egpText(LAST_I,"This disc already written! Do you want rewrite it?",vec2(0,-12))
+                EGP:egpText(LAST_I,"This disc already written! Do you want rewrite it?",alxos_dlgPos(0,-12))
                 EGP:egpAlign(LAST_I,1)
                 EGP:egpParent(LAST_I,Parent)
                 EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1650,7 +1665,7 @@ function alxos_burner_start_drive(Info:table) {
     
     local Parent = alxos_burner_dialog("Preparing...",330,60,"none","")
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Preparing to write, please wait...",vec2(0,-10))
+    EGP:egpText(LAST_I,"Preparing to write, please wait...",alxos_dlgPos(0,-10))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1680,7 +1695,7 @@ function alxos_burner_prestart_drive() {
 
     local Parent = alxos_burner_dialog("Initializating...",330,60,"none","")
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Please wait for drive get ready...",vec2(0,-10))
+    EGP:egpText(LAST_I,"Please wait for drive get ready...",alxos_dlgPos(0,-10))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1701,7 +1716,7 @@ function alxos_burner_prestart_drive_rw() {
 
     local Parent = alxos_burner_dialog("Initializating...",330,60,"none","")
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Please wait for drive get ready...",vec2(0,-10))
+    EGP:egpText(LAST_I,"Please wait for drive get ready...",alxos_dlgPos(0,-10))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1722,35 +1737,35 @@ function alxos_burner_progress() {
         local EntID = DialogData[-10,table]
         EntID:pushNumber(LAST_I)
         DialogData[2,number] = LAST_I
-        EGP:egpText(LAST_I,"Preparing file system structure...",vec2(-180,-42))
+        EGP:egpText(LAST_I,"Preparing file system structure...",alxos_dlgPos(-180,-42))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
         
         EntID:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"Total burning progress:",vec2(-180,0))
+        EGP:egpText(LAST_I,"Total burning progress:",alxos_dlgPos(-180,0))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
         
         EntID:pushNumber(LAST_I)
         DialogData[3,number] = LAST_I
-        EGP:egpText(LAST_I,"",vec2(-3,0))
+        EGP:egpText(LAST_I,"",alxos_dlgPos(-3,0))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
         
         EntID:pushNumber(LAST_I)
-        EGP:egpBox(LAST_I,vec2(LeftPos,LAST_Y),vec2(Width-40,20))
+        EGP:egpBox(LAST_I,alxos_dlgPos(LeftPos,LAST_Y),vec2(Width-40,20))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,125,125,125,255) LAST_I++
 
         DialogData[4,number] = LAST_I
         EntID:pushNumber(LAST_I)
-        EGP:egpBox(LAST_I,vec2(LeftPos,LAST_Y),vec2(1,20))
+        EGP:egpBox(LAST_I,alxos_dlgPos(LeftPos,LAST_Y),vec2(1,20))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
         
         DialogData[5,number] = LAST_I
         EntID:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"0%",vec2(0,LAST_Y))
+        EGP:egpText(LAST_I,"0%",alxos_dlgPos(0,LAST_Y))
         EGP:egpAlign(LAST_I,1)
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,200,200,200,255) LAST_I++
@@ -1814,7 +1829,7 @@ function alxos_burner_refresh() {
 
     local Parent = alxos_burner_dialog("Initializating...",330,60,"none","")
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Please wait for drive get ready...",vec2(0,-10))
+    EGP:egpText(LAST_I,"Please wait for drive get ready...",alxos_dlgPos(0,-10))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1841,7 +1856,7 @@ function alxos_burner_refresh_ds(Name:string) {
         local LAST_Y = -2+(-10*Arr:count())
         for (I=1,Arr:count()) {
             DialogData[-10,table]:pushNumber(LAST_I)
-            EGP:egpText(LAST_I,Arr[I,string],vec2(0,LAST_Y))
+            EGP:egpText(LAST_I,Arr[I,string],alxos_dlgPos(0,LAST_Y))
             EGP:egpAlign(LAST_I,1)
             EGP:egpParent(LAST_I,Parent)
             EGP:egpColor(LAST_I,0,0,0,255) LAST_I++ LAST_Y += 20
@@ -1862,7 +1877,7 @@ function alxos_burner_start_ds(Name:string) {
             local LAST_Y = -2+(-10*Arr:count())
             for (I=1,Arr:count()) {
                 DialogData[-10,table]:pushNumber(LAST_I)
-                EGP:egpText(LAST_I,Arr[I,string],vec2(0,LAST_Y))
+                EGP:egpText(LAST_I,Arr[I,string],alxos_dlgPos(0,LAST_Y))
                 EGP:egpAlign(LAST_I,1)
                 EGP:egpParent(LAST_I,Parent)
                 EGP:egpColor(LAST_I,0,0,0,255) LAST_I++ LAST_Y += 20
@@ -1895,7 +1910,7 @@ function alxos_burner_start_ds(Name:string) {
         BurnerDsH = ""
         local Parent = alxos_burner_dialog("Success",330,60,"ok","alxos_burner_closedialog")
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"Burning successfully finished.",vec2(0,-10))
+        EGP:egpText(LAST_I,"Burning successfully finished.",alxos_dlgPos(0,-10))
         EGP:egpAlign(LAST_I,1)
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
@@ -1985,7 +2000,7 @@ function alxos_burner_quit() {
     local Entries = table()
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Are you sure want exit to explorer?",vec2(0,-12))
+    EGP:egpText(LAST_I,"Are you sure want exit to explorer?",alxos_dlgPos(0,-12))
     EGP:egpAlign(LAST_I,1)
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
