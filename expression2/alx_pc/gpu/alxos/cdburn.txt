@@ -1770,6 +1770,13 @@ function alxos_burner_progress() {
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,200,200,200,255) LAST_I++
         
+        # change position of main progress bar
+        local PercID = DialogData[-4,number]
+        local BoxID = DialogData[-5,number]
+        EGP:egpPos(BoxID-1,alxos_dlgPos(LeftPos, LAST_Y+45))
+        #EGP:egpPos(BoxID,alxos_dlgPos(LeftPos, LAST_Y))
+        EGP:egpPos(PercID,alxos_dlgPos(0, LAST_Y+45))
+        
         DialogData[1,number] = 1
         DialogData[6,number] = ceil(BurnerDiskSize/4)
         DialogData[7,number] = 0
