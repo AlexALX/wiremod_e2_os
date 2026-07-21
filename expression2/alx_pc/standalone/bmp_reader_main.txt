@@ -1,7 +1,8 @@
 @name Standalone BMP Reader Multithreaded Main Process
 @inputs DigitalScreen:wirelink LongURL:string
 @outputs Percent Threads RenderTime RenderRealTime
-@persist BMP_NoKeepAR BmpData:table MaxThreads
+@persist BMP_NoKeepAR BmpData:table MaxThreads 
+@strict
 
 #[
     BMP Reader - Multithreaded
@@ -20,6 +21,7 @@
     
     Chat commands:
     !bmp http://url_with_bmp_file - open bmp file
+    !bmpfile filename.bmp.txt - open bmp file from a garrysmod/data/e2files/ folder, file extension must be renamed to .txt
     !bmp abort - abort rendering
     Note: long url may be cut, use input LongURL instead for such case (via string value) 
     
@@ -30,13 +32,8 @@
     
 ]#
 
-#ifndef httpClk()
-    error("HTTP e2 extension is required for this script. Please enable via wire_expression2_extension_enable http.")
-#else
-
 if (first()|duped()) {
     
-runOnChat(1)
 runOnLast(1)
 
 BmpData = table()
@@ -375,51 +372,111 @@ function alxos_bmp_draw() {
 
 }
 
-}
-
-if (chatClk(owner())) {
-    local Said = owner():lastSaid():trim()
-    local Find = Said:find(" ")
-    local Cmd = Said:left(Find-1)
-    local Url = Said:sub(Find+1) 
-    if (Cmd=="!bmp" && Said!="!bmp abort") {
-        if (!checkDS()) { exit() }
-        if (!httpCanRequest()) {
-            print(_HUD_PRINTTALK,"HTTP Request Canceled - Please wait a bit...")   
-            exit()
-        }
-        httpRequest(Url)    
-    } elseif (Cmd=="!bmpabort" | Cmd=="!bmpstop" | Said=="!bmp abort") {
-        print(_HUD_PRINTTALK,"BMP rendering canceled.")     
-        stopAllTimers()
-        #dsSend("BMP_MULTI_STOP","BMP_SUB",entity())
-        local Global = gTable("BMP_MULTI")
-        Global["BMP_STOP",number] = 1
-    }
-    exit()
-}
-
-if (~LongURL & LongURL!="") {
-    if (!checkDS()) { exit() }
-    if (!httpCanRequest()) {
-        print(_HUD_PRINTTALK,"HTTP Request Canceled - Please wait a bit...")   
-        exit()
-    }
-    httpRequest(LongURL) 
-}
-
-event httpLoaded(Body:string, Size, Url:string) {
+function bmpInit(Body:string, Size) {
     dsClear()  
     BmpData["data",string] = Body   
     BmpData["size",number] = Size
     alxos_bmp_draw()
-    exit()
+}
+
+}
+
+event chat(Player:entity, Message:string, Team:number) {
+    if (owner() == Player) {
+        local Said = Message:trim()
+        local Find = Said:find(" ")
+        local Cmd = Said:left(Find-1)
+        local Url = Said:sub(Find+1) 
+        if (Cmd=="!bmp" & Said!="!bmp abort") {
+            if (!checkDS()) { exit() }
+            #ifndef httpCanRequest()
+                print(_HUD_PRINTTALK,"HTTP extension is not enabled. Please enable via wire_expression2_extension_enable http")   
+                exit()
+            #else
+                if (!httpCanRequest()) {
+                    print(_HUD_PRINTTALK,"HTTP Request Canceled - Please wait a bit...")   
+                    exit()
+                }
+                httpRequest(Url)   
+            #endif
+        } elseif (Cmd=="!bmpfile" & Said!="!bmp abort") {
+            if (!checkDS()) { exit() }
+            #ifndef fileCanLoad()
+                print(_HUD_PRINTTALK,"FILE extension is not enabled. Please enable via wire_expression2_extension_enable file")   
+                exit()
+            #else
+                if (!fileCanLoad()) {
+                    print(_HUD_PRINTTALK,"FILE Request Canceled - Please wait a bit...")   
+                    exit()
+                }
+                try {
+                    fileLoad(Url) 
+                } catch(E:string) {
+                    print(E)   
+                }
+            #endif
+        } elseif (Cmd=="!bmpabort" | Cmd=="!bmpstop" | Said=="!bmp abort") {
+            print(_HUD_PRINTTALK,"BMP rendering canceled.")     
+            stopAllTimers()
+            #dsSend("BMP_MULTI_STOP","BMP_SUB",entity())
+            local Global = gTable("BMP_MULTI")
+            Global["BMP_STOP",number] = 1
+        }
+        exit() 
+    }    
+}
+
+if (~LongURL & LongURL!="") {
+    if (!checkDS()) { 
+        print(_HUD_PRINTTALK,"Digital Screen is not connected")   
+        exit() 
+    }
+
+    #ifndef httpCanRequest()
+        print(_HUD_PRINTTALK,"HTTP extension is not enabled. Please enable via wire_expression2_extension_enable http")   
+        exit()
+    #else
+        if (!httpCanRequest()) {
+            print(_HUD_PRINTTALK,"HTTP Request Canceled - Please wait a bit...")   
+            exit()
+        }
+        httpRequest(LongURL) 
+    #endif
+}
+
+#ifdef httpCanRequest()
+event httpLoaded(Body:string, Size, Url:string) {
+    bmpInit(Body, Size)
 }
 
 event httpErrored(Error:string, Url:string) {
     print(_HUD_PRINTTALK,"HTTP Request Failed - Error: "+Error)   
     exit()
 }
+#endif
+
+#ifdef fileLoad(string)
+event fileLoaded(FilePath:string, Data:string) {
+    bmpInit(Data, Data:length())    
+}
+
+event fileErrored(FilePath:string, Status:number) {
+    switch(Status) {
+        case _FILE_404,
+            print("File Error: Not Found")   
+            break     
+        case _FILE_TIMEOUT,
+            print("File Error: Timeout")   
+            break 
+        case _FILE_TRANSFER_ERROR,
+            print("File Error: Transfer Error")   
+            break 
+        default,
+            print("File Error: Unknown Error ("+Status+")")   
+            break 
+    }
+}
+#endif
 
 if (clk("bmp")) {
     alxos_bmp_draw()
@@ -465,5 +522,3 @@ if (last()) {
     local Global = gTable("BMP_MULTI")
     Global["BMP_STOP",number] = 1
 }
-
-#endif

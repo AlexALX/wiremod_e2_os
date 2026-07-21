@@ -7,10 +7,6 @@
     Created by AlexALX (c) 2018
 ]#
 
-#ifndef httpClk()
-    error("HTTP e2 extension is required for this script. Please enable via wire_expression2_extension_enable http.")
-#else
-
 if (first()|duped()) {
 
 dsJoinGroup("BMP_SUB")
@@ -254,5 +250,3 @@ if (dsClk("BMP_MULTI_START")) {
 if (last() & BMP_MAIN!=noentity()) {
     dsSendDirect("BMP_MULTI_FINISH",BMP_MAIN,entity())   
 }
-
-#endif
