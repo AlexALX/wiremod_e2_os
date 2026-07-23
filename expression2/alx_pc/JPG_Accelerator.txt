@@ -49,6 +49,12 @@ function usb_init() {
     dsSendDirect("usbcontroller",USB_Device,table("jpgacc",wirelink(),table()))
 }
 
+function sendProgress() {
+    dsSendDirect("jpgProgress", E2_GPU, table(
+        CurrentState, Progress, ProgressText, Processing, Error
+    ))
+}
+
 }
 
 if (dupefinished()) {
@@ -94,12 +100,6 @@ if (dsClk()) {
 
 if (clk("cmd")) {
     cmdClk()
-}
-
-function sendProgress() {
-    dsSendDirect("jpgProgress", E2_GPU, table(
-        CurrentState, Progress, ProgressText, Processing, Error
-    ))
 }
 
 event input(InputName:string) {
