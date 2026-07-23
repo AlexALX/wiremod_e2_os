@@ -1,0 +1,112 @@
+@name IDCT Step test
+
+@persist TestStage:number Block:table Expected:table
+
+#include "alx_pc/standalone/jpg_reader/tests/_shared_"
+#include "alx_pc/standalone/jpg_reader/idct"
+
+function test_idct_step()
+{
+    if (TestStage == 0) {
+
+        Block = table()
+        Expected = table()
+
+        for (I = 0, 63) {
+            Block[I,number] = 0
+        }
+        
+        Expected[0,number] = 164
+        Expected[1,number] = 163
+        Expected[2,number] = 162
+        Expected[3,number] = 162
+        Expected[4,number] = 166
+        Expected[5,number] = 173
+        Expected[6,number] = 176
+        Expected[7,number] = 176
+        
+        for (I = 8, 15) {
+            Expected[I,number] = Expected[I-8,number]
+        }
+        
+        for (I = 16, 23) {
+            Expected[I,number] = Expected[I-8,number]
+        }
+        
+        for (I = 24, 31) {
+            Expected[I,number] = Expected[I-8,number]
+        }
+        
+        for (I = 32, 39) {
+            Expected[I,number] = Expected[I-8,number]
+        }
+        
+        for (I = 40, 47) {
+            Expected[I,number] = Expected[I-8,number]
+        }
+        
+        for (I = 48, 55) {
+            Expected[I,number] = Expected[I-8,number]
+        }
+        
+        for (I = 56, 63) {
+            Expected[I,number] = Expected[I-8,number]
+        }
+
+        Block[0,number] = 321
+        Block[1,number] = -42
+        Block[2,number] = 17
+        Block[3,number] = 8
+        Block[4,number] = -5
+        Block[5,number] = 2
+        Block[6,number] = 1
+        Block[7,number] = -1
+
+        Jpg["idct",table] = table()
+
+        TestStage = 1
+    }
+
+    if (TestStage == 1) {
+
+        if (jpgIDCTStep(Block) == 0) {
+            return
+        }
+
+        TestStage = 2
+    }
+
+    if (TestStage == 2) {
+
+        for (I = 0, 63) {
+
+            if (Block[I,number] != Expected[I,number]) {
+
+                testFail(
+                    "IDCT STEP",
+                    "Index="+I+
+                    " expected="+Expected[I,number]+
+                    " got="+Block[I,number]
+                )
+
+                TestStage = 3
+                return
+            }
+        }
+
+        testPass("IDCT STEP")
+        TestStage = 3
+        testResults()
+    }
+}
+
+event tick() {
+
+    if (TestStage == 3) {
+        exit()
+    }
+
+    while(perf(90)) {
+        test_idct_step()
+    }
+}

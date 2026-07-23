@@ -1,0 +1,260 @@
+@persist Jpg:table
+
+#include "alx_pc/standalone/jpg_reader/tests/_shared_"
+#include "alx_pc/standalone/jpg_reader/tests/_jpg_shared_"
+
+function test_readbyte_normal()
+{
+    local Name = "READBYTE NORMAL"
+
+    jpgTestData(
+        toChar(0x12)
+        + toChar(0x34)
+        + toChar(0x56)
+    )
+
+    if (!assertCase(Name, 1, jpgReadByte(), 0x12)) {
+        return
+    }
+
+    if (!assertCase(Name, 2, jpgReadByte(), 0x34)) {
+        return
+    }
+
+    if (!assertCase(Name, 3, jpgReadByte(), 0x56)) {
+        return
+    }
+
+    testPass(Name)
+}
+test_readbyte_normal()
+
+function test_readbyte_stuffing()
+{
+    local Name = "READBYTE STUFFING"
+
+    jpgTestData(
+        toChar(0xFF)
+        + toChar(0x00)
+        + toChar(0x11)
+    )
+
+    if (!assertCase(Name, 1, jpgReadByte(), 0xFF)) {
+        return
+    }
+
+    if (!assertCase(Name, 2, jpgReadByte(), 0x11)) {
+        return
+    }
+
+    testPass(Name)
+}
+test_readbyte_stuffing()
+
+function test_readbyte_restart()
+{
+    local Name = "READBYTE RESTART"
+
+    jpgTestData(
+        toChar(0xAA)
+        + toChar(0xFF)
+        + toChar(0xD0)
+        + toChar(0xBB)
+    )
+
+    if (!assertCase(Name, 1, jpgReadByte(), 0xAA)) {
+        return
+    }
+
+    if (!assertCase(Name, 2, jpgReadByte(), -2)) {
+        return
+    }
+
+    if (!assertCase(Name, 3, Jpg["restartMarker",number], 0xD0)) {
+        return
+    }
+
+    if (!assertCase(Name, 4, jpgReadByte(), 0xBB)) {
+        return
+    }
+
+    testPass(Name)
+}
+test_readbyte_restart()
+
+function test_readbyte_end()
+{
+    local Name = "READBYTE END"
+
+    jpgTestData(
+        toChar(0xAA)
+        + toChar(0xFF)
+        + toChar(0xD9)
+    )
+
+    if (!assertCase(Name, 1, jpgReadByte(), 0xAA)) {
+        return
+    }
+
+    if (!assertCase(Name, 2, jpgReadByte(), -1)) {
+        return
+    }
+
+    if (!assertCase(Name, 3, jpgTell(), 4)) {
+        return
+    }
+
+    if (!assertCase(Name, 4, Jpg["marker",number], 0xD9)) {
+        return
+    }
+
+    testPass(Name)
+}
+test_readbyte_end()
+
+function test_bit_single_byte()
+{
+    local Name = "BIT SINGLE BYTE"
+
+    jpgTestData(
+        toChar(0xB2)
+    )
+
+    local Expected = array(
+        1,
+        0,
+        1,
+        1,
+        0,
+        0,
+        1,
+        0
+    )
+
+    for (I = 1, Expected:count()) {
+
+        if (!assertCase(
+            Name,
+            I,
+            jpgBit(),
+            Expected[I,number]
+        )) {
+            return
+        }
+    }
+
+    testPass(Name)
+}
+test_bit_single_byte()
+
+function test_bit_two_bytes()
+{
+    local Name = "BIT TWO BYTES"
+
+    jpgTestData(
+        toChar(0xB2)
+        + toChar(0x71)
+    )
+
+    local Expected = array(
+        1,0,1,1,0,0,1,0,
+        0,1,1,1,0,0,0,1
+    )
+
+    for (I = 1, Expected:count()) {
+
+        if (!assertCase(
+            Name,
+            I,
+            jpgBit(),
+            Expected[I,number]
+        )) {
+            return
+        }
+    }
+
+    testPass(Name)
+}
+test_bit_two_bytes()
+
+function test_bit_stuffing()
+{
+    local Name = "BIT STUFFING"
+
+    jpgTestData(
+        toChar(0xFF)
+        + toChar(0x00)
+        + toChar(0xAA)
+    )
+
+    local Expected = array(
+        1,1,1,1,1,1,1,1,
+        1,0,1,0,1,0,1,0
+    )
+
+    for (I = 1, Expected:count()) {
+
+        if (!assertCase(
+            Name,
+            I,
+            jpgBit(),
+            Expected[I,number]
+        )) {
+            return
+        }
+    }
+
+    testPass(Name)
+}
+test_bit_stuffing()
+
+function test_bits()
+{
+    local Name = "BITS"
+
+    #
+    # One byte
+    #
+
+    jpgTestData(
+        toChar(0xD2)
+    )
+
+    if (!assertCase(Name, 1, jpgBits(3), 6)) {
+        return
+    }
+
+    if (!assertCase(Name, 2, jpgBits(5), 18)) {
+        return
+    }
+
+    #
+    # Across byte boundary
+    #
+
+    jpgTestData(
+        toChar(0xF0)
+        + toChar(0x0F)
+    )
+
+    #
+    # 111100000000
+    #
+
+    if (!assertCase(Name, 3, jpgBits(12), 3840)) {
+        return
+    }
+
+    #
+    # Read remaining bits
+    #
+
+    if (!assertCase(Name, 4, jpgBits(4), 15)) {
+        return
+    }
+
+    testPass(Name)
+}
+test_bits()
+
+testResults()

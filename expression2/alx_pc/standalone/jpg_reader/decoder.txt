@@ -1,0 +1,1208 @@
+#include "alx_pc/standalone/jpg_reader/_shared_"
+#include "alx_pc/standalone/jpg_reader/bitreader"
+#include "alx_pc/standalone/jpg_reader/huffman"
+#include "alx_pc/standalone/jpg_reader/idct"
+
+function number jpgReceive(Size:number)
+{
+    if (Size == 0) {
+        return 0
+    }
+
+    return jpgBits(Size)
+}
+
+function number jpgExtend(Value:number, Size:number)
+{
+    if (Size == 0) {
+        return 0
+    }
+
+    local Limit = 1 << (Size - 1)
+
+    if (Value >= Limit) {
+        return Value
+    }
+
+    return Value - ((1 << Size) - 1)
+}
+
+function number jpgDecodeDC(HT:table, Previous:number)
+{
+    local Category = jpgHuffmanRead(HT)
+
+    if (Category < 0) {
+        return Previous
+    }
+
+    local Diff = jpgReceive(Category)
+
+    Diff = jpgExtend(Diff, Category)
+
+    return Previous + Diff
+}
+
+function jpgDecodeBlockBegin(
+    ComponentID:number,
+    DCHT:table,
+    ACHT:table
+)
+{
+    local S = Jpg["blockDecode",table]
+    
+    S["stage",number] = 0
+    S["component",number] = ComponentID
+    S["dcht",table] = DCHT
+    S["acht",table] = ACHT
+
+    S["block",table] = table()
+    S["dequantIndex",number] = 0
+
+    S["active",number] = 1
+    S["idct",number] = 0
+    S["saved",number] = 0
+}
+
+function number jpgDecodeBlockStep()
+{
+    local S = Jpg["blockDecode",table]
+
+    local Stage = S["stage",number]
+
+    local Block = S["block",table]
+
+    #
+    # Decode DC
+    #
+
+    if (Stage == 0) {
+
+        Block = table()
+
+        for (I = 0,63) {
+            Block[I,number] = 0
+        }
+        
+        local Size = jpgHuffmanRead(S["dcht",table])
+
+        if (Size < 0) {
+            return -1
+        }
+
+        local Diff = 0
+
+        if (Size > 0) {
+
+            Diff = jpgReceive(Size)
+
+            if (Diff < 0) {
+                #print("jpgReceive -1")
+                return -1
+            }
+
+            Diff = jpgExtend(Diff, Size)
+        }
+
+        local Component = S["component",number]
+        
+        local DC =
+            Jpg["lastDC",table][Component,number] + Diff
+
+
+        Jpg["lastDC",table][Component,number] = DC
+
+        Block[0,number] = DC
+
+        S["block",table] = Block
+        S["k",number] = 1
+        S["stage",number] = 1
+    }
+
+    #
+    # Decode AC
+    #
+
+    if (S["stage",number] == 1) {
+
+        Block = S["block",table]
+
+        local K = S["k",number]
+
+        while (K < 64) {
+
+            if (!perf(90)) {
+                S["k",number] = K
+                return 0
+            }
+
+            local Symbol =
+                jpgHuffmanRead(S["acht",table])
+
+            if (Symbol < 0) {
+                #print("jpgHuffmanRead acht -1")
+                return -1
+            }
+
+            #
+            # EOB
+            #
+
+            if (Symbol == 0) {
+                S["stage",number] = 2                
+                return 1
+            }
+
+            #
+            # ZRL
+            #
+
+            if (Symbol == 0xF0) {
+
+                K += 16
+                continue
+            }
+
+            local Run = Symbol >> 4
+            local Size = Symbol && 15
+
+            K += Run
+
+            if (K >= 64) {
+                break
+            }
+
+            local Value = 0
+
+            if (Size > 0) {
+
+                Value = jpgReceive(Size)
+
+                if (Value < 0) {
+                    #print("jpgReceive jpgReceive -1")
+                    return -1
+                }
+
+                Value = jpgExtend(Value, Size)
+            }
+
+            local Index = JpgZigZag[K + 1,number]
+
+            Block[Index,number] = Value
+
+            K++
+        }
+
+        S["k",number] = K
+        S["stage",number] = 2
+
+        return 1
+    }
+
+    return 1
+}
+
+function jpgBuildMCU()
+{
+    local MaxH = Jpg["maxH",number]
+    local MaxV = Jpg["maxV",number]
+
+    local Width = Jpg["width",number]
+    local Height = Jpg["height",number]
+
+    local MCUWidth = MaxH * 8
+    local MCUHeight = MaxV * 8
+
+    local MCUX = ceil(Width / MCUWidth)
+    local MCUY = ceil(Height / MCUHeight)
+
+    Jpg["mcuWidth",number] = MCUWidth
+    Jpg["mcuHeight",number] = MCUHeight
+
+    Jpg["mcuX",number] = MCUX
+    Jpg["mcuY",number] = MCUY
+
+    Jpg["mcuCount",number] = MCUX * MCUY
+
+    if (JPGDebug) {
+        print("--------------------------")
+        print("MCU")
+        print("--------------------------")
+        print("MCU Size: " + MCUWidth + "x" + MCUHeight)
+        print("Grid: " + MCUX + " x " + MCUY)
+        print("Total MCU: " + MCUX * MCUY)   
+    }
+}
+
+function jpgAllocateBlocks()
+{
+    local Blocks = table()
+
+    local Components = Jpg["components",table]
+
+    local MCUX = Jpg["mcuX",number]
+    local MCUY = Jpg["mcuY",number]
+
+    local MaxH = Jpg["maxH",number]
+    local MaxV = Jpg["maxV",number]
+
+    for (ID = 1, Jpg["componentCount",number]) {
+
+        local C = Components[ID,table]
+
+        local H = C["h",number]
+        local V = C["v",number]
+
+        local Count = MCUX * MCUY * H * V
+
+        if (JPGDebug) {
+            print(
+                "Component " + ID +
+                " blocks = " + Count
+            )
+        }
+
+        local Storage = table()
+
+        for (I = 0, Count - 1) {
+            Storage[I,table] = table()
+        }
+
+        Blocks[ID,table] = Storage
+    }
+
+    Jpg["blocks",table] = Blocks
+}
+
+function number jpgAllocateBlocksStep()
+{
+    local State = Jpg["allocBlocks",table]
+    
+    switch (State["stage",number]) {
+
+        #
+        # Initialize
+        #
+        case 0,
+
+            State["blocks",table] = table()
+
+            State["component",number] = 0
+
+            State["stage",number] = 1
+            
+            Jpg["totalBlocks",number] = 0
+
+            break
+
+        #
+        # Prepare next component
+        #
+        case 1,
+
+            State["component",number] = State["component",number] + 1
+
+            if (State["component",number] > Jpg["componentCount",number]) {
+
+                Jpg["blocks",table] = State["blocks",table]
+                    
+                Jpg["allocBlocks",table] = table()
+
+                return 1
+            }
+
+            local Components = Jpg["components",table]
+
+            local C = Components[State["component",number],table]
+
+            local Count =
+                Jpg["mcuX",number] *
+                Jpg["mcuY",number] *
+                C["h",number] *
+                C["v",number]
+
+            if (JPGDebug) {
+                print(
+                    "Component " + State["component",number] +
+                    " blocks = " + Count
+                )
+            }
+
+            State["storage",table] = table()
+            State["count",number] = Count
+            State["index",number] = 0
+
+            State["stage",number] = 2
+            
+            Jpg["totalBlocks",number] = Jpg["totalBlocks",number] + Count
+
+            break
+
+        #
+        # Allocate tables
+        #
+        case 2,
+
+            local Storage = State["storage",table]
+
+            while (
+                State["index",number] < State["count",number] &
+                perf(90)
+            ) {
+
+                Storage[State["index",number],table] = table()
+
+                State["index",number] = State["index",number] + 1
+            }
+
+            if (State["index",number] < State["count",number]) {
+                return 0
+            }
+
+            State["blocks",table][State["component",number],table] = Storage
+
+            State["stage",number] = 1
+
+            break
+    }
+
+    return 0
+}
+
+function number jpgDequantizeBlockStep(Block:table, QT:table)
+{
+    local S = Jpg["blockDecode",table]
+
+    local I = S["dequantIndex",number]
+
+    while (I < 64) {
+
+        if (!perf(90)) {
+            S["dequantIndex",number] = I
+            return 0
+        }
+
+        Block[I,number] = Block[I,number] * QT[I,number]
+
+        I++
+    }
+
+    S["dequantIndex",number] = 0
+    
+    return 1
+}
+
+function jpgInitMCU()
+{
+    local State = Jpg["mcuDecode",table]
+
+    State["component",number] = 1
+    State["x",number] = 1
+    State["y",number] = 1
+    State["active",number] = 1
+    State["stage", number] = 0
+}
+
+function number jpgDecodeMCU()
+{
+    
+    local State = Jpg["mcuDecode",table]
+
+    if (State["active",number] == 0) {
+
+        jpgInitMCU()
+    }
+
+    local Components = Jpg["scanComponents",table]
+
+    local C = State["component",number]
+
+    if (C > Components:count()) {
+        State["active",number] = 0
+        return 1
+    }
+
+    local Scan = Components[C,table]
+
+    local ID = Scan["id",number]
+
+    local Component = Jpg["components",table][ID,table]
+
+    local H = Component["h",number]
+    local V = Component["v",number]
+
+    local QT = Jpg["dqt",table][Component["qt",number],table]
+
+    local DCHT = Jpg["dht",table][Scan["dc",number],table]
+    local ACHT = Jpg["dht",table][16 + Scan["ac",number],table]
+
+    local Storage = Jpg["blocks",table][ID,table]
+    
+    local Index =
+        Jpg["mcuDecoded",number] * H * V +
+        (State["y",number] - 1) * H +
+        (State["x",number] - 1)
+    
+    local Decode = Jpg["blockDecode",table]
+
+    #
+    # Stage 0
+    #
+
+    if (State["stage",number] == 0) {
+
+        jpgDecodeBlockBegin(ID, DCHT, ACHT)
+
+        State["stage",number] = 1
+    }
+
+    #
+    # Stage 1 : Huffman
+    #
+
+    if (State["stage",number] == 1) {
+
+        local Result = jpgDecodeBlockStep()
+
+        if (Result == 0) {
+            return 0
+        }
+
+        if (Result < 0) {
+            
+            if (JPGDebug) {
+                print(
+                    "BLOCK ERROR",
+                    "MCU",
+                    Jpg["mcuDecoded",number],
+                    "COMP",
+                    State["component",number]
+                )
+            }
+                    
+            return -1
+        }
+
+        State["stage",number] = 2
+    }
+
+    #
+    # Stage 2 : Dequant
+    #
+
+    if (State["stage",number] == 2) {
+
+        if (!jpgDequantizeBlockStep(
+            Decode["block",table],
+            QT
+        )) {
+            return 0
+        }
+
+        State["stage",number] = 3
+    }
+
+    #
+    # Stage 3 : IDCT
+    #
+
+    if (State["stage",number] == 3) {
+        if (!jpgIDCTStep(
+            Decode["block",table]
+        )) {
+            return 0
+        }
+
+        State["stage",number] = 4
+    }
+
+    #
+    # Stage 4 : Save
+    #
+
+    if (State["stage",number] == 4) {
+
+        local Saved = table()
+
+        for (I = 0,63) {
+            Saved[I,number] =
+                Decode["block",table][I,number]
+        }
+        
+        Saved["x",number] = State["x",number]
+        Saved["y",number] = State["y",number]
+        Saved["mcu",number] = Jpg["mcuDecoded",number]
+        
+        Storage[Index,table] = Saved
+
+        State["stage",number] = 0
+
+        #
+        # next block
+        #
+
+        State["x",number] = State["x",number] + 1
+
+        if (State["x",number] > H) {
+
+            State["x",number] = 1
+            State["y",number] = State["y",number] + 1
+        }
+
+        if (State["y",number] > V) {
+
+            State["y",number] = 1
+            State["component",number] = State["component",number] + 1
+        }
+
+        if (State["component",number] > Components:count()) {
+
+            State["component",number] = 1
+            State["x",number] = 1
+            State["y",number] = 1
+
+            State["active",number] = 0
+            
+            return 1
+        }
+    }
+
+    return 0
+}
+
+function number jpgConsumeRestart()
+{
+    local Byte = jpgReadByte()
+
+    if (Byte != -2) {
+        return 0
+    }
+
+    jpgAlignByte()
+
+    for (I = 1, Jpg["componentCount",number]) {
+        Jpg["lastDC",table][I,number] = 0
+    }
+
+    return 1
+}
+
+function number jpgDecodeScan()
+{
+    while (perf(90)) {
+        
+        if (Jpg["restartPending",number]) {
+        
+            if (!jpgConsumeRestart()) {
+                return 0
+            }
+        
+            Jpg["restartPending",number] = 0
+        }
+                
+        if (jpgDecodeMCU()) {
+                        
+            Jpg["mcuDecoded",number] = Jpg["mcuDecoded",number] + 1
+            
+            if (Jpg["restartInterval",number] > 0 & Jpg["mcuDecoded",number] % Jpg["restartInterval",number] == 0 ) {
+                Jpg["restartPending",number] = 1
+            }
+
+            if (Jpg["mcuDecoded",number] >= Jpg["mcuCount",number]) {                
+                jpgAlignByte()
+                return 1
+            }
+        }
+    }
+
+    return 0
+}
+
+function number jpgInitFullPlanes()
+{
+    local State = Jpg["full",table]
+
+    if (State["active",number] == 0) {
+        
+        if (Jpg["maxH",number] == 1 & Jpg["maxV",number] == 1) {
+            State["active",number] = 0
+            Jpg["planesFull",table] = Jpg["planes",table]
+            return 1
+        }
+
+        State["active",number] = 1
+        State["index",number] = 0
+
+        local Full = table()
+
+        Full[1,table] = Jpg["planes",table][1,table]
+        Full[2,table] = table()
+        Full[3,table] = table()
+
+        Jpg["planesFull",table] = Full
+    }
+
+
+    local Width = Jpg["width",number]
+    local Height = Jpg["height",number]
+
+
+    local Planes = Jpg["planes",table]
+
+    local Cb = Planes[2,table]
+    local Cr = Planes[3,table]
+
+
+    local Full = Jpg["planesFull",table]
+
+    local CbFull = Full[2,table]
+    local CrFull = Full[3,table]
+
+
+    local Count = Width * Height
+    
+
+    while (perf(90)) {
+
+        local I = State["index",number]
+
+
+        if (I >= Count) {
+            State["active",number] = 0
+            return 1
+        }
+
+
+        local X = I % Width
+        local Y = floor(I / Width)
+
+        local Scan = Jpg["scanComponents",table]
+        
+        local CbID = Scan[2,table]["id",number]
+        local CrID = Scan[3,table]["id",number]
+        
+        local CbInfo =
+            Jpg["components",table][CbID,table]
+        
+        local CrInfo =
+            Jpg["components",table][CrID,table]
+        
+        local CbW = CbInfo["width",number]
+        local CrW = CrInfo["width",number]
+        
+        
+        local CbX =
+            floor(
+                X * CbInfo["h",number] /
+                Jpg["maxH",number]
+            )
+        
+        local CbY =
+            floor(
+                Y * CbInfo["v",number] /
+                Jpg["maxV",number]
+            )
+        
+        
+        local CrX =
+            floor(
+                X * CrInfo["h",number] /
+                Jpg["maxH",number]
+            )
+        
+        local CrY =
+            floor(
+                Y * CrInfo["v",number] /
+                Jpg["maxV",number]
+            )
+        
+        
+        local CbIndex =
+            CbY * CbW + CbX
+        
+        local CrIndex =
+            CrY * CrW + CrX
+        
+        
+        CbFull[I,number] =
+            Cb[CbIndex,number]
+        
+        CrFull[I,number] =
+            Cr[CrIndex,number]
+
+
+        State["index",number] = I + 1
+    }
+
+
+    return 0
+}
+
+function number jpgAllocatePlanesStep()
+{
+    local State = Jpg["allocPlanes",table]
+
+    if (State["active",number] == 0) {
+
+        local Planes = table()
+        local PlanesFull = table()
+
+        Jpg["planes",table] = Planes
+        Jpg["planesFull",table] = PlanesFull
+
+        State["active",number] = 1
+        State["component",number] = 1
+        State["index",number] = 0
+
+        if (JPGDebug) {
+            print("--------------------------")
+            print("Planes")
+            print("--------------------------")
+        }
+    }
+
+    local Components = Jpg["components",table]
+
+    local ID = State["component",number]
+
+    if (ID > Jpg["componentCount",number]) {   
+        State["active",number] = 0
+        return 1
+    }
+
+    local Component = Components[ID,table]
+
+    if (!Jpg["planes",table]:exists(ID)) {
+
+        local Width = Jpg["width",number]
+        local Height = Jpg["height",number]
+
+        local MaxH = Jpg["maxH",number]
+        local MaxV = Jpg["maxV",number]
+
+        local H = Component["h",number]
+        local V = Component["v",number]
+
+        Component["width",number] = ceil(Width * H / MaxH)
+        Component["height",number] = ceil(Height * V / MaxV)
+        
+        Jpg["planeWidth",table][ID,number] =
+            Component["width",number]
+        
+        Jpg["planeHeight",table][ID,number] =
+            Component["height",number]
+
+        Jpg["planes",table][ID,table] = table()
+
+        State["index",number] = 0
+
+        if (JPGDebug) {
+            print(
+                "Component " + ID +
+                " = " +
+                Component["width",number] +
+                "x" +
+                Component["height",number]
+            )
+        }
+    }
+
+    local Plane = Jpg["planes",table][ID,table]
+
+    local Count =
+        Component["width",number] *
+        Component["height",number]
+
+    while (perf(90)) {
+
+        local I = State["index",number]
+
+        if (I >= Count) {
+            State["component",number] = ID + 1
+            State["index",number] = 0
+            break
+        }
+
+        Plane[I,number] = 0
+
+        State["index",number] = I + 1
+    }
+
+    return 0
+}
+
+function jpgInitRGB()
+{
+    local State = table()
+
+    State["x",number] = 1
+    State["y",number] = 1
+
+    Jpg["rgbState",table] = State
+    Jpg["rgb",table] = table()
+}
+
+function number jpgConvertRGBStep()
+{
+    local State = Jpg["rgbState",table]
+
+    local Width = Jpg["width",number]
+    local Height = Jpg["height",number]
+
+    local YPlane = Jpg["planeY",table]
+    local CbPlane = Jpg["planeCb",table]
+    local CrPlane = Jpg["planeCr",table]
+
+    local RGB = Jpg["rgb",table]
+
+    local X = State["x",number]
+    local Y = State["y",number]
+
+    if (X == 0) {
+        X = 1
+        Y = 1
+    }
+
+    while (perf(90)) {
+
+        local Index = (Y - 1) * Width + (X - 1)
+
+        local Yv  = YPlane[Index,number]
+        local Cbv = CbPlane[Index,number] - 128
+        local Crv = CrPlane[Index,number] - 128
+
+        local R = floor(Yv + 1.402 * Crv)
+        local G = floor(Yv - 0.344136 * Cbv - 0.714136 * Crv)
+        local B = floor(Yv + 1.772 * Cbv)
+
+        if (R < 0) { R = 0 }
+        if (R > 255) { R = 255 }
+
+        if (G < 0) { G = 0 }
+        if (G > 255) { G = 255 }
+
+        if (B < 0) { B = 0 }
+        if (B > 255) { B = 255 }
+
+        local Pixel = table()
+        Pixel["r",number] = R
+        Pixel["g",number] = G
+        Pixel["b",number] = B
+
+        RGB[Index,table] = Pixel
+
+        X = X + 1
+
+        if (X > Width) {
+            X = 1
+            Y = Y + 1
+
+            if (Y > Height) {
+
+                State["x",number] = X
+                State["y",number] = Y
+
+                return 1
+            }
+        }
+    }
+
+    State["x",number] = X
+    State["y",number] = Y
+
+    return 0
+}
+
+function table jpgGetBlockPosition()
+{
+    local State = Jpg["assemble",table]
+
+    local MCU = State["mcu",number]
+    local ComponentIndex = State["component",number]
+    local Block = State["block",number]
+
+    local Scan = Jpg["scanComponents",table][ComponentIndex,table]
+    local ComponentID = Scan["id",number]
+
+    local Component = Jpg["components",table][ComponentID,table]
+
+    local H = Component["h",number]
+    local V = Component["v",number]
+
+    local MCUX = MCU % Jpg["mcuX",number]
+    local MCUY = floor(MCU / Jpg["mcuX",number])
+
+    local BlockX = Block % H
+    local BlockY = floor(Block / H)
+
+    local Pos = table()
+
+    Pos["x",number] = MCUX * H * 8 + BlockX * 8
+    Pos["y",number] = MCUY * V * 8 + BlockY * 8
+
+    Pos["id",number] = ComponentID
+
+    return Pos
+}
+
+function jpgCopyBlockToPlane(
+    Block:table,
+    ComponentID:number,
+    X:number,
+    Y:number
+)
+{
+    local Plane = Jpg["planes",table][ComponentID,table]
+
+    local Component =
+        Jpg["components",table][ComponentID,table]
+    
+    local Width =
+        Component["width",number]
+    
+    local Height =
+        Component["height",number]
+
+    for (BY = 0, 7) {
+
+        local PY = Y + BY
+
+        if (PY >= Height) {
+            break
+        }
+
+        for (BX = 0, 7) {
+
+            local PX = X + BX
+
+            if (PX >= Width) {
+                break
+            }
+
+            local Value = Block[BY * 8 + BX,number]
+            
+            if (Value < 0) {
+                Value = 0
+            }
+            elseif (Value > 255) {
+                Value = 255
+            }
+            
+            Plane[PY * Width + PX,number] = Value
+        }
+    }
+}
+
+function number jpgAllocatePixelsStep()
+{
+    local State = Jpg["allocPixels",table]
+
+    if (State["active",number] == 0) {
+
+        Jpg["pixels",table] = table()
+
+        State["active",number] = 1
+        State["index",number] = 0
+
+        if (JPGDebug) {
+            print("--------------------------")
+            print("Pixels")
+            print("--------------------------")
+        }
+    }
+
+    local Pixels = Jpg["pixels",table]
+
+    local Count =
+        Jpg["width",number] *
+        Jpg["height",number]
+
+    while (perf(90)) {
+
+        local I = State["index",number]
+
+        if (I >= Count) {
+            State["active",number] = 0
+            return 1
+        }
+
+        Pixels[I,vector] = vec(0,0,0)
+
+        State["index",number] = I + 1
+    }
+
+    return 0
+}
+
+function number jpgYCbCrToRGBStep()
+{
+    local State = Jpg["rgb",table]
+
+    if (State["active",number] == 0) {
+
+        State["active",number] = 1
+        State["index",number] = 0
+    }
+
+    local Width = Jpg["width",number]
+    local Height = Jpg["height",number]
+
+    local Count = Width * Height
+
+
+    local Planes = Jpg["planesFull",table]
+
+    local YPlane = Planes[1,table]
+    local CbPlane = Planes[2,table]
+    local CrPlane = Planes[3,table]
+
+
+    local Pixels = Jpg["pixels",table]
+
+    while (perf(90)) {
+
+        local I = State["index",number]
+
+
+        if (I >= Count) {
+
+            State["active",number] = 0
+            return 1
+        }
+
+
+        local Y  = YPlane[I,number]
+        local Cb = CbPlane[I,number] - 128
+        local Cr = CrPlane[I,number] - 128
+
+        local R = Y + 1.402 * Cr
+        local G = Y - 0.344136 * Cb - 0.714136 * Cr
+        local B = Y + 1.772 * Cb
+
+
+        if (R < 0) { R = 0 }
+        elseif (R > 255) { R = 255 }
+
+        if (G < 0) { G = 0 }
+        elseif (G > 255) { G = 255 }
+
+        if (B < 0) { B = 0 }
+        elseif (B > 255) { B = 255 }
+
+        Pixels[I,vector] = vec(R,G,B)
+
+
+        State["index",number] = I + 1
+    }
+
+
+    return 0
+}
+
+function number jpgAssembleImageStep()
+{
+    local State = Jpg["assemble",table]
+
+    if (State["active",number] == 0) {
+
+        State["active",number] = 1
+
+        State["mcu",number] = 0
+        State["component",number] = 1
+        State["block",number] = 0     
+        
+        State["processed",number] = 0
+        
+        local Components = Jpg["scanComponents",table]
+        
+        for (I = 1, Components:count()) {
+        
+            local ID = Components[I,table]["id",number]
+            local C = Jpg["components",table][ID,table]
+        }
+    }
+
+
+    local Components = Jpg["scanComponents",table]
+
+    while (perf(90)) {
+
+        #
+        #   MCU finished
+        #
+
+        if (State["mcu",number] >= Jpg["mcuCount",number]) {
+
+            State["active",number] = 0
+
+            return 1
+        }
+
+
+        local ComponentIndex = State["component",number]
+
+        local Scan = Components[ComponentIndex,table]
+
+        local ComponentID = Scan["id",number]
+
+        local Component = Jpg["components",table][ComponentID,table]
+
+
+        local H = Component["h",number]
+        local V = Component["v",number]
+
+        local BlocksPerMCU = H * V
+
+
+        local Storage = Jpg["blocks",table][ComponentID,table]
+
+        
+        local Index =
+            State["mcu",number] * BlocksPerMCU +
+            State["block",number]
+            
+        local Block = Storage[Index,table]  
+
+        local Pos = jpgGetBlockPosition()
+
+        jpgCopyBlockToPlane(
+            Block,
+            ComponentID,
+            Pos["x",number],
+            Pos["y",number]
+        )
+
+        #
+        #   Next block
+        #
+
+        State["processed",number] = State["processed",number] + 1
+
+        State["block",number] = State["block",number] + 1
+
+
+        if (State["block",number] >= BlocksPerMCU) {
+
+            State["block",number] = 0
+
+            State["component",number] =
+                State["component",number] + 1
+
+
+            #
+            #   Next MCU
+            #
+
+            if (State["component",number] > Components:count()) {
+
+                State["component",number] = 1
+
+                State["mcu",number] =
+                    State["mcu",number] + 1
+            }
+        }
+    }
+
+
+    return 0
+}
+

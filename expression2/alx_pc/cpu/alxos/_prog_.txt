@@ -25,6 +25,11 @@ function alxos_bmp_reader(FInfo:table) {
     dsSendDirect("alxos_runprog",E2_GPU,table("alxos_bmp_reader",FInfo))
 }
 
+ALXOS_PROGS["alxos_jpg_reader",number] = 1
+function alxos_jpg_reader(FInfo:table) {
+    dsSendDirect("alxos_runprog",E2_GPU,table("alxos_jpg_reader",FInfo))
+}
+
 ALXOS_PROGS["alxos_soundplay",number] = 1
 function alxos_soundplay(FInfo:table) {
     dsSendDirect("alxos_runprog",E2_GPU,table("alxos_explorer_soundplay",FInfo))
@@ -53,6 +58,7 @@ function alxos_network_chat(FInfo:table) {
     
 # program associations, for now hardcoded...
 ALXOS_PROG_ASOC["bmp",string] = "alxos_bmp_reader"
+ALXOS_PROG_ASOC["jpg",string] = "alxos_jpg_reader"
 ALXOS_PROG_ASOC["txt",string] = "alxos_txt_reader"
 ALXOS_PROG_ASOC["ini",string] = "alxos_txt_reader"
 ALXOS_PROG_ASOC["e2e",string] = "alxos_txt_reader"

@@ -1,0 +1,303 @@
+@name JPG Reader
+#@inputs HTTPData:string
+@inputs BMP_NoKeepAR # for now like input
+
+#[
+    ALX Wiremod E2 OS
+    Created by AlexALX
+]#
+
+#include "alx_pc/gpu/alxos/_main_"
+
+function array alxos_jpg_findAccelerator() {
+    
+    local PCI_Devices = Devices["pci_bus",table]
+            
+    foreach(K:number,V:array=PCI_Devices) {
+        if (V[1,string]=="jpgacc") {
+            return V    
+        }
+    }
+    
+    return array()
+}
+
+function alxos_jpg_init(Args:table) {
+    if (!DS:entity():isValid()) {
+        "alxos_explorer_error"("Digital screen not connected! Rendering canceled.",420)
+        return
+    }
+    
+    local JPGAccelerator = alxos_jpg_findAccelerator()
+    
+    if (!JPGAccelerator:count()) {
+        "alxos_explorer_error"("JPG Accelerator not found, please insert PCI card and reboot.",490)
+        return
+    }
+
+    local FInfo = Args[1,table]
+    local ExplorerFS = Args[2,table]
+    DsHandler = "alxos_jpg_ds"
+
+    ExplorerCurTask = "jpg"
+
+    dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(
+        ExplorerFS,FInfo,0,FInfo["size",number]
+    )))     
+
+    local Parent = "alxos_explorer_dialog"("Opening file",400,80,"progress","alxos_jpg_clear")[number]
+    
+    GpuData[1,table] = ExplorerFS
+    GpuData[2,table] = FInfo
+    GpuData[5,number] = 0
+    
+    GpuData["jpgData",string] = ""
+
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+
+    DS[1048574] = 0
+    DS[1048569] = 2
+    DS[1048575] = 1
+    
+    DialogData[1,number] = 1
+    DialogData[3,number] = 1
+    DialogData[4,number] = 1
+    runCmd("alxos_jpgread_progress",1)
+}
+
+function alxos_jpgread_progress() {
+    local ExplorerFS = GpuData[1,table]
+    
+    local FS = ExplorerFS["hdd_io",wirelink]
+    local Step = DialogData[4,number]
+
+    local CurTask = FS["CurTask",table]
+    local I = CurTask[2,number]
+    local Max = CurTask[1,number]
+    local Last = DialogData[3,number]
+    
+    if (!Step) { return }
+
+    if (Max>0) {
+        local PercID = DialogData[-4,number]
+        local BoxID = DialogData[-5,number]
+        local BoxW = DialogData[-6,number]
+        local CalcP = round(I/Max*100)
+        BoxW = ceil(BoxW/100*CalcP)
+        if (BoxW<1) { BoxW = 1 }
+        EGP:egpSize(BoxID,vec2(BoxW,20))
+        EGP:egpSetText(PercID,CalcP+"%")
+    }
+    
+    runCmd("alxos_jpgread_progress",1) 
+}
+
+function number alxos_jpg_cmd() {
+    #alxos_bmp_draw(GpuData[11,string])
+    return 0
+}
+
+function number alxos_jpg_clear() {
+    if (!checkPerf(7000)) {
+        runCmd("alxos_jpg_clear",1)
+        return 0
+    }
+    
+    local ExplorerFS = GpuData[1,table]
+    dsSendDirect("clear",ExplorerFS["hdd_io",wirelink]:entity(),1)
+    
+    local JPGAccelerator = alxos_jpg_findAccelerator()
+    dsSendDirect("SHUTDOWN",JPGAccelerator[3,entity],0)
+
+    "alxos_explorer_handlers"()
+    "alxos_explorer_listcurdir"()
+    return 0
+}
+
+function number alxos_jpg_finish(Err:string) {
+    local Height = 60
+    local Pos = vec2(220,18)
+    local NewLines = Err:explode("\n") 
+    
+    if (NewLines:count()>1) {
+        Height += (NewLines:count()-1) * 20
+    }
+    
+    if (Err) {
+        Pos = vec2(20,18)    
+    }
+        
+    local Parent = "alxos_explorer_dialog"("JPG Reader"+(Err!="" ? " Error" : ""),440,Height,"ok","alxos_jpg_clear")[number]
+
+    if (Err) {
+        for(I=1,NewLines:count()) {
+            DialogData[-10,table]:pushNumber(LAST_I)
+            EGP:egpText(LAST_I,NewLines[I,string],Pos)
+            EGP:egpParent(LAST_I,Parent)
+            EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+            
+            Pos[2] = Pos[2] + 20
+        }
+    } else {
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Opening JPG file success finished.",Pos)
+        EGP:egpParent(LAST_I,Parent)
+        if (!Err) {
+            EGP:egpAlign(LAST_I,1)
+        }
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    }
+
+    "alxos_explorer_handlers"()
+    return 0
+}
+
+function number alxos_jpg_finish() {
+    if (!checkPerf(7000)) {
+        runCmd("alxos_jpg_finish",1)
+        return 0
+    }
+    return alxos_jpg_finish("")
+}
+
+function alxos_jpg_draw(Data:string) {
+    DialogData[4,number] = 0
+    
+    local JPGAccelerator = alxos_jpg_findAccelerator()
+    
+    if (!JPGAccelerator:count()) {
+        "alxos_explorer_error"("JPG Accelerator not found, please insert PCI card and reboot.",490)
+        return
+    }
+    
+    GpuData["jpgData",string] = Data    
+    GpuData["jpgAccelerator",array] = JPGAccelerator
+    
+    dsSendDirect("drawJpg",JPGAccelerator[3,entity],table(
+        DS, Data, entity(), TickQuota
+    ))
+
+    local Width = 400
+    local Height = 120
+    
+    local LAST_Y = -22
+    local LeftPos = 20-Width/2
+    
+    local Parent = "alxos_explorer_dialog"("Reading JPG",Width,Height,"progress","alxos_jpg_clear")[number]
+
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Current Step: 0 / 10",alxos_dlgPos(-180,-42))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Current Task: Opening JPG",alxos_dlgPos(-180,0))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    DialogData[3,number] = LAST_I
+    EGP:egpText(LAST_I,"",alxos_dlgPos(-3,0))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpBox(LAST_I,alxos_dlgPos(LeftPos,LAST_Y),vec2(Width-40,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,125,125,125,255) LAST_I++
+
+    DialogData[4,number] = LAST_I
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpBox(LAST_I,alxos_dlgPos(LeftPos,LAST_Y),vec2(1,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    DialogData[5,number] = LAST_I
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"0%",alxos_dlgPos(0,LAST_Y))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,200,200,200,255) LAST_I++
+    
+    # change position of main progress bar
+    local PercID = DialogData[-4,number]
+    local BoxID = DialogData[-5,number]
+    EGP:egpPos(BoxID-1,alxos_dlgPos(LeftPos, LAST_Y+45))
+    #EGP:egpPos(BoxID,alxos_dlgPos(LeftPos, LAST_Y))
+    EGP:egpPos(PercID,alxos_dlgPos(0, LAST_Y+45))
+    
+}
+
+function alxos_jpg_progress(Info:table) {
+    local CurrentState = Info[1,string]
+    local Progress = Info[2,table]
+    local ProgressText = Info[3,string]
+    local Processing = Info[4,number]
+    local Error = Info[5,string]
+    
+    local TW = DialogData[3,number]
+        
+    EGP:egpSetText(TW-2, "Current Step: "+Progress["step",number] + " / 10")
+    
+    local PercID = DialogData[5,number]
+    local BoxID = DialogData[4,number]
+    local BoxW = DialogData[-6,number]
+    local CalcP = round(Progress["step",number] * 100 / 10)
+    
+    BoxW = ceil(BoxW/100*CalcP)
+    if (BoxW<1) { BoxW = 1 }
+    EGP:egpSize(BoxID,vec2(BoxW,20))
+    EGP:egpSetText(PercID,CalcP+"%")
+    
+    local PercID = DialogData[-4,number]
+    local BoxID = DialogData[-5,number]
+    local BoxW = DialogData[-6,number]
+    local CalcP = Progress["progressPercent",number]
+    
+    EGP:egpSetText(TW-1, "Current Task: "+Progress["progressTask",string])
+    
+    BoxW = ceil(BoxW/100*CalcP)
+    if (BoxW<1) { BoxW = 1 }
+    EGP:egpSize(BoxID,vec2(BoxW,20))
+    EGP:egpSetText(PercID,Progress["progressCurrent",number] + " / " + Progress["progressMax",number] + " (" + CalcP+"%)")
+    
+    if (Processing==0) {
+        alxos_jpg_finish(Error)
+    }
+    
+}
+
+function alxos_jpg_ds(Name:string) {
+    if (Name=="fs_readfile") {
+        alxos_jpg_draw(dsGetString())
+    } elseif (Name=="clear") {
+        if (!checkPerf(7000)) {
+            runCmd("alxos_jpg_clear",1)
+            return
+        }
+        alxos_jpg_clear()
+    } elseif (Name=="jpgProgress") {
+        if (DS==nowirelink()) {
+            local JPGAccelerator = alxos_jpg_findAccelerator()
+            dsSendDirect("SHUTDOWN",JPGAccelerator[3,entity],0)   
+            
+            "alxos_explorer_error"("Digital screen not connected! Rendering canceled.",420) 
+            return
+        }
+        alxos_jpg_progress(dsGetTable())
+    } elseif (Name=="JpgReaderError") {
+        "alxos_explorer_error"("JPG Reader Chip not connected (crashed?)",420)     
+    }
+}
+
+function alxos_jpg_key(Key:string,Pressed) {
+    if (!Pressed) { return }
+    if (Key=="f8") {
+        stoptimer("cmd")
+        dsSendDirect("clear",GpuData[1,table]["hdd_io",wirelink]:entity(),entity())
+    }
+}

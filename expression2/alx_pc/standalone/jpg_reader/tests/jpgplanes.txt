@@ -1,0 +1,163 @@
+@name JPG Planes Test
+
+#include "alx_pc/standalone/jpg_reader/tests/_shared_"
+#include "alx_pc/standalone/jpg_reader/tests/_jpg_shared_"
+#include "alx_pc/standalone/jpg_reader/decoder"
+
+function test_jpgInitFullPlanes()
+{
+    local Name = "jpgInitFullPlanes"
+
+
+    Jpg["width",number] = 4
+    Jpg["height",number] = 4
+    
+    Jpg["full", table] = table()
+
+
+    local Planes = table()
+
+
+    # Y 4x4
+
+    local Y = table()
+
+    for (I = 0, 16) {
+        Y[I,number] = I
+    }
+
+
+    # Cb 2x2
+    #
+    # 10 20
+    # 30 40
+
+    local Cb = table()
+
+    Cb[0,number] = 10
+    Cb[1,number] = 20
+    Cb[2,number] = 30
+    Cb[3,number] = 40
+
+
+    # Cr 2x2
+    #
+    # 50 60
+    # 70 80
+
+    local Cr = table()
+
+    Cr[0,number] = 50
+    Cr[1,number] = 60
+    Cr[2,number] = 70
+    Cr[3,number] = 80
+
+
+    Planes[1,table] = Y
+    Planes[2,table] = Cb
+    Planes[3,table] = Cr
+
+
+    Jpg["planes",table] = Planes
+
+
+
+    # components
+
+    local Components = table()
+
+
+    local C1 = table()
+    C1["h",number] = 2
+    C1["v",number] = 2
+    C1["width",number] = 4
+    C1["height",number] = 4
+
+    local C2 = table()
+    C2["h",number] = 1
+    C2["v",number] = 1
+    C2["width",number] = 2
+    C2["height",number] = 2
+
+
+    local C3 = table()
+    C3["h",number] = 1
+    C3["v",number] = 1
+    C3["width",number] = 2
+    C3["height",number] = 2
+
+
+    Components[1,table] = C1
+    Components[2,table] = C2
+    Components[3,table] = C3
+
+
+    Jpg["components",table] = Components
+    
+    local Scan = table()
+    
+    local S1 = table()
+    S1["id",number] = 1
+    
+    local S2 = table()
+    S2["id",number] = 2
+    
+    local S3 = table()
+    S3["id",number] = 3
+    
+    Scan[1,table] = S1
+    Scan[2,table] = S2
+    Scan[3,table] = S3
+    
+    Jpg["scanComponents",table] = Scan
+
+    Jpg["maxH",number] = 2
+    Jpg["maxV",number] = 2
+    
+    Jpg["planesFull",table] = table()
+
+    jpgInitFullPlanes()
+
+    local Full = Jpg["planesFull",table]
+
+    local FCb = Full[2,table]
+    local FCr = Full[3,table]
+
+
+    local Result = 1
+
+
+
+    if (!assertCase(Name,0,FCb[0, number],10)) {
+        Result = 0
+    }
+
+    if (!assertCase(Name,3,FCb[3, number],20)) {
+        Result = 0
+    }
+
+    if (!assertCase(Name,8,FCb[8, number],30)) {
+        Result = 0
+    }
+
+    if (!assertCase(Name,15,FCb[15, number],40)) {
+        Result = 0
+    }
+
+
+    if (!assertCase(Name,16,FCr[0, number],50)) {
+        Result = 0
+    }
+
+    if (!assertCase(Name,17,FCr[15, number],80)) {
+        Result = 0
+    }
+
+
+    if (Result) {
+        testPass(Name)
+    }
+}
+test_jpgInitFullPlanes()
+
+testResults()

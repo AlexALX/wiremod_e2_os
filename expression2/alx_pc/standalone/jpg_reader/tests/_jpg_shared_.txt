@@ -1,0 +1,15 @@
+@persist Jpg:table
+#include "alx_pc/standalone/jpg_reader/jpg_parser"
+
+if (first() | duped()) {
+    Jpg = table()    
+}
+
+function jpgTestData(Data:string)
+{
+    Jpg["data",string] = Data
+    Jpg["size",number] = Data:length()
+    Jpg["pos",number] = 1
+
+    jpgBitInit()
+}

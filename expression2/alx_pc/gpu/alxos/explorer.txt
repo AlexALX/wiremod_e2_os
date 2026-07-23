@@ -331,7 +331,7 @@ function alxos_explorer_info() {
     EGP:egpAlign(LAST_I,1)
     EGP:egpColor(LAST_I,255,255,0,255) LAST_I++ LAST_Y += 20
     
-    EGP:egpText(LAST_I,"Version 1.2, 17 March 2018",vec2(256,LAST_Y))
+    EGP:egpText(LAST_I,"Version 1.3, 23 July 2026",vec2(256,LAST_Y))
     EGP:egpAlign(LAST_I,1)
     EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ LAST_Y += 25
     
@@ -420,7 +420,7 @@ function alxos_explorer_info() {
     EGP:egpLine(LAST_I,vec2(8,437),vec2(504,437))
     EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ LAST_Y += 5
     
-    EGP:egpText(LAST_I,"Created by AlexALX (c) 2016-2018",vec2(256,442))
+    EGP:egpText(LAST_I,"Created by AlexALX (c) 2016-2026",vec2(256,442))
     EGP:egpAlign(LAST_I,1)
     EGP:egpColor(LAST_I,255,255,0,255) LAST_I++
     
@@ -621,7 +621,7 @@ function alxos_explorer_paste(Info:table) {
     ExplorerDsH = "alxos_explorer_paste_ds"
 }
 
-function alxos_explorer_paste_ds(Args:table) {
+function alxos_explorer_paste_ds(DsData:array) {
     local Type = dsGetType()
     local DS = dsClkName()
     if (DS=="fs_mkfile") {
@@ -668,7 +668,7 @@ function alxos_explorer_paste_ds(Args:table) {
 }
 
 function alxos_explorer_paste_ds() {
-    alxos_explorer_paste_ds(table())   
+    alxos_explorer_paste_ds(array())   
 }
 
 function alxos_explorer_copy(Info:table) {
@@ -1014,7 +1014,7 @@ function alxos_explorer_presendcl(Info:table) {
     }
 }
 
-function alxos_explorer_nwsend_ds(Args:table) {
+function alxos_explorer_nwsend_ds(Args:array) {
     local Type = dsGetType()
     local DS = dsClkName()
     
@@ -1070,7 +1070,7 @@ function alxos_explorer_nwsend_ds(Args:table) {
 }
 
 function alxos_explorer_nwsend_ds() {
-    alxos_explorer_nwsend_ds(table())   
+    alxos_explorer_nwsend_ds(array())   
 }
 
 function alxos_explorer_sharesretry() {
@@ -1264,10 +1264,10 @@ function alxos_explorer_send(Info:table) {
     alxos_explorer_nwinterface(table(1,Entry))
 }
 
-function alxos_explorer_dw_ds(Args:table) {
+function alxos_explorer_dw_ds(Args:array) {
     local Type = dsGetType()
     ExplorerDsH = ""
-    #ifndef jsonEncode(table) | fileWrite(string,string)
+    #ifndef fileWrite(string,string)
         alxos_explorer_error("Failed to open file!",250)
     #else
     if (Type=="array") {
@@ -1285,12 +1285,12 @@ function alxos_explorer_dw_ds(Args:table) {
         fileWrite(FName,Ret) ]#
         
         DialogData[1,number] = 2
-        local Inf = jsonEncode(table(Entry,array())):replace("},[]]","},[")
+
         DialogData[7,array] = dsGetArray()
         DialogData[8,number] = DialogData[7,array]:count()
         DialogData[9,number] = 1
         
-        fileWrite(FName,Inf)
+        fileWrite(FName,"")
         
         DialogData[10,string] = FName
         
@@ -1313,7 +1313,7 @@ function alxos_explorer_dw_ds(Args:table) {
 }
 
 function alxos_explorer_dw_ds() {
-    alxos_explorer_dw_ds(table())   
+    alxos_explorer_dw_ds(array())   
 }
 
 function alxos_explorer_dw_progress() {
@@ -1330,7 +1330,7 @@ function alxos_explorer_dw_progress() {
         local Entry = DialogData[5,table]
         local FName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
         
-        EGP:egpText(LAST_I,"Reading file "+FName+"...",vec2(-190,-22))
+        EGP:egpText(LAST_I,"Reading file "+FName+"...",alxos_dlgPos(-190,-22))
         EGP:egpParent(LAST_I,Parent)
         EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
         
@@ -1356,12 +1356,9 @@ function alxos_explorer_dw_progress() {
         local Buffer = ""
         while(perf(60)) {
             if (I>Max) { break }
-            if (I!=1) { Buffer += "," }
-            Buffer += Arr[I,number]
+            Buffer += byte2strraw(Arr[I,number],0)
             I++
         }
-        
-        if (I>=Max) { Buffer += "]]" }
         
         #ifdef fileCanWrite()
             fileAppend(FName,Buffer)
@@ -1424,8 +1421,8 @@ function alxos_explorer_dwpre() {
         return
     }
     
-    #ifndef jsonEncode(table) | fileWrite(string,string)
-        alxos_explorer_error("E2 Extension json and file is not enabled! Aborting...",450)
+    #ifndef fileWrite(string,string)
+        alxos_explorer_error("E2 Extension file is not enabled! Aborting...",450)
         if (1) { return }
     #endif
     
@@ -1446,15 +1443,13 @@ function alxos_explorer_dw(Info:table) {
         return
     }    
     
-    local Parent = alxos_explorer_dialog("Download file",410,160,"okcancel","alxos_explorer_dwpre")
+    local Parent = alxos_explorer_dialog("Download file",410,120,"okcancel","alxos_explorer_dwpre")
 
     local Strs = array()
     Strs:pushString("This action will save selected file to")
     Strs:pushString("garrysmod/data/e2files folder.")
-    Strs:pushString("Due to epxression2 lack of null byte support")
-    Strs:pushString("in file.write function, data written in json format.")
-    Strs:pushString("You will need convert it via lua/php script")
-    Strs:pushString("to restore it as normal file.")
+    Strs:pushString("Due to gmod limitation it will be saved as .txt")
+    Strs:pushString("You will need rename it to proper format.")
     
     DialogData[1,table] = Entry
     local LAST_Y = (-10*Strs:count())-2
@@ -1786,90 +1781,139 @@ function alxos_explorer_mkfile() {
         return
     }
     
-    local Parent = alxos_explorer_dialog("Create File",400,160,"text","alxos_explorer_mkfilepre")
+    local DialogMode = ""
+    
+    #ifdef httpRequest(string)
+        DialogMode += "http"
+    #endif
+    
+    #ifdef fileLoad(string)
+        DialogMode += "file"
+    #endif
+    
+    local DialogHeight = 160
+    if (DialogMode=="httpfile") {
+        DialogHeight = 180    
+    } elseif (DialogMode=="file") {
+        DialogHeight = 200  
+    } elseif (DialogMode=="http") {
+        DialogHeight = 180  
+    }
+    
+    local Parent = alxos_explorer_dialog("Create File",420,DialogHeight,"text","alxos_explorer_mkfilepre")
     local Entries = table()
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"File name:",alxos_dlgPos(-180,-67))
+    EGP:egpText(LAST_I,"File name:",vec2(20,15))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpBox(LAST_I,alxos_dlgPos(-180,-49),vec2(360,20))
+    EGP:egpBox(LAST_I,vec2(20,35),vec2(380,20))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
     Entries[0,table] = table(LAST_I,"","^[A-Za-z0-9_!@#$^ .-]$",14,"alxos_explorer_fnamefilter")
-    EGP:egpText(LAST_I,"_",alxos_dlgPos(-178,-49))
+    EGP:egpText(LAST_I,"_",vec2(22,35))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+        
+    local DialogText = "File content: (not necessary)"
+    if (DialogMode=="httpfile") {
+        DialogText = "File content or URL or file PATH: (not necessary)"               
+    } elseif (DialogMode=="http") {
+        DialogText = "File content or URL: (not necessary)"   
+    } elseif (DialogMode=="file") {
+        DialogText = "File content or file PATH: (not necessary)"   
+    } 
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,DialogText,vec2(20,55))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
-    #ifdef runOnHTTP(number)
-    
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"File content or URL: (not necessary)",alxos_dlgPos(-180,-29))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
-    
-    DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpBox(LAST_I,alxos_dlgPos(-180,-9),vec2(360,20))
+    EGP:egpBox(LAST_I,vec2(20,75),vec2(380,20))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
     Entries[1,table] = table(LAST_I,"","^[A-Za-z0-9_&$#?@!*()\"'^%%+;:.,|/\\ %[%]-]$",100)
-    EGP:egpText(LAST_I,Entries[2,table][2,string],alxos_dlgPos(-178,-9))
+    EGP:egpText(LAST_I,Entries[2,table][2,string],vec2(22,75))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    if (DialogMode!="") {    
+    
+    local DialogText = "Note: you can paste url or file path using"
+    if (DialogMode=="http") {
+        DialogText = "Note: you can paste url using"   
+    } elseif (DialogMode=="file") {
+        DialogText = "Note: you can paste file path using"   
+    }
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,DialogText,vec2(20,95))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    local DialogText = "\"!content http://\" or \"!content file://\" in chat"
+    if (DialogMode=="http") {
+        DialogText = "\"!content http://\" in chat"   
+    } elseif (DialogMode=="file") {
+        DialogText = "\"!content file://\" in chat"   
+    }
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,DialogText,vec2(20,115))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    local LastY = 135
+    
+    if (DialogMode:find("file")!=0) {
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Files should be located in garrysmod/data/e2files/",vec2(20,LastY))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    } else {
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"File download disabled (missing E2 file Extension)",vec2(20,LastY))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    }
+    
+    LastY += 20
+    
+    if (DialogMode:find("http")==0) {
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Http download disabled (missing E2 http Extension)",vec2(20,LastY))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    }
+    
+    } else { 
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Note: http/file download is disabled due to missing",vec2(20,98))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Note: you can paste url here using command",alxos_dlgPos(-180,16))
+    EGP:egpText(LAST_I,"E2 HTTP and FILE Extensions, please enable it.",vec2(20,118))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
-    DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"\"!url http://URL\" in chat",alxos_dlgPos(-180,36))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
-    
-    #else
-    
-    DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"File content: (not necessary)",alxos_dlgPos(-180,-29))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
-    
-    DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpBox(LAST_I,alxos_dlgPos(-180,-9),vec2(360,20))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpColor(LAST_I,0,168,168,255) LAST_I++
-    
-    DialogData[-10,table]:pushNumber(LAST_I)
-    Entries[2,table] = table(LAST_I,"","^[A-Za-z0-9_&$#?@!*()\"'^%%+;:.,|/\\ %[%]-]$",100)
-    EGP:egpText(LAST_I,Entries[2,table][2,string],alxos_dlgPos(-178,-9))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
-    
-    DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Note: http download is disabled due to missing",alxos_dlgPos(-180,16))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
-    
-    DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"E2 HTTP Extension, please enable it.",alxos_dlgPos(-180,36))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
-
-    #endif
+    }
     
     ExplorerKeyH = "dialog"
     
-    #ifdef runOnHTTP(number)
-    ChatHandler = "alxos_explorer_chat"
-    runOnChat(1)
-    ChatPlayer = Keyboard[2,entity]
-    #endif
+    if (DialogMode!="") {
+        ChatHandler = "alxos_explorer_chat"
+        runOnChat(1)
+        ChatPlayer = Keyboard[2,entity]
+    }
     
     DialogData[10,table] = Entries
     DialogData[11,number] = 0
@@ -1881,11 +1925,136 @@ function alxos_explorer_chat(Ply:entity) {
     local Find = Said:find(" ")
     local Cmd = Said:left(Find-1)
     local Url = Said:sub(Find+1)  
-    if (Cmd=="!url") {
+    if (Cmd=="!content") {
         local Entry = DialogData[10,table][1,table]
         local ID = Entry[1,number]
         Entry[2,string] = Url
         EGP:egpText(ID,Url,EGP:egpPos(ID))
+    }
+}
+
+function alxos_explorer_loadfile(Info:table) {
+    
+    #ifdef fileCanLoad()
+    if (!fileCanLoad()) {
+        alxos_explorer_error("File API is busy.",300)   
+        return    
+    }
+
+    local FileName = Info[2,string]:sub(7)
+    
+    # to sad that i cannot use try catch here because it requires STRICT mode
+    fileLoad(FileName)
+    
+    local QueueCount = fileLoadQueued()
+    
+    if (QueueCount==0) {
+        
+        local AllowedExt = table()
+        AllowedExt["txt", number] = 1
+        AllowedExt["dat", number] = 1
+        AllowedExt["json", number] = 1
+        AllowedExt["xml", number] = 1
+        AllowedExt["csv", number] = 1
+        AllowedExt["dem", number] = 1
+        AllowedExt["vcd", number] = 1
+        AllowedExt["gma", number] = 1
+        AllowedExt["mdl", number] = 1
+        AllowedExt["phy", number] = 1
+        AllowedExt["vvd", number] = 1
+        AllowedExt["vtx", number] = 1
+        AllowedExt["ani", number] = 1
+        AllowedExt["vtf", number] = 1
+        AllowedExt["vmt", number] = 1
+        AllowedExt["png", number] = 1
+        AllowedExt["jpg", number] = 1
+        AllowedExt["jpeg", number] = 1
+        AllowedExt["mp3", number] = 1
+        AllowedExt["wav", number] = 1
+        AllowedExt["ogg", number] = 1
+        
+        local FTmp = FileName:explode(".")
+        local FExt = FTmp[FTmp:count(),string]
+
+        
+        if (AllowedExt[FExt,number]==0) {
+            dsSendDirect("playgmsound",Devices["spu",entity],table(0,0.2,"buttons/button10.wav"))
+            
+            local Parent = alxos_explorer_dialog("Error",400,80,"ok","alxos_explorer_listcurdir")
+                    
+            DialogData[-10,table]:pushNumber(LAST_I)
+            EGP:egpText(LAST_I,"Extension \"."+FExt+"\" is not allowed.",vec2(200,15))
+            EGP:egpParent(LAST_I,Parent)
+            EGP:egpAlign(LAST_I,1)
+            EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+            
+            DialogData[-10,table]:pushNumber(LAST_I)
+            EGP:egpText(LAST_I,"But you can change it to .txt and still read file.",vec2(200,35))
+            EGP:egpParent(LAST_I,Parent)
+            EGP:egpAlign(LAST_I,1)
+            EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+            
+            
+            DsHandler = "alxos_explorer_ds"
+            return
+        }
+        
+        alxos_explorer_error("Failed to read file, too big or disallowed extension",420)
+    } else {
+        local Parent = alxos_explorer_dialog("Loading file",350,60,"","")
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Reading file from e2files directory...",alxos_dlgPos(0,-8))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpAlign(LAST_I,1)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+        
+        FILE_Handler = "alxos_explorer_onfileload"
+        
+        GpuData["dialogdata",table] = Info
+    }
+    
+    #endif
+}
+
+function alxos_explorer_filepostload(FileName:string, Body:string) {
+    local FName = GpuData["dialogdata",table][3,string]
+    local FNameE = GpuData["dialogdata",table][4,string]
+
+    GpuData["http_dw",number] = 1
+    GpuData["dialogdata",table][5,string] = Body
+    
+    ExplorerDsH = "alxos_explorer_mkfilepost"
+    
+    dsSendDirect(
+        "fs_mkfile",
+        ExplorerFS["hdd_io",wirelink]:entity(),
+        table(
+            entity(),
+            ExplorerFS["fs_str_id",string],
+            table(ExplorerFS,FName,FNameE,0,ExplorerDir[1,number])
+        )
+    )  
+
+}
+
+function alxos_explorer_onfileload(FileName:string, Body:string, Status) {
+    FILE_Handler = ""
+    switch(Status) {
+        case _FILE_404,
+            alxos_explorer_error("File not found.",300)  
+            break     
+        case _FILE_TIMEOUT,
+            alxos_explorer_error("File read timeout.",300)  
+            break 
+        case _FILE_TRANSFER_ERROR,
+            alxos_explorer_error("File transfer error.",300)  
+            break 
+        case _FILE_OK,
+            alxos_explorer_filepostload(FileName, Body)
+            break
+        default,
+            alxos_explorer_error("File read unknown error.",300)   
+            break 
     }
 }
 
@@ -1924,16 +2093,17 @@ function alxos_explorer_mkfilepre() {
         }
     } 
     
-    #ifdef runOnHTTP(number)
-    local URL = DialogData[10,table][1,table][2,string]
-    if (URL:left(7)=="http://" & URL!="http://" | URL:left(8)=="https://" & URL!="https://") {
-        
-        #[if (URL:find("localhost")) {
-            alxos_explorer_error("Requests to local resources are not allowed in Garry's Mod",480)
-            return
-        }]#
-        
-        alxos_explorer_nwinterface(table(0,URL,FName,FNameE))
+    local Content = DialogData[10,table][1,table][2,string]
+    #ifdef httpRequest(string)
+    if (Content:left(7)=="http://" & Content!="http://" | Content:left(8)=="https://" & Content!="https://") {        
+        alxos_explorer_nwinterface(table(0,Content,FName,FNameE))
+        return
+    }
+    #endif
+    
+    #ifdef fileLoad(string)
+    if (Content:left(7)=="file://" & Content!="file://") {        
+        alxos_explorer_loadfile(table(0,Content,FName,FNameE))
         return
     }
     #endif
@@ -2668,7 +2838,7 @@ function alxos_explorer_ds(Name:string) {
         ExplorerDsH(FileData)
     } elseif (Name=="fs_rawreadfile") {
         if (ExplorerDsH=="") { return }
-        local FileData = dsGetTable()
+        local FileData = dsGetArray()
         ExplorerDsH(FileData)
     } elseif (Name=="alxos_runprog") {
         local Info = dsGetTable()
@@ -2802,7 +2972,7 @@ function alxos_explorer_unplug() {
             alxos_explorer_msg("Disk was unplugged.",200,"Information")
         } elseif (
             ExplorerCurTask=="paste" | ExplorerCurTask=="mkfile" | ExplorerCurTask=="reader" | ExplorerCurTask=="bmp" | 
-            ExplorerCurTask=="sound"
+            ExplorerCurTask=="sound" | ExplorerCurTask=="jpg"
         ) {
             if (ExplorerCurTask=="sound") {
                 alxos_explorer_stopsound()    
@@ -2857,3 +3027,4 @@ function alxos_explorer_onplug(Name:string) {
         }
     }
 }
+

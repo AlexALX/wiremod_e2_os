@@ -1,5 +1,5 @@
 @name ALX Wiremod OS Main func
-@persist HTTP_Handler:string DialogData:table AllFs:table ALXOS_INCLUDED
+@persist HTTP_Handler:string FILE_Handler:string DialogData:table AllFs:table ALXOS_INCLUDED
 #[
 	ALX Wiremod E2 OS
 	Created by AlexALX
@@ -25,6 +25,7 @@ function alxos_OnEgpClear() {
 
 function alxos_clear(BSOD:array) {
     HTTP_Handler = ""
+    FILE_Handler = ""
     ChatHandler = ""
     DialogData = table()
     EgpCleanHandler = ""

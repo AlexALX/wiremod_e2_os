@@ -1,0 +1,529 @@
+#include "alx_pc/standalone/jpg_reader/_shared_"
+#include "alx_pc/standalone/jpg_reader/bitreader"
+#include "alx_pc/standalone/jpg_reader/decoder"
+
+function string jpgMarkerName(Marker:number) {
+    switch (Marker) {
+        case 0xFFD8,
+            return "SOI"
+
+        case 0xFFD9,
+            return "EOI"
+
+        case 0xFFC0,
+            return "SOF0"
+
+        case 0xFFC1,
+            return "SOF1"
+
+        case 0xFFC2,
+            return "SOF2"
+
+        case 0xFFC3,
+            return "SOF3"
+
+        case 0xFFC4,
+            return "DHT"
+
+        case 0xFFDB,
+            return "DQT"
+
+        case 0xFFDA,
+            return "SOS"
+
+        case 0xFFFE,
+            return "COM"
+            
+        case 0xFFDD,
+            return "DRI"
+
+        default,
+            if (Marker >= 0xFFE0 & Marker <= 0xFFEF) {
+                return "APP" + (Marker - 0xFFE0)
+            }
+
+            if (Marker >= 0xFFD0 & Marker <= 0xFFD7) {
+                return "RST" + (Marker - 0xFFD0)
+            }
+
+            return "UNKNOWN (0x" + Marker + ")"
+    }
+}
+
+function number jpgHasLength(Marker:number)
+{
+    switch (Marker) {
+
+        case 0xFFD8, # SOI
+        case 0xFFD9, # EOI
+            return 0
+
+        case 0xFFD0, case 0xFFD1, case 0xFFD2, case 0xFFD3,
+        case 0xFFD4, case 0xFFD5, case 0xFFD6, case 0xFFD7,
+            return 0
+
+        case 0xFF01, # TEM
+            return 0
+    }
+
+    return 1
+}
+
+function jpgParseDRI()
+{
+    local Length = jpgU16()
+    local Interval = jpgU16()
+
+    Jpg["restartInterval",number] = Interval
+
+    if (JPGDebug) {
+        print("Restart interval =", Interval)
+    }
+}
+
+function jpgParseSOF(Type:number)
+{
+    local Length = jpgU16()
+    local Precision = jpgU8()
+    local Height = jpgU16()
+    local Width = jpgU16()
+    
+    local WH = Width > Height ? Width : Height
+    
+    if (WH>512) {
+        jpgError("Your image are too big\nMaximum resolution is 512x512\nYour image: "+Width+"x"+Height)
+        return -1
+    }
+    
+    if (Type == 2) {
+        jpgError("Progressive JPEG is not supported")
+        return -1
+    }
+    
+    Jpg["progressive",number] = (Type == 2)
+
+    local Components = jpgU8()
+    
+    local ComponentTable = Jpg["components",table]
+    
+    local MaxH = 0
+    local MaxV = 0
+
+    for (I = 1, Components) {
+    
+        local ID = jpgU8()
+    
+        local Sampling = jpgU8()
+    
+        local QT = jpgU8()
+    
+        local H = Sampling >> 4
+        local V = Sampling && 15
+    
+        local Component = table()
+    
+        Component["id",number] = ID
+        Component["h",number] = H
+        Component["v",number] = V
+        Component["qt",number] = QT
+    
+        ComponentTable[ID,table] = Component
+    
+        if (H > MaxH) {
+            MaxH = H
+        }
+    
+        if (V > MaxV) {
+            MaxV = V
+        }
+    
+        if (JPGDebug) {
+            print(
+                "Component " + I +
+                "  ID=" + ID +
+                "  H=" + H +
+                "  V=" + V +
+                "  QT=" + QT
+            )
+        }
+    }
+    
+    Jpg["maxH",number] = MaxH
+    Jpg["maxV",number] = MaxV
+    
+    Jpg["width",number] = Width
+    Jpg["height",number] = Height
+    
+    Jpg["componentCount",number] = Components
+    
+    jpgBuildMCU()
+    
+    Jpg["allocBlocks",table] = table()
+    Jpg["state",string] = "alloc_blocks"
+    
+    return 1
+}
+
+function afterAllocateBlocks() {
+    local Index = table()
+
+    local Components = Jpg["components",table]
+    
+    for (ID = 1, Jpg["componentCount",number]) {
+    
+        if (Components:exists(ID)) {
+            Index[ID,number] = 0
+        }
+    }
+    
+    Jpg["blockIndex",table] = Index   
+    
+    Jpg["state",string] = "parse_scan"   
+}
+
+function jpgParseSOS()
+{
+    local Length = jpgU16()
+
+    local Components = jpgU8()
+    
+    Jpg["scanStart",number] = jpgTell()
+    Jpg["scanComponentsCount",number] = Components
+    
+    Jpg["lastDC",table][1,number] = 0
+    Jpg["lastDC",table][2,number] = 0
+    Jpg["lastDC",table][3,number] = 0
+    
+    if (JPGDebug) {
+        print("--------------------------------")
+        print("Start Of Scan")
+        print("--------------------------------")
+    
+        print("Components: " + Components)
+    }
+    
+    local ScanComponents = table()
+
+    for (I = 1, Components) {
+
+        local ID = jpgU8()
+        local Table = jpgU8()
+
+        local DC = Table >> 4
+        local AC = Table && 15
+
+        local Component = table()
+        
+        Component["id",number] = ID
+        Component["dc",number] = DC
+        Component["ac",number] = AC
+        
+        ScanComponents[I,table] = Component
+        
+        if (JPGDebug) {
+            print(
+                "Component ID=" + ID +
+                " DC=" + DC +
+                " AC=" + AC
+            )
+        }
+    }
+    
+    Jpg["scanComponents",table] = ScanComponents
+
+    local Ss = jpgU8()
+    local Se = jpgU8()
+    local AhAl = jpgU8()
+
+    local Ah = AhAl >> 4
+    local Al = AhAl && 15
+    
+    Jpg["scanSs",number] = Ss
+    Jpg["scanSe",number] = Se
+    Jpg["scanAh",number] = Ah
+    Jpg["scanAl",number] = Al
+
+    if (JPGDebug) {
+        print(
+            "Spectral: Ss=" + Ss +
+            " Se=" + Se +
+            " Ah=" + Ah +
+            " Al=" + Al
+        )
+    }
+}
+
+
+function jpgSaveScan()
+{
+    local Count = Jpg["scanCount",number] + 1
+    Jpg["scanCount",number] = Count
+
+    local Scan = table()
+
+    Scan["pos",number] = Jpg["scanStart",number]
+    Scan["size",number] = Jpg["scanBytes",number]
+
+    Scan["components",number] = Jpg["scanComponentsCount",number]
+
+    Scan["Ss",number] = Jpg["scanSs",number]
+    Scan["Se",number] = Jpg["scanSe",number]
+    Scan["Ah",number] = Jpg["scanAh",number]
+    Scan["Al",number] = Jpg["scanAl",number]
+
+    local Scans = Jpg["scans",table]
+    Scans[Count,table] = Scan
+}
+
+function table jpgNormalizeQT(QT:table)
+{
+    local Result = table()
+
+    for (I = 0, 63) {
+
+        local Index = JpgZigZag[I + 1,number]
+
+        Result[Index,number] = QT[I,number]
+    }
+
+    Result["precision",number] = QT["precision",number]
+
+    return Result
+}
+
+function jpgParseDQT()
+{
+    local End = jpgTell() + jpgU16() - 2
+
+    local DQT = Jpg["dqt",table]
+
+    while (jpgTell() < End) {
+
+        local Info = jpgU8()
+
+        local Precision = Info >> 4
+        local ID = Info && 15
+
+        local QT = table()
+
+        QT["precision",number] = Precision
+
+        if (Precision == 0) {
+
+            for (I = 0, 63) {
+                QT[I,number] = jpgU8()
+            }
+
+        } else {
+
+            for (I = 0, 63) {
+                QT[I,number] = jpgU16()
+            }
+
+        }
+
+        DQT[ID,table] = jpgNormalizeQT(QT)
+
+        #print("DQT #" + ID + " (" + (Precision == 0 ? "8" : "16") + " bit)")
+    }
+}
+
+function number jpgParseDHT()
+{
+    if (Jpg["DHTactive",number]==0) {
+        local Length = jpgU16()
+        
+        if (JPGDebug) {
+            print("DHT length = " + Length)
+        }
+        
+        local End = jpgTell() + Length - 2
+    
+        local DHT = Jpg["dht",table]
+        
+        Jpg["dhtLength",number] = Length
+        Jpg["dhtEnd",number] = End
+        Jpg["DHTactive",number] = 1
+    }
+    
+    local Length = Jpg["dhtLength",number]
+    
+    if (JPGDebug) {
+        print("DHT length = " + Length)
+    }
+    
+    local End = Jpg["dhtEnd",number]
+
+    local DHT = Jpg["dht",table]
+
+    while (jpgTell() < End) {
+        if (!perf(90)) {         
+            return 0    
+        }
+        
+        local Info = jpgU8()
+
+        local Class = Info >> 4
+        local ID = Info && 15
+
+        local HT = table()
+
+        HT["class",number] = Class
+
+        local Total = 0
+
+        local Lengths = table()
+
+        for (I = 1, 16) {
+
+            local Count = jpgU8()
+
+            Lengths[I,number] = Count
+
+            Total = Total + Count
+        }
+        
+        HT["lengths",table] = Lengths
+
+        local Symbols = table()
+
+        for (I = 0, Total - 1) {
+            Symbols[I,number] = jpgU8()
+        }
+
+        HT["symbols",table] = Symbols
+        
+        local Key = Class * 16 + ID
+
+        DHT[Key,table] = HT
+        
+        jpgBuildHuffman(HT)
+
+        if (JPGDebug) {
+            if (Class == 0) {
+                print("DHT DC #" + ID)
+            } else {
+                print("DHT AC #" + ID)
+            }
+    
+            print(
+                "Remaining = " + (End - jpgTell())
+            )
+        }
+    }
+    
+    return 1
+}
+
+function number jpgParse()
+{
+    while (perf(90)) {
+
+        switch (Jpg["parseState",number]) {
+
+            #
+            # Read next marker
+            #
+            case 0,
+
+                if (jpgEOF()) {
+                    return 1
+                }
+
+                Jpg["markerPos",number] = jpgTell()
+                Jpg["marker",number] = jpgU16()
+
+                if (JPGDebug) {
+                    print("[" + Jpg["markerPos",number] + "] " + jpgMarkerName(Jpg["marker",number]))
+                }
+
+                Jpg["parseState",number] = 1
+                break
+
+            #
+            # Process marker
+            #
+            case 1,
+
+                local Marker = Jpg["marker",number]
+
+                switch (Marker) {
+
+                    case 0xFFC0,
+                    
+                        local Result = jpgParseSOF(0)
+                    
+                        if (Result == -1) {
+                            return 0
+                        }
+                    
+                        if (Result == 1) {
+                            Jpg["parseState",number] = 0
+                            return 0
+                        }
+                    
+                        break
+                    
+                    case 0xFFC2,
+                    
+                        local Result = jpgParseSOF(2)
+                    
+                        if (Result == -1) {
+                            return 0
+                        }
+                    
+                        if (Result == 1) {
+                            Jpg["parseState",number] = 0
+                            return 0
+                        }
+                    
+                        break
+
+                    case 0xFFDB,
+                        jpgParseDQT()
+                        break
+
+                    case 0xFFC4,
+                        if (jpgParseDHT()) {
+                            Jpg["DHTactive",number] = 0  
+                        } else {
+                            return 0   
+                        }
+                        break
+
+                    case 0xFFDD,
+                        jpgParseDRI()
+                        break
+
+                    case 0xFFDA,
+
+                        jpgParseSOS()
+
+                        jpgBitInit()
+                        jpgInitMCU()
+
+                        Jpg["state",string] = "alloc_planes"
+
+                        Jpg["parseState",number] = 0
+
+                        return 0
+
+                    default,
+
+                        if (jpgHasLength(Marker)) {
+
+                            local Length = jpgU16()
+
+                            jpgSkip(Length - 2)
+                        }
+
+                        break
+                }
+
+                Jpg["parseState",number] = 0
+                break
+        }
+    }
+
+    return 0
+}

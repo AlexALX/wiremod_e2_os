@@ -1,0 +1,84 @@
+@name Bitmap To Rows Converter
+@strict
+
+#[
+    This helper allow convert special strings to array map for DS rendering
+    
+    Example: 
+    local Rows = bitmapToRows("
+    .###.
+    #...#
+    #...#
+    #####
+    #...#
+    #...#
+    #...#
+    ")
+    
+    print(Rows) 
+
+    Will output array(15, 31, 31, 31, 31, 31, 31)
+    
+    ----
+    
+    And reverse: 
+    
+    local Rows = array(14,17,17,31,17,17,17)
+    print(rowsToBitmap(Rows, 5))
+
+]#
+
+function array bitmapToRows(Bitmap:string)
+{
+    local Result = array()
+
+    local Lines = Bitmap:explode("\n")
+
+    foreach (I:number, Line:string = Lines) {
+        
+        Line = Line:replace("\r", ""):trim()
+
+        if (Line == "") {
+            continue
+        }
+
+        local Width = Line:length()
+        local Bits = 0
+
+        for (X = 1, Width) {
+
+            local Char = Line:sub(X, X)
+
+            if (Char != "." & Char != " ") {
+                Bits = Bits || (1 << (Width - X))
+            }
+        }
+
+        Result:pushNumber(Bits)
+    }
+
+    return Result
+}
+
+function string rowsToBitmap(Rows:array, Width:number)
+{
+    local Result = ""
+
+    foreach (I:number, Bits:number = Rows) {
+
+        for (X = 0, Width - 1) {
+
+            if (Bits && (1 << (Width - X - 1))) {
+                Result += "#"
+            } else {
+                Result += "."
+            }
+        }
+
+        if (I < Rows:count()) {
+            Result += "\n"
+        }
+    }
+
+    return Result
+}

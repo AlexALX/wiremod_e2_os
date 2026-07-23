@@ -233,6 +233,22 @@ if (httpClk()) {
 }
 #endif
 
+#ifdef fileClk()
+
+event fileLoaded(FilePath:string, Data:string) {
+    if (FILE_Handler!="") {
+        FILE_Handler(FilePath, Data, _FILE_OK)
+    }
+}
+
+event fileErrored(FilePath:string, Status:number) {
+    if (FILE_Handler!="") {
+        FILE_Handler(FilePath, "", Status)
+    }
+}
+
+#endif
+
 if (chatClk(ChatPlayer)) {
     if (ChatHandler!="") {
         ChatHandler(ChatPlayer)  

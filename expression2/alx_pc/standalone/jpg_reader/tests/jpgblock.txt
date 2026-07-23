@@ -1,0 +1,271 @@
+@name Jpg Block Test
+
+#include "alx_pc/standalone/jpg_reader/tests/_shared_"
+#include "alx_pc/standalone/jpg_reader/tests/_jpg_shared_"
+
+function table decodeBlock()
+{
+    while(1) {
+
+        local Result = jpgDecodeBlockStep()
+
+        if (Result == 1) {
+            return Jpg["blockDecode",table]["block",table]
+        }
+
+        if (Result < 0) {
+            return table()
+        }
+    }
+
+    return table()
+}
+
+function initDecodeBlockTest()
+{
+    Jpg = table()
+    
+    Jpg["blockDecode",table] = table()
+    Jpg["lastDC",table] = table()
+}
+
+function test_decodeblock_dc()
+{
+    initDecodeBlockTest()
+    
+    local Name = "DECODEBLOCK DC"
+
+    Jpg["lastDC",table] = table()
+    Jpg["lastDC",table][1,number] = 0
+
+    #
+    # build dc table
+    #
+
+    local DCLengths = table()
+    DCLengths[1,number] = 1
+    
+    local DCSymbols = table()
+    DCSymbols[0,number] = 2
+    
+    local DCHT = table()
+    DCHT["lengths",table] = DCLengths
+    DCHT["symbols",table] = DCSymbols
+
+    jpgTestData(
+        toChar(0x40)
+    )
+    
+    jpgBuildHuffman(DCHT)
+
+    #
+    # build ac table
+    #
+
+    local ACLengths = table()
+    ACLengths[1,number] = 1
+    
+    local ACSymbols = table()
+    ACSymbols[0,number] = 0
+    
+    local ACHT = table()
+    ACHT["lengths",table] = ACLengths
+    ACHT["symbols",table] = ACSymbols
+
+    jpgBuildHuffman(ACHT)
+
+    jpgTestData(
+        toChar(0x40)
+    )
+
+    jpgDecodeBlockBegin(
+        1,
+        DCHT,
+        ACHT
+    )
+
+    local Block = decodeBlock()
+
+    if (!assertCase(Name,1,Block[0,number],2)) {
+        return
+    }
+
+    if (!assertCase(Name,2,Jpg["lastDC",table][1,number],2)) {
+        return
+    }
+
+    for (I = 1,63) {
+
+        if (!assertCase(Name,I+2,Block[I,number],0)) {
+            return
+        }
+    }
+
+    testPass(Name)
+}
+test_decodeblock_dc()
+
+function test_decodeblock_ac_only()
+{
+    initDecodeBlockTest()
+
+    local Name = "DECODEBLOCK AC ONLY"
+
+    Jpg["lastDC",table][1,number] = 0
+
+
+    #
+    # DC size = 0
+    #
+
+    local DCHT = table()
+
+    DCHT["lengths",table] = table(
+        1 = 1
+    )
+
+    DCHT["symbols",table] = table(
+        0 = 0
+    )
+
+    jpgBuildHuffman(DCHT)
+
+
+    #
+    # AC:
+    # 0x2 = run0 size2
+    # 0 = EOB
+    #
+
+    local ACHT = table()
+
+    ACHT["lengths",table] = table(
+        1 = 1,
+        2 = 1
+    )
+
+    ACHT["symbols",table] = table(
+        0 = 0x02,
+        1 = 0
+    )
+
+    jpgBuildHuffman(ACHT)
+
+    #
+    # 0 0010 10 0
+    #
+
+    jpgTestData(
+        toChar(0x28)
+    )
+
+
+    jpgDecodeBlockBegin(
+        1,
+        DCHT,
+        ACHT
+    )
+
+    local Block = decodeBlock()
+
+
+    if(!assertCase(Name,1,Block[0,number],0)) {
+        return
+    }
+
+    if(!assertCase(Name,2,Block[1,number],2)) {
+        return
+    }
+
+
+    for(I = 2,63) {
+
+        if(!assertCase(Name,I+1,Block[I,number],0)) {
+            return
+        }
+    }
+
+    testPass(Name)
+}
+test_decodeblock_ac_only()
+
+function test_decodeblock_mixed()
+{
+    initDecodeBlockTest()
+
+    local Name = "DECODEBLOCK MIXED"
+
+
+    local DCHT = table()
+
+    DCHT["lengths",table] = table(
+        1 = 1
+    )
+
+    DCHT["symbols",table] = table(
+        0 = 2
+    )
+
+    jpgBuildHuffman(DCHT)
+
+
+
+    local ACHT = table()
+
+    ACHT["lengths",table] = table(
+        1 = 1,
+        2 = 2
+    )
+    
+    ACHT["symbols",table] = table(
+        0 = 0x02,
+        1 = 0x21,
+        2 = 0
+    )
+
+    jpgBuildHuffman(ACHT)
+
+    jpgTestData(
+        toChar(0x4E) +
+        toChar(0x60)
+    )
+    
+    jpgDecodeBlockBegin(
+        1,
+        DCHT,
+        ACHT
+    )
+    
+    local Block = decodeBlock()
+
+    if(!assertCase(Name,1,Block[0,number],2)) {
+        return
+    }
+
+
+    if(!assertCase(Name,2,Block[1,number],3)) {
+        return
+    }
+
+
+    if(!assertCase(Name,3,Block[9,number],-1)) {
+        return
+    }
+
+
+    for(I = 2,63) {
+
+        if(I != 9) {
+
+            if(!assertCase(Name,I+1,Block[I,number],0)) {
+                return
+            }
+        }
+    }
+
+
+    testPass(Name)
+}
+test_decodeblock_mixed()
+
+testResults()

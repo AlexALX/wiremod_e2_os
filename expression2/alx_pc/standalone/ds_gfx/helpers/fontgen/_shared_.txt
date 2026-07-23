@@ -1,0 +1,15 @@
+@name Font Generate
+@strict
+
+#include "alx_pc/standalone/ds_gfx/helpers/bitmap_to_rows"
+
+function fontGenerate(Char:string, Bitmap:string)
+{
+    local Rows = bitmapToRows(Bitmap)
+
+    local ASCII = toByte(Char)
+
+    print("")
+    print("    # " + ASCII + " '" + Char + "'")
+    print("    Glyphs:pushArray(" + Rows:toString() + ")")
+}

@@ -1,0 +1,22 @@
+@persist DsFont:table DsFontWidth:number DsFontHeight:number DsFontSpacing:number
+@persist DsWidth:number DsHeight:number
+@persist DsText:table DSWL:wirelink 
+@strict 
+
+function dsDrawPixel(X:number, Y:number, Color:vector)
+{
+    if (X < 0 | Y < 0 | X >= DsWidth | Y >= DsHeight) {
+        return
+    }
+
+    local Index = X + Y * DsWidth
+
+    DSWL[Index] =
+        floor(Color:x()) * 65536 +
+        floor(Color:y()) * 256 +
+        floor(Color:z())
+}
+
+function dsDrawPixel(X:number, Y:number) {
+    dsDrawPixel(X,Y,vec(255))    
+}

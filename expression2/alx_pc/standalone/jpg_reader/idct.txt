@@ -1,0 +1,134 @@
+@persist JpgIDCT:table
+
+#include "alx_pc/standalone/jpg_reader/_shared_"
+
+if (first() | duped()) {
+    JpgIDCT = table()
+    
+    JpgIDCT["C1",number] = cosr(1 * _PI / 16)
+    JpgIDCT["C2",number] = cosr(2 * _PI / 16)
+    JpgIDCT["C3",number] = cosr(3 * _PI / 16)
+    JpgIDCT["C4",number] = cosr(4 * _PI / 16)
+    JpgIDCT["C5",number] = cosr(5 * _PI / 16)
+    JpgIDCT["C6",number] = cosr(6 * _PI / 16)
+    JpgIDCT["C7",number] = cosr(7 * _PI / 16)
+}
+
+function table jpgIDCT1D(Input:table)
+{
+    local Output = table()
+
+    for (X = 0, 7) {
+
+        local Sum = 0
+
+        for (U = 0, 7) {
+
+            local C = 1
+
+            if (U == 0) {
+                C = sqrt(0.5)
+            }
+
+            Sum = Sum
+                + C
+                * Input[U,number]
+                * cosr((2 * X + 1) * U * _PI / 16)
+        }
+
+        Output[X,number] = Sum / 2
+    }
+
+    return Output
+}
+
+function number jpgIDCTStep(Block:table)
+{
+    local State = Jpg["idct",table]
+
+    #
+    # INIT
+    #
+
+    if (State["active",number] == 0) {
+
+        State["active",number] = 1
+        State["stage",number] = 0
+        State["index",number] = 0
+
+        State["temp",table] = table()
+    }
+
+    local Temp = State["temp",table]
+
+    #
+    # ROWS
+    #
+
+    if (State["stage",number] == 0) {
+
+        local Y = State["index",number]
+
+        local Row = table()
+
+        for (X = 0, 7) {
+            Row[X,number] = Block[Y * 8 + X,number]
+        }
+
+        Row = jpgIDCT1D(Row)
+        
+        for (X = 0, 7) {
+            Temp[Y * 8 + X,number] = Row[X,number]
+        }
+
+        State["index",number] = Y + 1
+
+        if (State["index",number] >= 8) {
+            State["stage",number] = 1
+            State["index",number] = 0
+        }
+
+        return 0
+    }
+
+    #
+    # COLS
+    #
+
+    local X = State["index",number]
+
+    local Col = table()
+
+    for (Y = 0, 7) {
+        Col[Y,number] = Temp[Y * 8 + X,number]
+    }
+
+    Col = jpgIDCT1D(Col)
+
+    for (Y = 0, 7) {
+
+        local Value = Col[Y,number] + 128
+
+        if (Value < 0) {
+            Value = 0
+        }
+
+        if (Value > 255) {
+            Value = 255
+        }
+
+        Block[Y * 8 + X,number] = floor(Value)
+    }
+
+    State["index",number] = X + 1
+
+    if (State["index",number] >= 8) {
+
+        State["active",number] = 0
+        State["temp",table] = table()
+        return 1
+    }
+
+    return 0
+}
+

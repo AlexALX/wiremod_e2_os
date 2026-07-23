@@ -24,13 +24,16 @@ Main features:
 * Virtual BIOS, boot sequence.
 * Low-level WM1 File System what works with wire dupable HDDs/EEPROM. 
 * WCD File System what used for wiremod CD Discs. 
-* Expression2 BMP reader, draw on wire Digital Screen (up to 512x512). 
+* Expression2 BMP Reader, draw on wire Digital Screen (up to 512x512). 
+* Baseline JPG Reader for Digital Screen.
 * Few programs: Console, Burning software, file manager, network chat, partitions manager. 
 * Simple directory listing/file managing interface (DOS style).
 * Simple text viewer.  
 * Simple networking between PC's.
 * Satellite internet device, what provides access to real internet (http e2 extension) for files downloading.
 * Switch/router network system, also with laser transferer and two-way radio devices.
+* Standalone BMP and JPG Readers.
+* Basic GFX lib for draw text on Digital Screen.
 * And some other features and devices!
 
 Also includes PHP version of WM1 File System.

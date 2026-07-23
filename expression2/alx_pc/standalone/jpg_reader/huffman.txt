@@ -1,0 +1,87 @@
+#include "alx_pc/standalone/jpg_reader/bitreader"
+
+function number jpgHuffmanKey(Bits:number, Code:number)
+{
+    return Bits * 65536 + Code
+}
+
+function jpgBuildHuffman(HT:table)
+{
+    local Lengths = HT["lengths",table]
+    local Symbols = HT["symbols",table]
+
+    local Codes = table()
+    local Lookup = table()
+
+    local Code = 0
+    local Index = 0
+    
+    local MaxBits = 0
+
+    for (Bits = 1, 16) {
+
+        local Count = Lengths[Bits,number]
+        
+        if (Count > 0) {
+            MaxBits = Bits
+        }
+
+        for (I = 1, Count) {
+
+            local Symbol = Symbols[Index,number]
+
+            local Entry = table()
+
+            Entry["code",number] = Code
+            Entry["bits",number] = Bits
+            Entry["symbol",number] = Symbol
+
+            Codes[Index,table] = Entry
+
+            Lookup[jpgHuffmanKey(Bits,Code), number] = Symbol
+#[
+            print(  
+                "Code=" + Code +
+                " Bits=" + Bits +
+                " Symbol=" + Symbol
+            )
+]#
+            Code = Code + 1
+            Index = Index + 1
+        }
+
+        Code = Code << 1
+    }
+
+    HT["codes",table] = Codes
+    HT["lookup",table] = Lookup
+    HT["maxBits",number] = MaxBits
+}
+
+function number jpgHuffmanRead(HT:table)
+{
+    local Lookup = HT["lookup",table]
+    
+    local MaxBits = HT["maxBits",number]
+
+    local Code = 0
+
+    for (Bits = 1, MaxBits) {
+
+        local Bit = jpgBit()
+
+        if (Bit < 0) {
+            return Bit
+        }
+
+        Code = (Code << 1) || Bit
+
+        local Key = jpgHuffmanKey(Bits, Code)
+
+        if (Lookup:exists(Key)) {
+            return Lookup[Key,number]
+        }
+    }
+    
+    return -1
+}

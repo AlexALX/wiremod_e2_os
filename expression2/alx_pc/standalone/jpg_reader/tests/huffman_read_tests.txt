@@ -1,0 +1,124 @@
+#include "alx_pc/standalone/jpg_reader/tests/_shared_"
+#include "alx_pc/standalone/jpg_reader/tests/_jpg_shared_"
+
+function test_huffman_read_simple()
+{
+    local Name = "HUFFMAN READ SIMPLE"
+
+    local HT = table()
+
+    local Lengths = table()
+    local Symbols = table()
+
+    Lengths[1,number] = 1
+    Lengths[2,number] = 2
+
+    Symbols[0,number] = 10
+    Symbols[1,number] = 20
+    Symbols[2,number] = 30
+
+    HT["lengths",table] = Lengths
+    HT["symbols",table] = Symbols
+
+    jpgBuildHuffman(HT)
+
+    jpgTestData(
+        toChar(0x58)
+    )
+
+    if (!assertCase(Name, 1, jpgHuffmanRead(HT), 10)) {
+        return
+    }
+
+    if (!assertCase(Name, 2, jpgHuffmanRead(HT), 20)) {
+        return
+    }
+
+    if (!assertCase(Name, 3, jpgHuffmanRead(HT), 30)) {
+        return
+    }
+
+    testPass(Name)
+}
+test_huffman_read_simple()
+
+function test_huffman_read_multi()
+{
+    local Name = "HUFFMAN READ MULTI"
+
+    local HT = table()
+
+    local Lengths = table()
+    local Symbols = table()
+
+    Lengths[1,number] = 1
+    Lengths[2,number] = 2
+
+    Symbols[0,number] = 10
+    Symbols[1,number] = 20
+    Symbols[2,number] = 30
+
+    HT["lengths",table] = Lengths
+    HT["symbols",table] = Symbols
+
+    jpgBuildHuffman(HT)
+
+    jpgTestData(
+        toChar(0x5A)
+        + toChar(0xC0)
+    )
+
+    local Expected = array(
+        10,
+        20,
+        30,
+        10,
+        20,
+        30
+    )
+
+    for (I = 1, Expected:count()) {
+
+        if (!assertCase(
+            Name,
+            I,
+            jpgHuffmanRead(HT),
+            Expected[I,number]
+        )) {
+            return
+        }
+    }
+
+    testPass(Name)
+}
+test_huffman_read_multi()
+
+function test_huffman_read_eof()
+{
+    local Name = "HUFFMAN READ EOF"
+
+    local HT = table()
+
+    local Lengths = table()
+    local Symbols = table()
+
+    Lengths[1,number] = 1
+
+    Symbols[0,number] = 10
+
+    HT["lengths",table] = Lengths
+    HT["symbols",table] = Symbols
+
+    jpgBuildHuffman(HT)
+
+    jpgTestData("")
+
+    if (!assertCase(Name, 1, jpgHuffmanRead(HT), -1)) {
+        return
+    }
+
+    testPass(Name)
+}
+test_huffman_read_eof()
+
+testResults()

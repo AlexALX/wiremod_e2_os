@@ -1,0 +1,42 @@
+#include "alx_pc/standalone/jpg_reader/tests/_shared_"
+#include "alx_pc/standalone/jpg_reader/tests/_jpg_shared_"
+
+function test_receive_zero()
+{
+    local Name = "RECEIVE ZERO"
+
+    jpgTestData("")
+
+    if (!assertCase(Name, 1, jpgReceive(0), 0)) {
+        return
+    }
+
+    testPass(Name)
+}
+test_receive_zero()
+
+function test_receive()
+{
+    local Name = "RECEIVE"
+
+    #
+    # 11010010
+    #
+
+    jpgTestData(
+        toChar(0xD2)
+    )
+
+    if (!assertCase(Name, 1, jpgReceive(3), 6)) {
+        return
+    }
+
+    if (!assertCase(Name, 2, jpgReceive(5), 18)) {
+        return
+    }
+
+    testPass(Name)
+}
+test_receive()
+
+testResults()

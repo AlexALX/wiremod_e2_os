@@ -1,0 +1,153 @@
+@name JPG Helper for DS
+@persist Header:string BlockDraw:number DelayDraw:number
+@inputs DS:wirelink CurrentState:string Progress:table ProgressText:string Processing:number Error:string
+@strict
+
+#include "alx_pc/standalone/ds_gfx/_init_"
+#include "alx_pc/standalone/ds_gfx/font_5x7"
+#include "alx_pc/standalone/ds_gfx/font_8x8"
+
+function displayInit(FontMode) {
+    BlockDraw = 0
+    DelayDraw = 0
+    
+    if (FontMode==1) {
+        dsInit(DS, 400, 300)
+        dsSetFont(dsFont8x8())
+    } else {    
+        dsInit(DS, 200, 150)
+        dsSetFont(dsFont5x7())
+    }
+}
+
+function displayInit() {
+    displayInit(0)    
+}
+
+function displayHelp() {
+    displayInit(1)
+
+    local Text = Header+
+"
+JPG Parser, specifications:
+- Max resolution is up to 512x512 (DS limit) 
+- Support ONLY baseline JPG 
+- Support YUV 4:2:0 4:2:2 4:2:2v 4:4:4
+- Slow, no multithread
+
+Usage via chat commands:
+!jpg http://url - open jpg file from the web
+
+!jpgfile filename.jpg - open jpg file from 
+garrysmod/data/e2files/ folder
+
+!jpgabort - abort rendering
+
+Note: long url may be cut, use input LongURL 
+instead for such case (via string value) 
+"
+
+    dsDrawTextStart(2, 0, Text)
+}
+
+function displayProgressStart() {
+    displayInit()
+    
+    local Text = Header+
+"
+Step:
+0 / 10
+
+Current task:
+Loading JPEG
+
+Progress:
+0 / 0 (0%)
+"
+    
+    dsDrawTextStart(2, 0, Text)
+}
+
+function displayError(Msg:string) {
+    displayInit()
+    
+    local Text = Header+
+"
+JPG Reader Error:
+
+"+Msg+"
+"
+
+    dsDrawTextStart(2, 0, Text)
+}
+
+function displayProgress()
+{
+    if (CurrentState=="draw" | CurrentState=="done") {
+        dsStopQueues()
+        return
+    }
+     
+    if (BlockDraw | CurrentStep!="") {
+        return
+    }
+    
+    local Step = Progress["step", number]
+    local Current = Progress["progressCurrent", number]
+    local Max = Progress["progressMax", number]
+    local Perc = Progress["progressPercent", number]
+    local CurrentTask = Progress["progressTask",string]
+    
+    local FontLine = DsFontHeight + DsFontSpacing
+    
+    # add small delay for better rendering
+    if (LastStep=="drawText" & !DelayDraw) {
+        timer(1,function() {
+            DelayDraw = 1
+        })
+        return            
+    }
+    
+    BlockDraw = 1
+    
+    dsDrawCachedText(2, 4 * FontLine, Step + " / 10")
+    dsDrawCachedText(2, 7 * FontLine, CurrentTask)
+    dsDrawCachedText(2, 10 * FontLine, Current + " / " + Max + " ("+Perc+"%)")
+    
+    timer(2,function() {
+        BlockDraw = 0    
+    })
+    
+}
+
+function displayMode() {
+    if (Error){ 
+        displayError(Error)
+    } elseif (Processing) {
+        displayProgressStart()
+    } else {
+        displayHelp()    
+    }   
+}
+
+if (first() | duped()) {
+    Header = 
+"JPG Reader
+Created by AlexALX (c) 2026
+-------------------"
+    
+    displayMode()
+}
+
+event input(InputName:string) {
+    if (InputName=="DS" & DS!=nowirelink()) {
+        displayMode()
+    } elseif (InputName=="Processing" & Processing) {
+        displayProgressStart()
+    } elseif (InputName=="Error" & Error) {
+        displayError(Error)    
+    } elseif (InputName == "Progress" & Processing) {
+        displayProgress()
+    }
+}
+

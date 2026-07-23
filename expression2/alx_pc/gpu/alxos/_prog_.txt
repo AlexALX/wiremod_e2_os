@@ -38,6 +38,12 @@ function alxos_bmp_reader(Args:table) {
     alxos_bmp_init(Args)
 }
 
+ALXOS_PROGS["alxos_jpg_reader",number] = 1
+function alxos_jpg_reader(Args:table) {
+    #include "alx_pc/gpu/alxos/jpg"
+    alxos_jpg_init(Args)
+}
+
 ALXOS_PROGS["alxos_cd_burner",number] = 1
 function alxos_cd_burner(Args:table) {
     #include "alx_pc/gpu/alxos/cdburn"

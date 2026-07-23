@@ -1,0 +1,44 @@
+@name DS GFX Test
+@persist Done
+@inputs DS:wirelink
+@strict
+
+#include "alx_pc/standalone/ds_gfx/font_5x7"
+#include "alx_pc/standalone/ds_gfx/font_8x8"
+#include "alx_pc/standalone/ds_gfx/text"
+#include "alx_pc/standalone/ds_gfx/_shared_"
+
+if (first() | duped()) {
+
+    Done = 0
+
+    dsInit(DS, 144, 80)
+    dsSetFont(dsFont8x8())
+
+    #dsInit(96, 48)
+    #dsSetFont(dsFont5x7())
+
+    local Text = " !\"#$%&'()*+,-./\n"+
+    "0123456789:;<=>?\n"+
+    "@ABCDEFGHIJKLMNO\n"+
+    "PQRSTUVWXYZ[\\]^_\n"+
+    "`abcdefghijklmno\n"+
+    "pqrstuvwxyz{|}~"
+
+    dsDrawTextStart(0, 0, Text)
+}
+
+event tick() {
+    if (!Done) {
+        
+        while (perf(90)) {
+        
+            if (dsDrawTextStep()) {
+                Done = 1
+                break
+            }
+        }
+    }
+}
+
+

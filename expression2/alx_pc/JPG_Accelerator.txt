@@ -1,0 +1,115 @@
+@name JPG Accelerator
+@inputs InA Board:wirelink JPGReader:wirelink
+@inputs CurrentState:string Progress:table ProgressText:string Processing:number Error:string
+@outputs EntID DS:wirelink
+@persist BIOS:entity Device_Name:string
+@persist E2_GPU:entity Init
+
+#[
+    ALX Wiremod E2 PC
+    Created by AlexALX
+    -------------------
+]#
+
+if (first()|duped()) {
+    
+#include "alx_pc/shared/_main_"
+#include "alx_pc/shared/cmd"
+
+dsSetScope(2)
+
+BIOS = getentity(InA)
+Board["A",number] = entity():id()
+if (!duped()) {
+    dsSendDirect("reload",BIOS,"jpgacc")
+}
+
+Init = 0
+Device_Name = "JPG Accelerator"
+
+function shutdown() {
+    if (!Init) { return }
+
+    stopAllTimers()
+
+    dsSendDirect("abortJpg",JPGReader:entity(),1)
+    DsHandler = ""
+    Init = 0
+
+}
+
+function pci_init() {    
+    dsSendDirect("pci",BIOS,table("jpgacc",entity(),Device_Name))
+}
+
+function usb_init() {
+    Init = 1
+    local Info = dsGetTable()
+    local USB_Device = Info[2,entity]
+    dsSendDirect("usbcontroller",USB_Device,table("jpgacc",wirelink(),table()))
+}
+
+}
+
+if (dupefinished()) {
+    Board["A",number] = entity():id()
+    BIOS = getentity(InA)
+}
+
+if (~InA) {
+    local New_BIOS = entity(InA)
+    if (BIOS!=New_BIOS & Init) {
+        shutdown()
+    }
+    BIOS = New_BIOS
+}
+
+if (!BIOS:isValid()) { exit() }
+
+if (dsClk()) {
+    local Name = dsClkName()
+    
+    if (Name=="drawJpg") {
+        local Info = dsGetTable()
+        E2_GPU = Info[3,entity]
+        TickQuota = Info[4,number]
+        Init = 1
+        DS = Info[1,wirelink]
+        
+        if (JPGReader == nowirelink()) {
+            dsSendDirect("JpgReaderError",E2_GPU,1)
+        } else {        
+            dsSendDirect("drawJpg", JPGReader:entity(), Info[2,string])
+        }
+    } elseif (Name=="pci") {
+        pci_init()
+    } elseif (Name=="usbcontroller") {
+        usb_init()
+    } elseif (Name=="SHUTDOWN") {
+        shutdown()
+    } elseif (DsHandler!="") {
+        DsHandler(Name)
+    }
+}
+
+if (clk("cmd")) {
+    cmdClk()
+}
+
+function sendProgress() {
+    dsSendDirect("jpgProgress", E2_GPU, table(
+        CurrentState, Progress, ProgressText, Processing, Error
+    ))
+}
+
+event input(InputName:string) {
+    if (InputName=="Processing" & Processing) {
+        sendProgress()
+    } elseif (InputName=="Error" & Error) {
+        sendProgress()    
+    } elseif (InputName == "Progress" & Processing) {
+        sendProgress()
+    } elseif (InputName == "CurrentState") {
+        sendProgress()   
+    }
+}

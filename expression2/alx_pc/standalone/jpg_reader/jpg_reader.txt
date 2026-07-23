@@ -1,0 +1,46 @@
+#include "alx_pc/standalone/jpg_reader/_shared_"
+
+function number jpgU8()
+{
+    local Pos = Jpg["pos",number]
+
+    local Value = toByte(Jpg["data",string], Pos)
+
+    Jpg["pos",number] = Pos + 1
+
+    return Value
+}
+
+function number jpgU16()
+{
+    local Pos = Jpg["pos",number]
+    local Data = Jpg["data",string]
+
+    local High = toByte(Data, Pos)
+    local Low  = toByte(Data, Pos + 1)
+
+    Jpg["pos",number] = Pos + 2
+
+    return High * 256 + Low
+}
+
+
+function number jpgTell()
+{
+    return Jpg["pos",number]
+}
+
+function jpgSeek(Pos:number)
+{
+    Jpg["pos",number] = Pos
+}
+
+function jpgSkip(Bytes:number)
+{
+    Jpg["pos",number] = Jpg["pos",number] + Bytes
+}
+
+function number jpgEOF()
+{
+    return Jpg["pos",number] > Jpg["size",number]
+}

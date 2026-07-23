@@ -1,0 +1,62 @@
+@persist TestsPassed TestsFailed
+
+if (first() | duped()) {
+    TestsPassed = 0
+    TestsFailed = 0
+}
+
+function number assertNear(A:number, B:number, Eps:number)
+{
+    return abs(A - B) <= Eps
+}
+
+function number assertEqual(A:number, B:number)
+{
+    return A == B
+}
+
+function testPass(Name:string)
+{
+    TestsPassed++
+
+    print("[PASS]",Name)
+}
+
+function testFail(Name:string,Msg:string)
+{
+    TestsFailed++
+
+    print("[FAIL]",Name,Msg)
+}
+
+function testResults() {
+    print(
+        "Passed",
+        TestsPassed,
+        "Failed",
+        TestsFailed
+    )    
+}
+
+function number assertCase(
+    Name:string,
+    Case:number,
+    Got:number,
+    Expected:number
+)
+{
+    if (Got != Expected) {
+
+        testFail(
+            Name,
+            "Case="+Case+
+            " expected="+Expected+
+            " got="+Got
+        )
+
+        return 0
+    }
+
+    return 1
+}
+

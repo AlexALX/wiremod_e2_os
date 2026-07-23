@@ -1,0 +1,156 @@
+@name JPG Reader Main Chip
+
+#include "alx_pc/standalone/jpg_reader/_shared_"
+#include "alx_pc/standalone/jpg_reader/jpg_parser"
+#include "alx_pc/standalone/jpg_reader/draw"
+#include "alx_pc/standalone/jpg_reader/decoder"
+#include "alx_pc/standalone/jpg_reader/progress"
+
+function jpgInit(Data:string)
+{
+    Processing = 0
+    
+    Jpg = table()
+    
+    Jpg["data",string] = Data
+    Jpg["size",number] = Data:length()
+    Jpg["pos",number] = 1
+    Jpg["active",number] = 0
+    
+    Jpg["scanCount",number] = 0
+    Jpg["scanBytes",number] = 0
+    Jpg["scans",table] = table()
+    Jpg["state",string] = ""
+    
+    Jpg["dqt",table] = table()
+    Jpg["dht",table] = table()
+    
+    Jpg["lastDC",table] = table()
+    Jpg["components",table] = table()
+    Jpg["scanComponents",table] = table()
+    Jpg["blocks",table] = table()
+    Jpg["blockIndex",table] = table()
+    
+    Jpg["mcuDecoded",number] = 0
+    Jpg["mcuDecode",table] = table()
+    
+    Jpg["blockDecode",table] = table()
+    Jpg["idct",table] = table()
+    
+    Jpg["assemble",table] = table()
+    Jpg["upsample",table] = table()
+    Jpg["pixels",table] = table()
+    Jpg["rgb",table] = table()
+    
+    Jpg["planes",table] = table()
+    Jpg["allocPlanes",table] = table()
+    Jpg["planesFull",table] = table()
+    Jpg["full",table] = table()
+    Jpg["allocPixels",table] = table()
+    
+    Jpg["planeWidth",table] = table()
+    Jpg["planeHeight",table] = table()
+    
+    Jpg["draw",table] = table()
+    
+    Progress = table()
+    
+    Error = ""
+    
+    if (jpgU16() != 0xFFD8) {
+        timer(0.001,function() {
+            Error = "Not JPEG"
+        })
+        if (!JPGNoPrint) {
+            print(Error)    
+        }
+        return
+    }
+    
+    jpgUpdateProgress()
+    
+    # we must delay a bit or it will not trigger proper outputs
+    timer(0.001,function() {
+        Jpg["state",string] = "parse"    
+        Processing = 1
+    })
+    if (!JPGNoPrint) {
+        print("JPEG detected")
+    }
+}
+
+event tick()
+{
+    if (Jpg["state",string] == "parse" | Jpg["state",string] == "parse_scan") {
+
+        jpgParse()
+
+    } elseif (Jpg["state",string] == "alloc_blocks") {
+
+        if (jpgAllocateBlocksStep()) {
+            afterAllocateBlocks()      
+        }
+
+    } elseif (Jpg["state",string] == "alloc_planes") {
+
+        if (jpgAllocatePlanesStep()) {
+            Jpg["state",string] = "alloc_pixels"
+        }
+
+    } elseif (Jpg["state",string] == "alloc_pixels") {
+
+        if (jpgAllocatePixelsStep()) {
+            Jpg["state",string] = "scan"
+        }
+
+    } elseif (Jpg["state",string] == "scan") {
+
+        if (jpgDecodeScan()) {
+            Jpg["state",string] = "assemble"
+        }
+    
+    } elseif (Jpg["state",string] == "assemble") {
+    
+        if (jpgAssembleImageStep()) {
+            Jpg["state",string] = "fullplanes"
+        }
+    
+    } elseif (Jpg["state",string] == "fullplanes") {
+    
+        if (jpgInitFullPlanes()) {
+            Jpg["state",string] = "rgb"
+        }
+        
+    } elseif (Jpg["state",string] == "rgb") {
+
+        if (jpgYCbCrToRGBStep()) {
+            Jpg["state",string] = "draw"
+        }
+
+    } elseif (Jpg["state",string] == "draw") {
+
+        if (jpgDrawStep()) {
+            Jpg["state",string] = "done"
+            
+            Processing = 0            
+            jpgUpdateProgress()
+        }
+
+    }
+    
+    if (Jpg["state",string] & Jpg["state",string]!="done") {
+        jpgUpdateProgress()
+    }
+}
+
+if (dsClk()) {
+    local DSName = dsClkName()    
+    if (DSName=="drawJpg") {
+        JPGNoPrint = 1    
+        jpgInit(dsGetString())    
+    } elseif (DSName=="abortJpg") {
+        Jpg["state",string] = ""
+        Processing = 0
+        jpgUpdateProgress()
+    }
+}

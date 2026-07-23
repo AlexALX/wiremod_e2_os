@@ -1,0 +1,74 @@
+@strict
+
+#include "alx_pc/standalone/ds_gfx/_shared_"
+
+function dsDrawChar(X:number, Y:number, Char:string, Color:vector)
+{
+    if (Char == "") {
+        return
+    }
+
+    local Ascii = toByte(Char)
+
+    if (Ascii < 32 | Ascii > 126) {
+        return
+    }
+    
+    local Glyph = DsFont[Ascii - 31, array]
+    
+    if (!Glyph:count()) {
+        return
+    }
+
+    for (Row = 1, DsFontHeight) {
+
+        local Bits = Glyph[Row, number]
+
+        local Mask = 1 << (DsFontWidth - 1)
+        
+        for (Col = 0, DsFontWidth - 1) {
+        
+            if (Bits && Mask) {
+                dsDrawPixel(X + Col, Y + Row - 1, Color)
+            }
+        
+            Mask = Mask >> 1
+        }
+    }
+}
+
+function dsDrawChar(X:number, Y:number, Char:string)
+{
+    dsDrawChar(X, Y, Char, vec(255))
+}
+
+function dsDrawText(X, Y, Text:string, Color:vector)
+{
+    local StartX = X
+
+    foreach (K, Char:string = Text) {
+
+        if (Char == "\n") {
+
+            X = StartX
+            Y += DsFontHeight + DsFontSpacing
+
+            continue
+        }
+
+        dsDrawChar(X, Y, Char, Color)
+
+        X += DsFontWidth + DsFontSpacing
+    }
+}
+
+function dsDrawText(X:number, Y:number, Text:string)
+{
+    dsDrawText(X, Y, Text, vec(255))
+}
+
+function dsTextClearLine(Y:number) {
+    for (Row = 0, DsFontHeight - 1) {
+        DSWL[1048570] = Y + Row
+    }
+}

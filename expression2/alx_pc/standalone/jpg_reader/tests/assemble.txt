@@ -1,0 +1,283 @@
+@name JPG Assemble Test
+
+@persist TestStage:number
+
+#include "alx_pc/standalone/jpg_reader/tests/_shared_"
+#include "alx_pc/standalone/jpg_reader/tests/_jpg_shared_"
+#include "alx_pc/standalone/jpg_reader/decoder"
+
+
+if (first() | duped()) {
+
+    TestStage = 0
+
+}
+
+function setupAssembleTest()
+{
+    #
+    # image 16x16
+    #
+
+    Jpg["width",number] = 16
+    Jpg["height",number] = 16
+
+    Jpg["mcuX",number] = 1
+    Jpg["mcuY",number] = 1
+    Jpg["mcuCount",number] = 1
+    
+    Jpg["maxH",number] = 2
+    Jpg["maxV",number] = 2
+    
+    Jpg["assemble", table] = table()
+
+
+    #
+    # components
+    #
+
+    local Components = table()
+
+    local Y = table()
+    Y["id",number] = 1
+    Y["h",number] = 2
+    Y["v",number] = 2
+
+    local Cb = table()
+    Cb["id",number] = 2
+    Cb["h",number] = 1
+    Cb["v",number] = 1
+
+    local Cr = table()
+    Cr["id",number] = 3
+    Cr["h",number] = 1
+    Cr["v",number] = 1
+
+
+    Components[1,table] = Y
+    Components[2,table] = Cb
+    Components[3,table] = Cr
+
+
+    Jpg["scanComponents",table] = Components
+    
+    Y["width",number] = 16
+    Y["height",number] = 16
+    
+    Cb["width",number] = 8
+    Cb["height",number] = 8
+    
+    Cr["width",number] = 8
+    Cr["height",number] = 8
+
+
+    #
+    # component info
+    #
+
+    Jpg["components",table] = Components
+
+
+    #
+    # plane storage
+    #
+
+    local Planes = table()
+
+    Planes[1,table] = table()
+    Planes[2,table] = table()
+    Planes[3,table] = table()
+
+
+    Jpg["planes",table] = Planes
+
+
+    #
+    # blocks
+    #
+
+    local Blocks = table()
+
+
+    #
+    # Y has 4 blocks
+    #
+
+    local YBlocks = table()
+
+    for(B = 0,3) {
+
+        local Block = table()
+
+        for(I = 0,63) {
+            Block[I,number] = 10 + B
+        }
+
+        YBlocks[B,table] = Block
+    }
+
+
+    #
+    # Cb block
+    #
+
+    local CbBlocks = table()
+
+    local CbBlock = table()
+
+    for(I = 0,63) {
+        CbBlock[I,number] = 50
+    }
+
+    CbBlocks[0,table] = CbBlock
+
+
+
+    #
+    # Cr block
+    #
+
+    local CrBlocks = table()
+
+    local CrBlock = table()
+
+    for(I = 0,63) {
+        CrBlock[I,number] = 100
+    }
+
+    CrBlocks[0,table] = CrBlock
+
+
+    Blocks[1,table] = YBlocks
+    Blocks[2,table] = CbBlocks
+    Blocks[3,table] = CrBlocks
+
+
+    Jpg["blocks",table] = Blocks
+
+
+    local State = table()
+
+    Jpg["assemble",table] = State
+}
+
+
+function testAssemble()
+{
+    if (TestStage == 0) {
+
+        setupAssembleTest()
+
+        TestStage = 1
+    }
+
+
+    if (TestStage == 1) {
+
+        if (!jpgAssembleImageStep()) {
+            return
+        }
+
+        TestStage = 2
+    }
+
+
+    if (TestStage == 2) {
+    
+        local Planes = Jpg["planes",table]
+    
+        local Y =
+            Planes[1,table]
+    
+        local Cb =
+            Planes[2,table]
+    
+        local Cr =
+            Planes[3,table]
+    
+    
+        assertCase(
+            "jpgAssembleImageStep",
+            0,
+            Y[0,number],
+            10
+        )
+        
+        assertCase(
+            "jpgAssembleImageStep",
+            1,
+            Y[8,number],
+            11
+        )
+        
+        assertCase(
+            "jpgAssembleImageStep",
+            2,
+            Y[128,number],
+            12
+        )
+        
+        assertCase(
+            "jpgAssembleImageStep",
+            3,
+            Y[136,number],
+            13
+        )
+        
+        
+        assertCase(
+            "jpgAssembleImageStep",
+            4,
+            Cb[0,number],
+            50
+        )
+        
+        
+        assertCase(
+            "jpgAssembleImageStep",
+            5,
+            Cr[0,number],
+            100
+        )
+    
+    
+        print(
+            "RAW PLANE",
+            Y[0,number],
+            Y[8,number],
+            Y[128,number],
+            Y[136,number]
+        )
+    
+    
+        print(
+            "Cb",
+            Cb[0,number]
+        )
+    
+    
+        print(
+            "Cr",
+            Cr[0,number]
+        )
+    
+    
+        testPass("jpgAssembleImageStep")
+    
+        testResults()
+    
+        TestStage = 3
+    }
+}
+
+
+event tick()
+{
+    if (TestStage == 3) {
+        exit()
+    }
+
+    while(perf(90)) {
+        testAssemble()
+    }
+}

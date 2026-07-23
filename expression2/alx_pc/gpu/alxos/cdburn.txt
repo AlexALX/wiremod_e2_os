@@ -1989,6 +1989,7 @@ function alxos_burner_init(Args:table) {
     BurnerKeyH = ""
     DsHandler = "alxos_burner_ds"
     KeyHandler = ""
+    PlugHandler = "alxos_burner_onplug"
     
     alxos_burner_listdir(BurnerFS,BurnerFS["root_dir_cluster",number],0) 
 }
@@ -2218,7 +2219,7 @@ function alxos_burner_unplug(Name:string) {
     }
 }
 
-function alxos_explorer_onplug(Name:string) {
+function alxos_burner_onplug(Name:string) {
     if (Name=="sata_onplug") {
         local Info = dsGetTable()
         

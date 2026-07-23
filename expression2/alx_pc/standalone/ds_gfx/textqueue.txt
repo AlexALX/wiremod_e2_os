@@ -1,0 +1,139 @@
+@persist DSTextQueue:table CurrentStep:string LastStep:string DSCache:table
+@strict
+#include "alx_pc/standalone/ds_gfx/_shared_"
+#include "alx_pc/standalone/ds_gfx/text"
+
+function dsDrawTextStart(X:number, Y:number, Text:string)
+{
+    DsText = table()
+
+    DsText["text", string] = Text:replace("\r", "")
+    DsText["x", number] = X
+    DsText["y", number] = Y
+
+    DsText["startX", number] = X
+    DsText["index", number] = 1
+
+    DsText["active", number] = 1
+    
+    CurrentStep = "drawText"
+}
+
+function number dsDrawTextStep()
+{
+    if (!DsText["active", number]) {
+        return 1
+    }
+
+    local Text = DsText["text", string]
+    local Index = DsText["index", number]
+
+    if (Index > Text:length()) {
+        DsText["active", number] = 0
+        return 1
+    }
+
+    local Char = Text:sub(Index, Index)
+    
+    if (Char == "\n") {
+
+        DsText["x", number] = DsText["startX", number]
+        DsText["y", number] = DsText["y", number] + DsFontHeight + DsFontSpacing
+
+    } else {
+
+        dsDrawChar(
+            DsText["x", number],
+            DsText["y", number],
+            Char
+        )
+
+        DsText["x", number] = DsText["x", number] + DsFontWidth + DsFontSpacing
+    }
+
+    DsText["index", number] = Index + 1
+
+    return 0
+}
+
+function dsDrawCachedTextStep()
+{
+    if (DSTextQueue:count() <= 0) {
+        return 1
+    }
+
+    local Item = DSTextQueue[1, table]
+
+    local Index = Item["index",number]
+    local Text = Item["text",string]
+
+    if (Index > Text:length()) {
+        DSTextQueue:remove(1)
+        return 0
+    }
+
+    local Char = Text:sub(Index, Index)
+
+    dsDrawChar(
+        Item["x",number] + (Index-1)*(DsFontWidth+DsFontSpacing),
+        Item["y",number],
+        Char
+    )
+
+    Item["index",number] = Index + 1
+
+    return 0
+}
+
+function dsDrawCachedText(X:number, Y:number, Text:string)
+{
+    local Key = X + ":" + Y
+    
+    if (DSCache[Key,string] == Text) {
+        return
+    }
+    
+    DSCache[Key,string] = Text
+    
+    dsTextClearLine(Y)
+    
+    local Item = table()
+    
+    Item["x",number] = X
+    Item["y",number] = Y
+    Item["text",string] = Text
+    Item["index",number] = 1
+    
+    DSTextQueue:pushTable(Item)
+        
+    CurrentStep = "drawCachedText"
+}
+
+function dsClearCache() {
+    DSCache = table()   
+    DSTextQueue = table()
+}
+
+function dsStopQueues() {
+    dsClearCache()
+    CurrentStep = ""  
+    LastStep = ""  
+}
+
+event tick() {
+    if (CurrentStep) {
+        
+        while (perf(90)) { 
+            if (CurrentStep=="drawText" & dsDrawTextStep()) {
+                LastStep = CurrentStep
+                CurrentStep = ""
+                break
+            } elseif (CurrentStep=="drawCachedText" & dsDrawCachedTextStep()) {
+                LastStep = CurrentStep
+                CurrentStep = ""
+                break    
+            }
+            
+        }
+    }
+}

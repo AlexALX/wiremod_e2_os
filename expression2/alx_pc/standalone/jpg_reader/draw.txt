@@ -1,0 +1,90 @@
+#include "alx_pc/standalone/jpg_reader/_shared_"
+
+function number jpgDrawStep()
+{
+    local State = Jpg["draw",table]
+
+    if (State["active",number] == 0) {
+
+        State["active",number] = 1
+        State["index",number] = 0
+        State["initialized",number] = 0
+    }
+
+
+    local Width = Jpg["width",number]
+    local Height = Jpg["height",number]
+
+
+    #
+    #   Init Digital Screen
+    #
+
+    if (State["initialized",number] == 0) {
+
+        DS[1048569] = 2
+        DS[1048574] = 0
+        DS[1048575] = 1
+        
+        if (!JPG_NoKeepAR) {
+            local SWH = (Width>Height ? Width : Height)
+            Jpg["Xadd",number] = (Height>Width ? floor((Height-Width)/2) : 0 )
+            Jpg["Yadd",number] = (Width>Height ? floor((Width-Height)/2) : 0 )
+            DS[1048573] = SWH
+            DS[1048572] = SWH
+        } else {
+            Jpg["Xadd",number] = 0
+            Jpg["Yadd",number] = 0
+            DS[1048573] = Width
+            DS[1048572] = Height
+        }
+
+
+        State["initialized",number] = 1
+    }
+
+
+    local Pixels = Jpg["pixels",table]
+
+    local Count = Width * Height
+
+    local Xadd = Jpg["Xadd",number]
+    local Yadd = Jpg["Yadd",number]
+    
+    local PosMul = (Xadd>Yadd ? Height : Width)
+
+    while (perf(90)) {
+
+        local I = State["index",number]
+
+
+        if (I >= Count) {
+
+            State["active",number] = 0
+            return 1
+        }
+
+
+        local RGB = Pixels[I,vector]
+        
+        local DSIndex = I
+        
+        if (!JPG_NoKeepAR) {
+            local X = I % Width
+            local Y = floor(I / Width)
+            
+            DSIndex = (X + Xadd) + (Y + Yadd) * PosMul
+        }
+
+        DS[DSIndex] =
+            floor(RGB:x()) * 65536 +
+            floor(RGB:y()) * 256 +
+            floor(RGB:z())
+
+
+        State["index",number] = I + 1
+    }
+
+
+    return 0
+}

@@ -1,6 +1,6 @@
 @name Standalone BMP Reader Multithreaded Main Process
 @inputs DigitalScreen:wirelink LongURL:string
-@outputs Percent Threads RenderTime RenderRealTime
+@outputs Percent Threads RenderTime RenderRealTime Error:string
 @persist BMP_NoKeepAR BmpData:table MaxThreads 
 @strict
 
@@ -128,13 +128,27 @@ function alxos_bmp_draw() {
                 BmpData[20,number] = 1
             }
             
-            if (Width<1 | Height<1 | Compression!=0 & (Compression!=3 | Compression==3 & BitCount==32) | Size==0) {
-                print(_HUD_PRINTTALK,"Unsupported BMP file.")
+            if (Width<1 | Height<1 | Size==0) {
+                Error = "Invalid BMP resolution.\nWidth and Height is: "+Width+"x"+Height
+                print(_HUD_PRINTTALK,Error)
+                return
+            }
+            
+            if (Size==0) {
+                Error = "Unsupported BMP file.\nInvalid BMP Size."
+                print(_HUD_PRINTTALK,Error)
+                return
+            }
+            
+            if (Compression!=0 & (Compression!=3 | Compression==3 & BitCount==32)) {
+                Error = "Unsupported BMP file.\nCompression: "+Compression+"\nBitCount: "+BitCount
+                print(_HUD_PRINTTALK,Error)
                 return
             }
 
             if (Width>512 | Height>512) {
-                print(_HUD_PRINTTALK,"Max BMP resolution is 512x512 (current is "+Width+"x"+Height+").")
+                Error = "Max BMP resolution is 512x512\nYour's current is "+Width+"x"+Height+"."
+                print(_HUD_PRINTTALK,Error)
                 return
             }
 
@@ -226,7 +240,8 @@ function alxos_bmp_draw() {
             alxos_bmp_draw()
 
         } else {
-            print(_HUD_PRINTTALK,"This is not valid BMP file.")
+            Error = "This is not valid BMP file."
+            print(_HUD_PRINTTALK,Error)
             return
         }
     } else {
@@ -373,10 +388,11 @@ function alxos_bmp_draw() {
 }
 
 function bmpInit(Body:string, Size) {
+    Error = ""
     dsClear()  
     BmpData["data",string] = Body   
     BmpData["size",number] = Size
-    alxos_bmp_draw()
+    timer("bmp",1)
 }
 
 }

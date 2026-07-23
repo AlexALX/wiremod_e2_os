@@ -1,0 +1,87 @@
+#include "alx_pc/standalone/jpg_reader/_shared_"
+#include "alx_pc/standalone/jpg_reader/jpg_reader"
+
+# ----------------------------------------------------
+# JPEG Bit Reader
+# ----------------------------------------------------
+
+function jpgBitInit()
+{
+    Jpg["bitBuffer",number] = 0
+    Jpg["bitCount",number] = 0
+}
+
+function number jpgReadByte()
+{
+    local Byte = jpgU8()
+
+    if (Byte != 0xFF) {
+        return Byte
+    }
+
+    local Next = jpgU8()
+
+    # Byte stuffing (FF 00 -> FF)
+    if (Next == 0x00) {
+        return 0xFF
+    }
+
+    # Restart markers
+    if (Next >= 0xD0 & Next <= 0xD7) {
+        Jpg["restartMarker",number] = Next
+        return -2
+    }
+
+    # End of entropy stream
+    Jpg["marker",number] = Next
+
+    return -1
+}
+
+function number jpgBit()
+{
+    
+    local Count = Jpg["bitCount",number]
+
+    if (Count == 0) {
+
+        local Byte = jpgReadByte()
+
+        if (Byte < 0) {
+            return Byte
+        }
+
+        Jpg["bitBuffer",number] = Byte
+        Count = 8
+    }
+
+    Count = Count - 1
+
+    Jpg["bitCount",number] = Count
+
+    return (Jpg["bitBuffer",number] >> Count) && 1
+}
+
+function number jpgBits(Bits:number)
+{
+    local Value = 0
+
+    for (I = 1, Bits) {
+
+        local Bit = jpgBit()
+
+        if (Bit < 0) {
+            return Bit
+        }
+
+        Value = (Value << 1) || Bit
+    }
+
+    return Value
+}
+
+function jpgAlignByte()
+{
+    Jpg["bitBuffer",number] = 0
+    Jpg["bitCount",number] = 0
+}

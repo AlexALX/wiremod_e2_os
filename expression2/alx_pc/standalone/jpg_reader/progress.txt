@@ -1,0 +1,170 @@
+#include "alx_pc/standalone/jpg_reader/_shared_"
+
+function jpgProgress(Task:string, Current:number, Max:number)
+{
+    Progress["progressTask",string] = Task
+    Progress["progressCurrent",number] = Current
+    Progress["progressMax",number] = Max
+    
+    local Percent = 0
+    
+    ProgressText = Progress["progressTask",string]
+    
+    if (Max > 0) {
+        Percent = floor(Current * 100 / Max)
+    
+        ProgressText += 
+            " - " +
+            Progress["progressCurrent",number] +
+            "/" +
+            Progress["progressMax",number] +
+            " ("+Percent + "%)"
+    }
+    
+    Progress["progressPercent",number] = Percent
+    
+    Progress["step",number]
+}
+
+
+function jpgUpdateProgress()
+{
+    CurrentState = Jpg["state",string]
+
+    switch (CurrentState) {
+
+        case "parse",
+            Progress["step",number] = 1
+            
+            jpgProgress("Parsing JPEG", 0, 0)
+            break
+            
+        case "parse_scan",
+            Progress["step",number] = 2
+            
+            jpgProgress("Decoding scan", 0, 0)
+            break
+
+        case "alloc_blocks",
+            Progress["step",number] = 3
+            
+            local S = Jpg["allocBlocks",table]
+
+            jpgProgress("Allocating block "+S["component",number],
+                S["index",number],
+                S["count",number]
+            )
+            break
+
+        case "alloc_planes",
+            Progress["step",number] = 4
+
+            local S = Jpg["allocPlanes",table]
+
+            local Max = 0
+
+            if (
+                S["component",number] <= Jpg["componentCount",number] &
+                Jpg["components",table]:exists(S["component",number])
+            ) {
+
+                local C =
+                    Jpg["components",table][S["component",number],table]
+
+                Max =
+                    C["width",number] *
+                    C["height",number]
+            }
+            
+            local Component = S["component",number]
+
+            if (Component > Jpg["componentCount",number]) {
+                Component = Jpg["componentCount",number]
+            }
+
+            jpgProgress(
+                "Allocating plane "+Component,
+                S["index",number],
+                Max
+            )
+
+            break
+
+        case "alloc_pixels",
+            Progress["step",number] = 5
+
+            jpgProgress(
+                "Allocating pixels",
+                Jpg["allocPixels",table]["index",number],
+                Jpg["width",number] * Jpg["height",number]
+            )
+            
+            break
+
+        case "scan",
+            Progress["step",number] = 6
+
+            jpgProgress("Decoding JPEG",
+                Jpg["mcuDecoded",number],
+                Jpg["mcuCount",number]
+            )
+            break
+
+        case "assemble",
+            Progress["step",number] = 7
+
+            local S = Jpg["assemble",table]
+
+            jpgProgress(
+                "Assembling image",
+                S["processed",number],
+                Jpg["totalBlocks",number]
+            )
+            
+            break
+
+        case "fullplanes",
+            Progress["step",number] = 8
+
+            jpgProgress(
+                "Expanding planes",
+                Jpg["full",table]["index",number],
+                Jpg["width",number] * Jpg["height",number]
+            )
+            
+            break
+
+        case "rgb",
+            Progress["step",number] = 9
+
+            jpgProgress(
+                "Converting RGB",
+                Jpg["rgb",table]["index",number],
+                Jpg["width",number] * Jpg["height",number]
+            )
+            
+            break
+
+        case "draw",
+            Progress["step",number] = 10
+
+            local S = Jpg["draw",table]
+
+            jpgProgress(
+                "Drawing image",
+                S["index",number],
+                Jpg["width",number] * Jpg["height",number]
+            )
+            
+            break
+
+        case "done",
+            jpgProgress("Done", 0, 0)
+            break
+
+        default,
+
+            jpgProgress("", 0, 0)
+    }
+}
+

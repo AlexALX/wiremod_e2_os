@@ -1,0 +1,122 @@
+@name IDCT tests
+
+#include "alx_pc/standalone/jpg_reader/tests/_shared_"
+#include "alx_pc/standalone/jpg_reader/idct"
+
+# valid will be all 28.284271247462
+function test_idct1d()
+{
+    local Name = "IDCT1D DC"
+
+    local Row = table()
+
+    for(I=0,7) {
+        Row[I,number]=0
+    }
+
+    Row[0,number]=80
+
+    Row = jpgIDCT1D(Row)
+
+    local Expected = 28.284271247462
+
+    for(I=0,7){
+
+        if(!assertNear(Row[I,number], Expected, 0.0001)){
+
+            testFail(
+                Name,
+                "Index="+I+
+                " expected="+Expected+
+                " got="+Row[I,number]
+            )
+
+            return
+        }
+    }
+
+    testPass(Name)
+}
+
+test_idct1d()
+
+# valid will be all 138
+function test_idct()
+{
+    local Name = "IDCT DC"
+
+    local Block = table()
+
+    for(I=0,63) {
+        Block[I,number]=0
+    }
+
+    Block[0,number]=80
+    
+    Jpg["idct",table] = table()
+    while(jpgIDCTStep(Block) == 0) {}
+
+    for(I=0,63){
+
+        if(Block[I,number] != 138){
+
+            testFail(
+                Name,
+                "Index="+I+
+                " expected=138 got="+Block[I,number]
+            )
+
+            return
+        }
+    }
+
+    testPass(Name)
+}
+
+test_idct()
+
+# valid will be 0
+function test_idct_minmax(Mode:string)
+{
+    local Name = "IDCT"
+    local ValidResult = 0
+
+    local Block = table()
+
+    for(I=0,63) {
+        Block[I,number]=0
+    }
+    
+    if (Mode=="max") {
+        Block[0,number] = 1016   
+        Name += " MAX"
+        ValidResult = 255
+    } else {
+        Block[0,number] = -1024
+        Name += " MIN"
+    }
+
+    Jpg["idct",table] = table()
+    while(jpgIDCTStep(Block) == 0) {}
+
+    for(I=0,63){
+
+        if(Block[I,number]!=ValidResult){
+
+            testFail(
+                Name,
+                "Index="+I+
+                " expected=255 got="+Block[I,number]
+            )
+
+            return
+        }
+    }
+
+    testPass(Name)
+}
+
+test_idct_minmax("min")
+test_idct_minmax("max")
+
+testResults()

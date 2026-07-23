@@ -1,0 +1,141 @@
+@name YCbCrToRGB Test
+
+#include "alx_pc/standalone/jpg_reader/tests/_shared_"
+#include "alx_pc/standalone/jpg_reader/tests/_jpg_shared_"
+#include "alx_pc/standalone/jpg_reader/decoder"
+
+function test_jpgYCbCrToRGBStep()
+{
+    local Name = "YCbCrToRGB"
+
+
+    Jpg["width",number] = 1
+    Jpg["height",number] = 1
+
+
+    local Full = table()
+    local Y = table()
+    local Cb = table()
+    local Cr = table()
+
+    Full[1,table] = Y
+    Full[2,table] = Cb
+    Full[3,table] = Cr
+
+
+    Jpg["planesFull",table] = Full
+
+
+    local Pixels = table()
+
+    Jpg["pixels",table] = Pixels
+
+
+    # WHITE
+
+    Jpg["rgb",table] = table()
+
+    Y[0,number] = 255
+    Cb[0,number] = 128
+    Cr[0,number] = 128
+
+
+    while (jpgYCbCrToRGBStep() == 0) {}
+
+
+    local P = Pixels[0,vector]
+
+
+    if (
+        assertNear(P[1],255,1) &
+        assertNear(P[2],255,1) &
+        assertNear(P[3],255,1)
+    ) {
+
+        testPass(Name+" WHITE")
+
+    } else {
+
+        testFail(
+            Name+" WHITE",
+            "RGB="+P[1]+","+P[2]+","+P[3]
+        )
+    }
+
+
+
+    # BLACK
+
+    Pixels = table()
+    Jpg["pixels",table] = Pixels
+
+    Jpg["rgb",table] = table()
+
+
+    Y[0,number] = 0
+    Cb[0,number] = 128
+    Cr[0,number] = 128
+
+
+    while (jpgYCbCrToRGBStep() == 0) {}
+
+
+    P = Pixels[0,vector]
+
+
+    if (
+        assertNear(P[1],0,1) &
+        assertNear(P[2],0,1) &
+        assertNear(P[3],0,1)
+    ) {
+
+        testPass(Name+" BLACK")
+
+    } else {
+
+        testFail(
+            Name+" BLACK",
+            "RGB="+P[1]+","+P[2]+","+P[3]
+        )
+    }
+
+
+
+    # RED
+
+    Pixels = table()
+    Jpg["pixels",table] = Pixels
+
+    Jpg["rgb",table] = table()
+
+
+    Y[0,number] = 76
+    Cb[0,number] = 85
+    Cr[0,number] = 255
+
+
+    while (jpgYCbCrToRGBStep() == 0) {}
+
+
+    P = Pixels[0,vector]
+
+
+    if (
+        assertNear(P[1],255,3) &
+        assertNear(P[2],0,3) &
+        assertNear(P[3],0,3)
+    ) {
+
+        testPass(Name+" RED")
+
+    } else {
+
+        testFail(
+            Name+" RED",
+            "RGB="+P[1]+","+P[2]+","+P[3]
+        )
+    }
+}
+test_jpgYCbCrToRGBStep()
+
+testResults()

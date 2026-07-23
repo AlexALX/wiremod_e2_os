@@ -1,0 +1,92 @@
+@name BMP Helper for DS
+@persist Header:string 
+@inputs DS:wirelink Error:string
+@strict
+
+#include "alx_pc/standalone/ds_gfx/_init_"
+#include "alx_pc/standalone/ds_gfx/font_8x8"
+
+function displayInit() {
+    dsInit(DS, 420, 310)
+    dsSetFont(dsFont8x8())
+}
+
+function displayHelp() {
+    displayInit()
+
+    local Text = Header+
+"
+BMP Parser, specifications:
+- Max resolution is up to 512x512 (DS limit)
+- Support most common uncompressed bmp files: 
+ - 32/24/8/4 bits and monochrome
+ - including RGB444/RGB555/RGB565
+- Support \"flip row order\" function
+- Slow, but multithreaded
+
+Usage:
+- Spawn one BMP Main Process E2
+- Connect this E2 to Digital Screen
+- Spawn one or more BMP Sub Process E2's
+
+Chat commands:
+!bmp http://url - open bmp file
+
+!bmpfile filename.bmp.txt - open bmp file from 
+garrysmod/data/e2files/ folder
+file extension must be renamed to .txt
+
+!bmp abort - abort rendering
+
+Note: long url may be cut, use input LongURL 
+instead for such case (via string value) 
+
+If you have own web server with PHP, 
+then you can place img2bmp.php from php dir in
+https://github.com/AlexALX/wiremod_e2_os/
+and then use it to convert any image to BMP
+with auto resize in url:
+http://yourserv/img2bmp.php?http://url/img.jpg
+"
+
+    dsDrawTextStart(2, 0, Text)
+}
+
+function displayError(Msg:string) {
+    displayInit()
+    
+    local Text = Header+
+"
+BMP Reader Error:
+
+"+Msg+"
+"
+
+    dsDrawTextStart(2, 0, Text)
+}
+
+function displayMode() {
+    if (Error){ 
+        displayError(Error)
+    } else {
+        displayHelp()    
+    }   
+}
+
+if (first() | duped()) {
+    Header = 
+"BMP Reader - Multithreaded
+Created by AlexALX (c) 2018
+-------------------"
+    
+    displayMode()
+}
+
+
+event input(InputName:string) {
+    if (InputName=="DS" & DS!=nowirelink()) {
+        displayMode()
+    } elseif (InputName=="Error" & Error) {
+        displayError(Error)    
+    }
+}

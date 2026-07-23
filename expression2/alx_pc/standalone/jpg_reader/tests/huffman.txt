@@ -1,0 +1,127 @@
+@name Huffman tests
+
+#include "alx_pc/standalone/jpg_reader/tests/_shared_"
+#include "alx_pc/standalone/jpg_reader/huffman"
+
+function number assertHuffmanEntry(
+    Name:string,
+    Case:number,
+    Entry:table,
+    Code:number,
+    Bits:number,
+    Symbol:number
+)
+{
+    if (Entry["code",number] != Code) {
+
+        testFail(
+            Name,
+            "Case="+Case+
+            " code expected="+Code+
+            " got="+Entry["code",number]
+        )
+
+        return 0
+    }
+
+    if (Entry["bits",number] != Bits) {
+
+        testFail(
+            Name,
+            "Case="+Case+
+            " bits expected="+Bits+
+            " got="+Entry["bits",number]
+        )
+
+        return 0
+    }
+
+    if (Entry["symbol",number] != Symbol) {
+
+        testFail(
+            Name,
+            "Case="+Case+
+            " symbol expected="+Symbol+
+            " got="+Entry["symbol",number]
+        )
+
+        return 0
+    }
+
+    return 1
+}
+
+function test_huffman_build_simple()
+{
+    local Name = "HUFFMAN BUILD SIMPLE"
+
+    local HT = table()
+
+    local Lengths = table()
+    local Symbols = table()
+
+    #
+    # 1 code (1 bit)
+    # 2 codes (2 bits)
+    # 1 code (3 bits)
+    #
+
+    Lengths[1,number] = 1
+    Lengths[2,number] = 2
+    Lengths[3,number] = 1
+
+    Symbols[0,number] = 10
+    Symbols[1,number] = 20
+    Symbols[2,number] = 30
+    Symbols[3,number] = 40
+
+    HT["lengths",table] = Lengths
+    HT["symbols",table] = Symbols
+
+    jpgBuildHuffman(HT)
+
+    local Codes = HT["codes",table]
+    local Lookup = HT["lookup",table]
+
+    if (!assertHuffmanEntry(Name, 1, Codes[0,table], 0, 1, 10)) {
+        return
+    }
+
+    if (!assertHuffmanEntry(Name, 2, Codes[1,table], 2, 2, 20)) {
+        return
+    }
+
+    if (!assertHuffmanEntry(Name, 3, Codes[2,table], 3, 2, 30)) {
+        return
+    }
+
+    if (!assertHuffmanEntry(Name, 4, Codes[3,table], 8, 3, 40)) {
+        return
+    }
+
+    #
+    # Lookup
+    #
+
+    if (!assertCase(Name, 5, Lookup[jpgHuffmanKey(1,0),number], 10)) {
+        return
+    }
+
+    if (!assertCase(Name, 6, Lookup[jpgHuffmanKey(2,2),number], 20)) {
+        return
+    }
+
+    if (!assertCase(Name, 7, Lookup[jpgHuffmanKey(2,3),number], 30)) {
+        return
+    }
+
+    if (!assertCase(Name, 8, Lookup[jpgHuffmanKey(3,8),number], 40)) {
+        return
+    }
+
+    testPass(Name)
+}
+
+test_huffman_build_simple()
+
+testResults()

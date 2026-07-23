@@ -1,0 +1,210 @@
+@name DS Font 5x7
+@strict
+
+#include "alx_pc/standalone/ds_gfx/_shared_"
+
+function table dsFont5x7()
+{
+    Font = table()
+        
+    Font["width",number] = 5
+    Font["height",number] = 7
+    Font["spacing",number] = 1
+    
+    local Glyphs = table()
+        
+    # 32 ' '
+    Glyphs:pushArray(array(0, 0, 0, 0, 0, 0, 0))
+    # 33 '!'
+    Glyphs:pushArray(array(4, 4, 4, 4, 4, 0, 4))
+    # 34 '"'
+    Glyphs:pushArray(array(10, 10, 10, 0, 0, 0, 0))
+    # 35 '#'
+    Glyphs:pushArray(array(10, 10, 31, 10, 31, 10, 10))
+    # 36 '$'
+    Glyphs:pushArray(array(4, 15, 8, 14, 2, 30, 4))
+    # 37 '%'
+    Glyphs:pushArray(array(24, 25, 2, 4, 8, 19, 3))
+    # 38 '&'
+    Glyphs:pushArray(array(12, 18, 20, 12, 20, 18, 13))
+    # 39 '''
+    Glyphs:pushArray(array(12, 4, 8, 0, 0, 0, 0))
+    # 40 '('
+    Glyphs:pushArray(array(2, 4, 8, 8, 8, 4, 2))
+    # 41 ')'
+    Glyphs:pushArray(array(8, 4, 2, 2, 2, 4, 8))
+    # 42 '*'
+    Glyphs:pushArray(array(0, 4, 21, 14, 21, 4, 0))
+    # 43 '+'
+    Glyphs:pushArray(array(0, 4, 4, 31, 4, 4, 0))
+    # 44 ','
+    Glyphs:pushArray(array(0, 0, 0, 0, 12, 4, 8))
+    # 45 '-'
+    Glyphs:pushArray(array(0, 0, 0, 31, 0, 0, 0))
+    # 46 '.'
+    Glyphs:pushArray(array(0, 0, 0, 0, 0, 12, 12))
+    # 47 '/'
+    Glyphs:pushArray(array(0, 1, 2, 4, 8, 16, 0))
+    # 48 '0'
+    Glyphs:pushArray(array(14, 17, 19, 21, 25, 17, 14))
+    # 49 '1'
+    Glyphs:pushArray(array(4, 12, 4, 4, 4, 4, 14))
+    # 50 '2'
+    Glyphs:pushArray(array(14, 17, 1, 2, 4, 8, 31))
+    # 51 '3'
+    Glyphs:pushArray(array(31, 1, 2, 1, 0, 17, 14))
+    # 52 '4'
+    Glyphs:pushArray(array(2, 6, 10, 18, 31, 2, 2))
+    # 53 '5'
+    Glyphs:pushArray(array(31, 16, 30, 1, 1, 17, 14))
+    # 54 '6'
+    Glyphs:pushArray(array(6, 8, 16, 30, 17, 17, 14))
+    # 55 '7'
+    Glyphs:pushArray(array(31, 1, 2, 4, 8, 8, 8))
+    # 56 '8'
+    Glyphs:pushArray(array(14, 17, 17, 14, 17, 17, 14))
+    # 57 '9'
+    Glyphs:pushArray(array(14, 17, 17, 15, 1, 2, 6))
+    # 58 ':'
+    Glyphs:pushArray(array(0, 12, 12, 0, 12, 12, 0))
+    # 59 ';'
+    Glyphs:pushArray(array(0, 12, 12, 0, 12, 4, 8))
+    # 60 '<'
+    Glyphs:pushArray(array(2, 4, 8, 16, 8, 4, 2))
+    # 61 '='
+    Glyphs:pushArray(array(0, 0, 31, 0, 31, 0, 0))
+    # 62 '>'
+    Glyphs:pushArray(array(16, 8, 4, 2, 4, 8, 16))
+    # 63 '?'
+    Glyphs:pushArray(array(14, 17, 1, 2, 4, 0, 4))
+    # 64 '@'
+    Glyphs:pushArray(array(14, 17, 1, 13, 21, 21, 14))
+    # 65 'A'
+    Glyphs:pushArray(array(14, 17, 17, 31, 17, 17, 17))
+    # 66 'B'
+    Glyphs:pushArray(array(30, 17, 17, 30, 17, 17, 30))
+    # 67 'C'
+    Glyphs:pushArray(array(14, 17, 16, 16, 16, 17, 14))
+    # 68 'D'
+    Glyphs:pushArray(array(30, 17, 17, 17, 17, 17, 30))
+    # 69 'E'
+    Glyphs:pushArray(array(31, 16, 16, 30, 16, 16, 31))
+    # 70 'F'
+    Glyphs:pushArray(array(31, 16, 16, 30, 16, 16, 16))
+    # 71 'G'
+    Glyphs:pushArray(array(14, 17, 16, 23, 17, 17, 14))
+    # 72 'H'
+    Glyphs:pushArray(array(17, 17, 17, 31, 17, 17, 17))
+    # 73 'I'
+    Glyphs:pushArray(array(14, 4, 4, 4, 4, 4, 14))
+    # 74 'J'
+    Glyphs:pushArray(array(7, 1, 1, 1, 1, 17, 14))
+    # 75 'K'
+    Glyphs:pushArray(array(17, 18, 20, 24, 20, 18, 17))
+    # 76 'L'
+    Glyphs:pushArray(array(16, 16, 16, 16, 16, 16, 31))
+    # 77 'M'
+    Glyphs:pushArray(array(17, 27, 21, 21, 17, 17, 17))
+    # 78 'N'
+    Glyphs:pushArray(array(17, 25, 21, 19, 17, 17, 17))
+    # 79 'O'
+    Glyphs:pushArray(array(14, 17, 17, 17, 17, 17, 14))
+    # 80 'P'
+    Glyphs:pushArray(array(30, 17, 17, 30, 16, 16, 16))
+    # 81 'Q'
+    Glyphs:pushArray(array(14, 17, 17, 17, 21, 4, 3))
+    # 82 'R'
+    Glyphs:pushArray(array(30, 17, 17, 30, 20, 18, 17))
+    # 83 'S'
+    Glyphs:pushArray(array(14, 17, 16, 14, 1, 17, 14))
+    # 84 'T'
+    Glyphs:pushArray(array(31, 4, 4, 4, 4, 4, 4))
+    # 85 'U'
+    Glyphs:pushArray(array(17, 17, 17, 17, 17, 17, 14))
+    # 86 'V'
+    Glyphs:pushArray(array(17, 17, 17, 17, 10, 10, 4))
+    # 87 'W'
+    Glyphs:pushArray(array(17, 17, 17, 21, 21, 27, 17))
+    # 88 'X'
+    Glyphs:pushArray(array(17, 17, 10, 4, 10, 17, 17))
+    # 89 'Y'
+    Glyphs:pushArray(array(17, 17, 10, 4, 4, 4, 4))
+    # 90 'Z'
+    Glyphs:pushArray(array(31, 1, 2, 4, 8, 16, 31))
+    # 91 '['
+    Glyphs:pushArray(array(14, 8, 8, 8, 8, 8, 14))
+    # 92 '\'
+    Glyphs:pushArray(array(0, 16, 8, 4, 2, 1, 0))
+    # 93 ']'
+    Glyphs:pushArray(array(14, 2, 2, 2, 2, 2, 14))
+    # 94 '^'
+    Glyphs:pushArray(array(4, 10, 17, 0, 0, 0, 0))
+    # 95 '_'
+    Glyphs:pushArray(array(0, 0, 0, 0, 0, 0, 31))
+    # 96 '`'
+    Glyphs:pushArray(array(8, 4, 2, 0, 0, 0, 0))
+    # 97 'a'
+    Glyphs:pushArray(array(0, 0, 14, 1, 15, 17, 15))
+    # 98 'b'
+    Glyphs:pushArray(array(16, 16, 22, 25, 17, 17, 30))
+    # 99 'c'
+    Glyphs:pushArray(array(0, 0, 14, 16, 16, 17, 14))
+    # 100 'd'
+    Glyphs:pushArray(array(1, 1, 13, 19, 17, 17, 15))
+    # 101 'e'
+    Glyphs:pushArray(array(0, 0, 14, 17, 31, 16, 14))
+    # 102 'f'
+    Glyphs:pushArray(array(6, 9, 8, 30, 8, 8, 8))
+    # 103 'g'
+    Glyphs:pushArray(array(0, 0, 14, 17, 15, 1, 14))
+    # 104 'h'
+    Glyphs:pushArray(array(16, 16, 22, 25, 17, 17, 17))
+    # 105 'i'
+    Glyphs:pushArray(array(4, 0, 12, 4, 4, 4, 14))
+    # 106 'j'
+    Glyphs:pushArray(array(2, 0, 6, 2, 2, 18, 12))
+    # 107 'k'
+    Glyphs:pushArray(array(16, 16, 18, 20, 24, 20, 18))
+    # 108 'l'
+    Glyphs:pushArray(array(12, 4, 4, 4, 4, 4, 14))
+    # 109 'm'
+    Glyphs:pushArray(array(0, 0, 26, 21, 21, 17, 17))
+    # 110 'n'
+    Glyphs:pushArray(array(0, 0, 22, 25, 17, 17, 17))
+    # 111 'o'
+    Glyphs:pushArray(array(0, 0, 14, 17, 17, 17, 14))
+    # 112 'p'
+    Glyphs:pushArray(array(0, 0, 30, 17, 30, 16, 16))
+    # 113 'q'
+    Glyphs:pushArray(array(0, 0, 15, 17, 15, 1, 1))
+    # 114 'r'
+    Glyphs:pushArray(array(0, 0, 22, 25, 16, 16, 16))
+    # 115 's'
+    Glyphs:pushArray(array(0, 0, 15, 16, 14, 1, 30))
+    # 116 't'
+    Glyphs:pushArray(array(4, 4, 14, 4, 4, 5, 2))
+    # 117 'u'
+    Glyphs:pushArray(array(0, 0, 17, 17, 17, 25, 13))
+    # 118 'v'
+    Glyphs:pushArray(array(0, 0, 17, 17, 17, 10, 4))
+    # 119 'w'
+    Glyphs:pushArray(array(0, 0, 17, 17, 21, 21, 10))
+    # 120 'x'
+    Glyphs:pushArray(array(0, 0, 17, 10, 4, 10, 17))
+    # 121 'y'
+    Glyphs:pushArray(array(0, 0, 17, 17, 17, 15, 1, 14))
+    # 122 'z'
+    Glyphs:pushArray(array(0, 0, 31, 2, 4, 8, 31))
+    # 123 '{'
+    Glyphs:pushArray(array(2, 4, 4, 8, 4, 4, 2))
+    # 124 '|'
+    Glyphs:pushArray(array(4, 4, 4, 4, 4, 4, 4))
+    # 125 '}'
+    Glyphs:pushArray(array(8, 4, 4, 2, 4, 4, 8))
+    # 126 '~'
+    Glyphs:pushArray(array(0, 4, 21, 10, 0, 0, 0))
+
+    Font["glyphs",table] = Glyphs
+
+    return Font
+}
