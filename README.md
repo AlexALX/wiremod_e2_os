@@ -42,4 +42,9 @@ Also includes PHP version of WM1 File System.
 This addon also included part of **GeneralUser-GS** wav files for midi "addon" playback mode.
 https://github.com/mrbumpy409/GeneralUser-GS
 
+### Notes about Midi Player
+* Due to gmod limitations it actually plays 9-10 channels only
+* May not play all notes simultaneously
+* Sound quality for complex midi pretty poor
+
 Created by AlexALX (c) 2016-2026
