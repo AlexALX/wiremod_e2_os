@@ -1,0 +1,160 @@
+@name Midi Base Chip
+@strict
+
+#include "alx_pc/standalone/midi/_shared_"
+#include "alx_pc/standalone/midi/parser"
+#include "alx_pc/standalone/midi/events"
+#include "alx_pc/standalone/midi/player"
+#include "alx_pc/standalone/midi/progress"
+
+function midiInit(Body:string)
+{
+    midiPause()
+    
+    Midi = table()
+    
+    Processing = 0
+
+    Midi["body", string] = Body
+    Midi["length", number] = Body:length()
+    Midi["offset", number] = 1
+
+    Midi["format", number] = 0
+    Midi["tracks", number] = 0
+    Midi["division", number] = 0
+    
+    Error = ""
+
+    if (!midiParseHeader()) {
+        timer(0.001,function() {
+            Error = "Invalid MIDI"
+            if (!MidiNoPrint) {
+                print(Error)
+            }
+        })
+        Midi["state", string] = "done"
+        midiUpdateProgress()
+        return
+    }
+    
+    Processing = 1
+    
+    if (MidiDebug) {
+        print("Format: " + Midi["format", number])
+        print("Tracks: " + Midi["tracks", number])
+        print("Division: " + Midi["division", number])
+    }
+
+    Midi["trackCurrent", number] = 0
+    Midi["trackEventCount", number] = 0
+    Midi["trackEvents", table] = table()
+    Midi["trackEventsCount",table] = table()
+    
+    Midi["state", string] = "tracks"
+    
+    Midi["eventCount",number] = 0
+    Midi["events",table] = table()
+    Midi["mergePos",table] = table()
+    Midi["mergeIndex",number] = 0
+    
+    Midi["channelProgram",table] = table()
+    Midi["channelVolume",table] = table()
+    Midi["channelPan",table] = table()
+    Midi["channelExpression",table] = table()
+    Midi["channelPitch",table] = table()
+    Midi["channelSustain",table] = table()
+    Midi["channelInit",table] = table()
+    
+    Midi["voices",table] = table()
+    Midi["voiceNext",number] = 0
+    Midi["voicesCount",number] = 0
+    
+    Midi["timeTempo",number] = 500000
+    
+    midiBackendInit()
+    
+    Progress = table()
+    CurrentState = ""
+    
+    if (!MidiNoPrint) {
+        print(_HUD_PRINTTALK,"MIDI detected")
+    }
+}
+
+function midiAbort()
+{
+    Midi["playing",number] = 0
+    Midi["state",string] = ""
+    Progress = table()
+    ProgressText = ""
+    Error = ""
+    Processing = 0
+    midiBackendStop()
+    midiUpdateProgress()
+}
+
+function number midiParse()
+{
+    local State = Midi["state",string]
+    
+    if (State == "tracks") {
+        return midiParseTracksStep()
+    } elseif (State == "events") {
+        if (!midiReadTrackEvent()) {
+
+            Midi["trackCurrent",number] =
+                Midi["trackCurrent",number] + 1
+
+            Midi["state",string] = "tracks"
+
+            return 1
+        }
+
+        return 1
+    } elseif (State == "sort") {
+
+        if (midiSortEventsStep()) {
+            Midi["state",string] = "time"
+        }
+    
+        return 1
+    }elseif (State == "time") {
+
+        if (midiBuildTimeStep()) {
+            midiPlay()
+        }
+    
+        return 1
+    } elseif (State == "error") {
+        Midi["state",string] = "done"
+        Processing = 0
+        
+        Error = "MIDI parse error"
+        print(Error)
+
+        return 0
+    }
+
+    return 0
+}
+
+event tick()
+{
+    local State = Midi["state",string]
+    
+    if (State == "" | State == "done") {
+        exit()
+    }
+    
+    if ((State == "play" | State == "pause") && perf(60)) {
+        midiUpdateStep()
+    } else {
+        while (perf(90)) {
+            if (!midiParse()) {
+                break
+            }
+        }
+    }
+    
+    midiUpdateProgress()
+}

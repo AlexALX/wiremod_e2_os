@@ -1,6 +1,4 @@
 @name JPG Reader
-#@inputs HTTPData:string
-@inputs BMP_NoKeepAR # for now like input
 
 #[
     ALX Wiremod E2 OS
@@ -50,8 +48,6 @@ function alxos_jpg_init(Args:table) {
     GpuData[1,table] = ExplorerFS
     GpuData[2,table] = FInfo
     GpuData[5,number] = 0
-    
-    GpuData["jpgData",string] = ""
 
     DialogData[-10,table]:pushNumber(LAST_I)
     EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
@@ -173,8 +169,7 @@ function alxos_jpg_draw(Data:string) {
         "alxos_explorer_error"("JPG Accelerator not found, please insert PCI card and reboot.",490)
         return
     }
-    
-    GpuData["jpgData",string] = Data    
+
     GpuData["jpgAccelerator",array] = JPGAccelerator
     
     dsSendDirect("drawJpg",JPGAccelerator[3,entity],table(

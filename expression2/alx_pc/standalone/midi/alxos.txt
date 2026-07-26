@@ -1,0 +1,43 @@
+@name ALX OS Midi Player
+@inputs SpeakerEnt:entity
+
+#include "alx_pc/standalone/midi/_init_"
+#include "alx_pc/standalone/midi/backends/e2"
+
+if (dsClk()) {
+    local DSName = dsClkName()    
+    if (DSName=="midiInit") {
+        MidiNoPrint = 1    
+          
+        local Info = dsGetTable()
+        local Mode = Info[1,string]
+        local Data = Info[2,string]  
+
+        midiBackendSet(midiBackendE2(Mode))
+        midiInit(Data)
+        
+        dsSendDirect("midiInited",dsGetSender(),1)
+    } elseif (DSName=="midiSetMode") {
+        midiBackendSet(midiBackendE2(dsGetString()))
+    } elseif (DSName=="midiPlayPause") {
+        midiPause()
+    } elseif (DSName=="midiRepeat") {
+        midiRepeat()
+    } elseif (DSName=="midiStop" | DSName=="SHUTDOWN") {
+        midiAbort()
+        soundPurge()
+    } elseif (DSName=="SPEAKER_UNPLUG") {
+        midiAbort()
+        Error = DSName
+        soundPurge()
+    } elseif (DSName=="isMidiPlayer") {
+        dsSendDirect("isMidiPlayer",dsGetSender(),table(wirelink()))
+    } elseif (DSName=="playgmsound") {
+        local Info = dsGetTable()
+        SpeakerEnt:soundPlay(Info[1,number],Info[2,number],Info[3,string])
+    } elseif (DSName=="stopgmsound") {
+        local Info = dsGetTable()
+        soundStop(Info[1,number],Info[2,number])
+    }
+}
+

@@ -1,0 +1,123 @@
+#include "alx_pc/standalone/midi/_shared_"
+
+function string midiReadString(Count:number)
+{
+    local Offset = Midi["offset", number]
+    local Body = Midi["body", string]
+
+    if (Offset + Count - 1 > Body:length()) {
+        return ""
+    }
+
+    Midi["offset", number] = Offset + Count
+
+    return Body:sub(Offset, Offset + Count - 1)
+}
+
+function number midiReadU8()
+{
+    local Offset = Midi["offset", number]
+    local Body = Midi["body", string]
+
+    if (Offset > Body:length()) {
+        return -1
+    }
+
+    Midi["offset", number] = Offset + 1
+
+    return toByte(Body:sub(Offset, Offset))
+}
+
+function number midiReadU16BE()
+{
+    local A = midiReadU8()
+    local B = midiReadU8()
+
+    if (A < 0 | B < 0) {
+        return -1
+    }
+
+    return A * 256 + B
+}
+
+function number midiReadU32BE()
+{
+    local A = midiReadU8()
+    local B = midiReadU8()
+    local C = midiReadU8()
+    local D = midiReadU8()
+
+    if (A < 0 | B < 0 | C < 0 | D < 0) {
+        return -1
+    }
+
+    return ((A * 256 + B) * 256 + C) * 256 + D
+}
+
+function number midiReadVarInt()
+{
+    local Value = 0
+
+    while (1) {
+        local Byte = midiReadU8()
+
+        if (Byte < 0) {
+            return -1
+        }
+
+        Value = Value * 128 + (Byte && 127)
+
+        if ((Byte && 128) == 0) {
+            break
+        }
+    }
+
+    return Value
+}
+
+function number midiSkip(Count:number)
+{
+    local Offset = Midi["offset", number]
+    local Length = Midi["body", string]:length()
+
+    if (Offset + Count - 1 > Length) {
+        Midi["offset", number] = Length + 1
+        return 0
+    }
+
+    Midi["offset", number] = Offset + Count
+
+    return 1
+}
+
+function number midiTell()
+{
+    return Midi["offset", number]
+}
+
+function number midiSeek(Position:number)
+{
+    local Length = Midi["body", string]:length()
+
+    if (Position < 1) {
+        Position = 1
+    }
+
+    if (Position > Length + 1) {
+        Position = Length + 1
+    }
+
+    Midi["offset", number] = Position
+
+    return 1
+}
+
+function number midiEOF()
+{
+    return Midi["offset", number] > Midi["body", string]:length()
+}
+
+function number midiRemaining()
+{
+    return Midi["body", string]:length() - Midi["offset", number] + 1
+}

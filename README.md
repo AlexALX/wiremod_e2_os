@@ -22,20 +22,24 @@ Main features:
 * Virtual motherboard with pcie/pci sockets and other sockets.
 * Virtual CD Drives, HDDs, USB devices, cables, pcie/pci cards, etc.
 * Virtual BIOS, boot sequence.
-* Low-level WM1 File System what works with wire dupable HDDs/EEPROM. 
-* WCD File System what used for wiremod CD Discs. 
-* Expression2 BMP Reader, draw on wire Digital Screen (up to 512x512). 
-* Baseline JPG Reader for Digital Screen.
+* **Low-level WM1 File System** what works with wire dupable HDDs/EEPROM. 
+* **WCD File System** what used for wiremod CD Discs. 
+* Expression2 **BMP Reader**, draw on wire Digital Screen (up to 512x512). 
+* Expression2 **Baseline JPG Reader** for Digital Screen.
+* **Midi player** with 3 play modes (synth, instrumental, addon).
 * Few programs: Console, Burning software, file manager, network chat, partitions manager. 
 * Simple directory listing/file managing interface (DOS style).
 * Simple text viewer.  
 * Simple networking between PC's.
 * Satellite internet device, what provides access to real internet (http e2 extension) for files downloading.
 * Switch/router network system, also with laser transferer and two-way radio devices.
-* Standalone BMP and JPG Readers.
-* Basic GFX lib for draw text on Digital Screen.
+* Basic **GFX lib** for draw text on Digital Screen.
+* Standalone BMP, JPG Readers and Midi Player.
 * And some other features and devices!
 
 Also includes PHP version of WM1 File System.
 
-Created by AlexALX (c) 2016-2018
+This addon also included part of **GeneralUser-GS** wav files for midi "addon" playback mode.
+https://github.com/mrbumpy409/GeneralUser-GS
+
+Created by AlexALX (c) 2016-2026

@@ -1,0 +1,131 @@
+@name Midi Player Helper
+@inputs CurrentState:string Progress:table ProgressText:string Processing:number Error:string MidiPlayMode:string MidiWarning:string
+@outputs String:string
+@persist Header:string
+@strict
+
+function displayHelp() {
+    local Text = Header+
+"
+Midi Player, specifications:
+- Support MIDI Type 0 and 1 (multiple tracks) 
+- Have 3 play modes with different sound set
+- Due to gmod limit it plays 9-10 channels only :(
+- May not play all notes simultaneously :(
+
+Usage via chat commands:
+!midi http://midfileurl - open midi file from the web
+Note: long url may be cut, use input LongURL instead
+!midifile filename.mid.txt - open midi file from a garrysmod/data/e2files/ folder, file extension must be renamed to .txt
+!midiabort - abort playing
+!midimode mode - change playing mode, available modes: synth, instrumental, addon
+
+More information you can read inside expression2 chip
+"
+
+    String = Text
+}
+
+function string capitalize(Text:string)
+{
+    if (Text:length() == 0) {
+        return ""
+    }
+
+    return Text:left(1):upper() + Text:right(Text:length() - 1)
+}
+
+function displayProgress() {
+    
+    local Step = Progress["step", number]
+    local Current = Progress["progressCurrent", number]
+    local Max = Progress["progressMax", number]
+    local Perc = Progress["progressPercent", number]
+    local CurrentTask = Progress["progressTask",string]
+    
+    if (Progress["curTime",string]!="") {
+        local CurTime = Progress["curTime",string]
+        local MaxTime = Progress["maxTime",string]    
+        
+        CurrentTask = CurrentTask + " " + CurTime+" / "+MaxTime
+    }
+    
+    local ProgressString = "Progress:\n"+Current+" / "+Max+" ("+Perc+"%)"
+    
+    if (!Processing) {
+        ProgressString = ""    
+    }
+    
+    local Text = Header+
+"
+Midi Play Mode:
+"+capitalize(MidiPlayMode)+"
+
+Step:
+"+Step+" / 5
+
+Current task:
+"+CurrentTask+"
+
+"+ProgressString+"
+"
+
+    if (MidiWarning!="") {
+        Text += "\nWarning: "+MidiWarning    
+    } 
+    
+    String = Text
+}
+
+function displayError(Msg:string) {
+    local Text = Header+
+"
+Midi Player Error:
+
+"+Msg+"
+"
+
+    String = Text
+}
+
+function displayMode() {
+    if (Error){ 
+        displayError(Error)
+    } elseif (Processing) {
+        displayProgress()
+    } else {
+        displayHelp()    
+    }
+}
+
+if (first() | duped()) {
+    Header = 
+"Midi Player
+Created by AlexALX (c) 2026
+-------------------"
+    String = ""
+    
+    timer(0.01,function() {
+        displayMode()
+    })
+}
+
+event input(InputName:string) {
+    if (InputName=="Processing" & Processing) {
+        displayProgress()
+    } elseif (InputName=="Error" & Error) {
+        displayError(Error)    
+    } elseif (InputName == "Progress") {
+        if (CurrentState) {
+            displayProgress()
+            timer(0.01,function() {
+                if (CurrentState=="done") {
+                    displayProgress()
+                }
+            })
+        }
+    } elseif (CurrentState=="") {
+        displayHelp()
+    }
+}
+

@@ -1,0 +1,14 @@
+@outputs CurrentState:string Progress:table ProgressText:string Processing:number Error:string EntID:number
+@persist Midi:table CurrentBackend:table MidiDebug MidiNoPrint
+
+if (first() | duped()) {
+    Midi = table()
+    
+    MidiDebug = 0
+    MidiNoPrint = 0
+    
+    EntID = entity():id()
+    
+    dsSetScope(2)
+}
+

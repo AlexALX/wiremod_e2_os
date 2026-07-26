@@ -1,0 +1,391 @@
+#include "alx_pc/standalone/midi/reader"
+
+function midiAddEvent()
+{
+    local Index = Midi["trackEventCount",number]
+
+    Midi["events",table][Index,table] = table()
+
+    local Event = Midi["events",table][Index,table]
+
+    Event["track",number] = Midi["trackCurrent",number]
+    Event["tick",number] = Midi["tick",number]
+    Event["type",string] = Midi["eventType",string]
+
+
+    if (Midi["eventType",string] == "META") {
+    
+        Event["metaType",number] = Midi["metaType",number]
+    
+        switch (Midi["metaType",number]) {
+    
+            case 0x51,
+                Event["tempo",number] = Midi["tempo",number]
+    
+                break
+            case 0x58,
+    
+                Event["numerator",number] = Midi["timeNumerator",number]
+                Event["denominator",number] = Midi["timeDenominator",number]
+    
+                break
+            case 0x59,
+    
+                Event["sharps",number] = Midi["keySharps",number]
+                Event["mode",number] = Midi["keyMode",number]
+                break
+        }
+
+    } elseif (
+        Midi["eventType",string] == "NOTE_ON" |
+        Midi["eventType",string] == "NOTE_OFF"
+    ) {
+
+        Event["channel",number] = Midi["channel",number]
+        Event["note",number] = Midi["note",number]
+        Event["velocity",number] = Midi["velocity",number]
+
+    } elseif (Midi["eventType",string] == "PROGRAM") {
+
+        Event["channel",number] = Midi["channel",number]
+        Event["program",number] = Midi["program",number]
+
+    } elseif (Midi["eventType",string] == "CONTROL") {
+
+        Event["channel",number] = Midi["channel",number]
+        Event["controller",number] = Midi["controller",number]
+        Event["value",number] = Midi["value",number]
+
+    }
+
+
+    Midi["trackEventCount",number] = Index + 1
+}
+
+function number midiReadTrackEvent()
+{
+    if (Midi["offset",number] >= Midi["trackEnd",number]) {
+        
+        local Events = Midi["events",table]
+        
+        local CurrentTrack = Midi["trackCurrent", number]
+        
+        Midi["trackEventsCount",table][CurrentTrack,number] = Midi["trackEventCount",number]
+        Midi["trackEvents",table][CurrentTrack,table] = Events
+        
+        Midi["eventCount",number] = Midi["eventCount",number] + Midi["trackEventCount",number]
+        
+        Midi["events",table] = table()
+        Midi["trackEventCount",number] = 0
+        
+        return 0
+    }
+
+    # Delta time
+    local Delta = midiReadVarInt()
+
+    if (Delta < 0) {
+        return 0
+    }
+
+    Midi["tick",number] = Midi["tick",number] + Delta
+
+    # Read status byte
+    local Status = midiReadU8()
+
+    if (Status < 0) {
+        return 0
+    }
+
+    # Running status
+    if (Status < 0x80) {
+        if (Midi["runningStatus",number] == 0) {
+            return 0
+        }
+
+        midiSeek(midiTell() - 1)
+
+        Status = Midi["runningStatus",number]
+
+    } else {
+        if (Status < 0xF0) {
+            Midi["runningStatus",number] = Status
+        }
+    }
+
+
+    Midi["eventStatus",number] = Status
+    
+    
+
+
+    # Meta event
+    if (Status == 0xFF) {
+    
+        local Type = midiReadU8()
+        local Length = midiReadVarInt()
+    
+        Midi["eventType",string] = "META"
+        Midi["metaType",number] = Type
+    
+        switch (Type) {
+    
+            # End Of Track
+            case 0x2F,
+    
+                Midi["trackEndEvent",number] = 1
+    
+                midiSkip(Length)
+                break
+            # Tempo
+            case 0x51,
+    
+                if (Length == 3) {
+    
+                    Midi["tempo",number] =
+                        (midiReadU8() << 16) ||
+                        (midiReadU8() << 8) ||
+                        midiReadU8()
+    
+                } else {
+    
+                    midiSkip(Length)
+                }
+                break
+            # Time Signature
+            case 0x58,
+    
+                if (Length == 4) {
+    
+                    Midi["timeNumerator",number] = midiReadU8()
+                    Midi["timeDenominator",number] = 2 ^^ midiReadU8()
+                    Midi["timeClocks",number] = midiReadU8()
+                    Midi["time32nds",number] = midiReadU8()
+    
+                } else {
+    
+                    midiSkip(Length)
+                }
+                break
+            # Key Signature
+            case 0x59,
+    
+                if (Length == 2) {
+    
+                    Midi["keySharps",number] = midiReadU8()
+                    Midi["keyMode",number] = midiReadU8()
+    
+                } else {
+    
+                    midiSkip(Length)
+                }
+                break
+            default,
+    
+                midiSkip(Length)
+        }
+    
+        midiAddEvent()
+    
+        return 1
+    }
+
+
+    # SysEx
+    if (Status == 0xF0 | Status == 0xF7) {
+
+        local Length = midiReadVarInt()
+
+        Midi["eventType",string] = "SYSEX"
+        Midi["sysexLength",number] = Length
+
+        midiSkip(Length)
+        
+        midiAddEvent()
+
+        return 1
+    }
+
+
+    local Command = Status && 0xF0
+    local Channel = Status && 0x0F
+
+
+    Midi["channel",number] = Channel
+    Midi["command",number] = Command
+
+
+    switch(Command) {
+
+
+        # Note Off
+        case 0x80,
+
+            Midi["eventType",string] = "NOTE_OFF"
+
+            Midi["note",number] = midiReadU8()
+            Midi["velocity",number] = midiReadU8()
+
+            break
+        # Note On
+        case 0x90,
+
+            Midi["eventType",string] = "NOTE_ON"
+
+            Midi["note",number] = midiReadU8()
+            Midi["velocity",number] = midiReadU8()
+
+            # velocity 0 = Note Off
+            if (Midi["velocity",number] == 0) {
+                Midi["eventType",string] = "NOTE_OFF"
+            }
+
+            break
+        # Poly aftertouch
+        case 0xA0,
+
+            Midi["eventType",string] = "POLY_PRESSURE"
+
+            Midi["note",number] = midiReadU8()
+            Midi["pressure",number] = midiReadU8()
+
+            break
+        # Control change
+        case 0xB0,
+
+            Midi["eventType",string] = "CONTROL"
+
+            Midi["controller",number] = midiReadU8()
+            Midi["value",number] = midiReadU8()
+
+            break
+        # Program change
+        case 0xC0,
+
+            Midi["eventType",string] = "PROGRAM"
+
+            Midi["program",number] = midiReadU8()
+
+            break
+        # Channel pressure
+        case 0xD0,
+
+            Midi["eventType",string] = "PRESSURE"
+
+            Midi["pressure",number] = midiReadU8()
+
+            break
+        # Pitch bend
+        case 0xE0,
+
+            local LSB = midiReadU8()
+            local MSB = midiReadU8()
+
+            Midi["eventType",string] = "PITCH"
+
+            Midi["pitch",number] =
+                ((MSB << 7) || LSB) - 8192
+
+            break
+        default,
+            return 0
+            break
+    }
+    
+    midiAddEvent()
+    
+    return 1
+}
+
+function number midiSortEventsStep()
+{
+    if (Midi["tracks",number] == 1) {
+
+        Midi["events",table] =
+            Midi["trackEvents",table][0,table]
+
+        return 1
+    }
+
+    local BestTrack = -1
+    local BestTick = 0
+
+    for (Track = 0, Midi["tracks",number] - 1) {
+
+        Pos = Midi["mergePos",table][Track,number]
+
+        if (
+            Pos >=
+            Midi["trackEventsCount",table][Track,number]
+        ) {
+            continue
+        }
+
+        Event =
+            Midi["trackEvents",table][Track,table][Pos,table]
+
+        Tick = Event["tick",number]
+
+        if (BestTrack < 0 | Tick < BestTick) {
+            BestTrack = Track
+            BestTick = Tick
+        }
+    }
+
+    if (BestTrack < 0) {
+        return 1
+    }
+
+    Pos = Midi["mergePos",table][BestTrack,number]
+
+    Midi["events",table][Midi["mergeIndex",number],table] =
+        Midi["trackEvents",table][BestTrack,table][Pos,table]
+
+    Midi["mergePos",table][BestTrack,number] = Pos + 1
+    Midi["mergeIndex",number] =
+        Midi["mergeIndex",number] + 1
+
+    return 0
+}
+
+function number midiBuildTimeStep()
+{
+    local Index = Midi["timeIndex",number]
+
+    if (Index >= Midi["eventCount",number]) {
+
+        Midi["maxSeconds",number] = Midi["timeSeconds",number]
+        
+        local Events = Midi["events",table]
+        Midi["maxTick",number] = Events[Events:count()-1,table]["tick",number]
+
+        return 1
+    }
+
+    local Event = Midi["events",table][Index,table]
+
+    local DeltaTick = Event["tick",number] - Midi["timeTick",number]
+
+    if (DeltaTick > 0) {
+
+        Midi["timeSeconds",number] =
+            Midi["timeSeconds",number] +
+            DeltaTick * Midi["timeTempo",number] /
+            (Midi["division",number] * 1000000)
+
+        Midi["timeTick",number] = Event["tick",number]
+    }
+
+    Event["seconds",number] = Midi["timeSeconds",number]
+
+    if (
+        Event["type",string] == "META" &
+        Event["metaType",number] == 0x51
+    ) {
+        Midi["timeTempo",number] = Event["tempo",number]
+    }
+
+    Midi["timeIndex",number] = Index + 1
+
+    return 0
+}

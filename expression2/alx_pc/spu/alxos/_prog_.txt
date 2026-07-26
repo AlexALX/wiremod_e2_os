@@ -26,10 +26,8 @@ function alxos_execute(Name:string,Args:table) {
     }
 }
 
-#[ midi placeholder
-ALXOS_PROGS["alxos_midi",number] = 1
-function alxos_midi(Args:table) {
-    #include "alx_pc/spu/alxos/explorer"
+ALXOS_PROGS["alxos_midi_player",number] = 1
+function alxos_midi_player(Args:table) {
+    #include "alx_pc/spu/alxos/midi"
     alxos_midi_init(Args)
-}]#
-
+}

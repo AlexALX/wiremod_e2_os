@@ -1,0 +1,39 @@
+@name Midi Player (SPU)
+
+#[
+    ALX Wiremod E2 OS
+    Created by AlexALX
+]#
+#include "alx_pc/spu/_main_"
+
+function alxos_midi_init(Args:table) {
+    local Data = Args[1,string]
+    
+    DsHandler = "alxos_midi_ds"
+    
+    local Mode = "addon"
+    
+    if (Args[3,string]!="") {
+        Mode = Args[3,string]    
+    } elseif (!isSinglePlayer()) {
+        # use synth mode not in singleplayer as default
+        Mode = "synth"
+    }
+    
+    dsSendDirect("midiInit",Speaker,table(Mode,Data))
+    SpuData["midiInitSender",entity] = Args[2,entity]
+}
+
+function alxos_midi_ds(Name:string) {
+    if (Name=="midiStop") {
+        dsSendDirect("midiStop",Speaker,1)  
+    } elseif (Name=="midiPlayPause") {
+        dsSendDirect("midiPlayPause",Speaker,1)      
+    } elseif (Name=="midiRepeat") {
+        dsSendDirect("midiRepeat",Speaker,1)      
+    } elseif (Name=="midiSetMode") {
+        dsSendDirect("midiSetMode",Speaker,dsGetString())      
+    } elseif (Name=="midiInited") {
+        dsSendDirect("midiStart",SpuData["midiInitSender",entity],1)    
+    }
+}

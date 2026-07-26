@@ -1,0 +1,214 @@
+@inputs Voice1:entity Voice2:entity Voice3:entity Voice4:entity
+@inputs Voice5:entity Voice6:entity Voice7:entity Voice8:entity
+@inputs Voice9:entity Voice10:entity Voice11:entity Voice12:entity
+@inputs Voice13:entity Voice14:entity Voice15:entity Voice16:entity
+
+@outputs MidiPlayMode:string MidiWarning:string
+@persist VoicesArray:array MidiProgram:function MidiSample:function 
+@persist ActiveNotes:number 
+
+#include "alx_pc/standalone/midi/_shared_"
+#include "alx_pc/standalone/midi/backends/e2modes/_shared_"
+#include "alx_pc/standalone/midi/backends/e2modes/instrumental"
+#include "alx_pc/standalone/midi/backends/e2modes/synth"
+#include "alx_pc/standalone/midi/backends/e2modes/addon"
+
+function table midiGetInstrument(Program:number)
+{
+    local Cache = Midi["instrumentCache",table]
+
+    if (Cache[Program,table]:count() > 0) {
+        return Cache[Program,table]
+    }
+
+    local Instrument = MidiProgram(Program)[table]
+
+    Cache[Program,table] = Instrument
+
+    return Instrument
+}
+
+function table midiGetSample(Instrument:table, Program:number, Note:number)
+{
+    local Index = Program * 128 + Note
+
+    local Cache = Midi["sampleCache",table]
+
+    if (Cache[Index,table]:count() > 0) {
+        return Cache[Index,table]
+    }
+    
+    local Sample = MidiSample(Instrument,Program,Note)[table]
+
+    Cache[Index,table] = Sample
+
+    return Sample
+}
+
+function midiUpdateVoices(Backend:table) {
+    local MaxVoices = 16
+    
+    VoicesArray = array()
+    for (I=1,MaxVoices) {
+        local Ent = ioInputEntity("Voice"+I)
+        if (Ent!=noentity()) {
+            VoicesArray:pushEntity(Ent)  
+        }             
+    }
+
+    Backend["voiceCount",number] = VoicesArray:count()
+}
+
+function midiBackendE2SetMode(Mode:string) {
+    MidiPlayMode = Mode:lower()
+    
+    if (Mode=="addon") {
+        MidiProgram = function(Program:number) { 
+            return midiProgramAddon(Program) 
+        }
+        MidiSample = function(Instrument:table,Program:number,Note:number) {
+            return midiSelectSampleSfz(Instrument,Program,Note)    
+        }
+    } elseif (Mode=="instrumental") {
+        MidiProgram = function(Program:number) { 
+            return midiProgramInstrument(Program) 
+        }
+        MidiSample = function(Instrument:table,Program:number,Note:number) {
+            return midiSelectSample(Instrument,Program,Note)    
+        }
+    } else {
+        MidiProgram = function(Program:number) { 
+            return midiProgramSynth(Program) 
+        }
+        MidiSample = function(Instrument:table,Program:number,Note:number) {
+            return midiSelectSample(Instrument,Program,Note)    
+        }
+    }  
+}
+
+function table midiBackendE2(Mode:string) {
+    local Backend = table()
+    
+    midiBackendE2SetMode(Mode)
+    
+    midiUpdateVoices(Backend)
+    
+    Backend["Init",function] = function() {
+        Midi["instrumentCache",table] = table()
+        Midi["sampleCache",table] = table()
+        MidiWarning = ""
+    }
+    
+    Backend["Check",function] = function() {
+        return 1
+    }
+    
+    Backend["Play",function] = function() {
+        ActiveNotes = 0
+    }
+    
+    Backend["Pause",function] = function() {
+        soundPurge()
+    }
+    
+    Backend["Stop",function] = function() {
+        soundPurge()
+        MidiWarning = ""
+    }
+
+    Backend["TickStart",function] = function() {
+        if (MidiWarning=="" & ActiveNotes>9) {
+            MidiWarning = "Midi with more than 9 activeNotes detected\nSound may play incorrectly due to gmod limitations"
+            if (!MidiNoPrint) {
+                print(MidiWarning)   
+            }
+        } 
+    }
+
+    Backend["TickEnd",function] = function() {
+        #
+    }
+
+    Backend["VoiceOn",function] = function(Voice:number)
+    {
+        local V = Midi["voices",table][Voice,table]
+    
+        local SoundId = Voice + 1
+        local Ent = VoicesArray[SoundId,entity]
+        if (!Ent:isValid()) { return }
+    
+        local Instrument = midiGetInstrument(V["program",number])
+    
+        local Sample = midiGetSample(
+            Instrument,
+            V["program",number],
+            V["note",number]
+        )
+        
+        Ent:soundPlay(
+            SoundId,
+            0,
+            Sample["sample",string]
+        )
+        
+        ActiveNotes++
+    
+        if (!soundPlaying(SoundId)) { return }
+        
+        local Pitch = round(
+            100 * (2 ^ (
+                (V["note",number] - Sample["rootNote",number]) / 12
+            ))
+        )
+
+        soundPitch(SoundId, clamp(Pitch, 0, 255))
+    
+        local Volume =
+            (V["velocity",number] / 127) *
+            (V["volume",number] / 127) *
+            (V["expression",number] / 127) *
+            Instrument["gain",number]
+    
+        soundVolume(SoundId, clamp(Volume, 0, 1))
+    }
+
+    Backend["VoiceOff",function] = function(Voice:number)
+    {
+        local SoundId = Voice + 1
+        soundStop(SoundId)
+        
+        ActiveNotes--
+    }
+
+    Backend["VoiceVolume",function] = function(Voice:number)
+    {
+        local V = Midi["voices",table][Voice,table]
+    
+        local Volume =
+            (V["velocity",number] / 127) *
+            (V["volume",number] / 127) *
+            (V["expression",number] / 127)
+            
+        if (!soundPlaying(Voice + 1)) { return }
+    
+        soundVolume(Voice + 1, clamp(Volume, 0, 1))
+    }
+    
+    Backend["VoiceExpression",function] = function(Voice:number)
+    {
+        Backend["VoiceVolume",function](Voice)
+    }
+    
+    Backend["VoicePan",function] = function(Voice:number)
+    {
+        #  Wire Sound does support pan.
+    }
+
+    return Backend
+}
+
+event input(Name:string) {
+    if (Name:find("Voice")==1) {
+        midiUpdateVoices(CurrentBackend)
+    }
+}

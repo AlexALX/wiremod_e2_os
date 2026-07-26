@@ -56,6 +56,8 @@ function initGpu() {
         egpClear()
         dsClear()
     }
+    GpuData = table()
+    GpuPersistData = table()
 }
 
 function ready() {
@@ -70,6 +72,7 @@ function gpuShutdown() {
     }
     stopAllTimers()
     GpuData = table()
+    GpuPersistData = table()
     Init = 0
     PlugHandler = ""
     egpClear()
@@ -183,6 +186,7 @@ if (dsClk("keyboard")) {
 
 if (dsClk()) {
     local Name = dsClkName()
+    
     if (Name=="ready") {
         ready()
     } elseif (Name=="pcie") {

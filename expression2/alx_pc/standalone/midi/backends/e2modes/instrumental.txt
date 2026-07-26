@@ -1,0 +1,200 @@
+#include "alx_pc/standalone/midi/backends/e2modes/_shared_"
+
+#include "alx_pc/standalone/midi/backends/e2modes/_shared_"
+
+function table midiProgramInstrument(Program:number)
+{
+    local T = table()
+
+    T["gain",number] = 1
+
+    switch (Program) {
+
+        # Piano (Acoustic Grand / Bright)
+        case 0, case 1, case 2, case 3,
+            T["samples",table] = midiSamples(
+                "instruments/pianoc",
+                60,
+                array()
+            )
+            break
+
+        # Piano (Honky-tonk / Electric)
+        case 4, case 5, case 6, case 7,
+            T["samples",table] = midiSamples(
+                "instruments/pianoa",
+                69,
+                array(440)
+            )
+            break
+
+        # Chromatic (, )
+        case 8, case 9, case 10, case 11, case 12, case 13, case 14, case 15,
+            T["samples",table] = midiSamples(
+                "synth/triangle",
+                69,
+                array(440,880,1760)
+            )
+            break
+
+        # Organ
+        case 16, case 17, case 18, case 19, case 20, case 21, case 22, case 23,
+            T["samples",table] = midiSamples(
+                "synth/square",
+                69,
+                array(440,880,1760)
+            )
+            break
+
+        # Guitar
+        case 24, case 25, case 26, case 27, case 28, case 29, case 30, case 31,
+            T["samples",table] = midiSamples(
+                "synth/saw",
+                69,
+                array(440,880,1760)
+            )
+            break
+
+        # Bass
+        case 32, case 33, case 34, case 35, case 36, case 37, case 38, case 39,
+            T["samples",table] = midiSamples(
+                "instruments/bass",
+                48,
+                array()
+            )
+            break
+
+        # Strings
+        case 40, case 41, case 42, case 43, case 44, case 45, case 46, case 47,
+            T["samples",table] = midiSamples(
+                "synth/saw",
+                69,
+                array(440,880,1760)
+            )
+            break
+
+        # Ensemble
+        case 48, case 49, case 50, case 51, case 52, case 53, case 54, case 55,
+            T["samples",table] = midiSamples(
+                "synth/saw_inverted",
+                69,
+                array(440,880,1760)
+            )
+            break
+
+        # Brass
+        case 56, case 57, case 58, case 59, case 60, case 61, case 62, case 63,
+            T["samples",table] = midiSamples(
+                "synth/75_pwm",
+                69,
+                array(440,880,1760)
+            )
+            break
+
+        # Reed
+        case 64, case 65, case 66, case 67, case 68, case 69, case 70, case 71,
+            T["samples",table] = midiSamples(
+                "synth/25_pwm",
+                69,
+                array(440,880,1760)
+            )
+            break
+
+        # Pipe
+        case 72, case 73, case 74, case 75, case 76, case 77, case 78, case 79,
+            T["samples",table] = midiSamples(
+                "synth/12_5_pwm",
+                69,
+                array(440,880,1760)
+            )
+            break
+
+        # Synth Lead
+        case 80, case 81, case 82, case 83, case 84, case 85, case 86, case 87,
+            T["samples",table] = midiSamples(
+                "synth/square",
+                69,
+                array(440,880,1760)
+            )
+            break
+
+        # Synth Pad
+        case 88, case 89, case 90, case 91, case 92, case 93, case 94, case 95,
+            T["samples",table] = midiSamples(
+                "synth/saw_inverted",
+                69,
+                array(440,880,1760)
+            )
+            break
+
+        # FX
+        case 96,
+            T["sample",string] = "synth/white_noise.wav"
+            T["rootNote",number] = 69
+            break
+
+        case 97,
+            T["sample",string] = "synth/pink_noise.wav"
+            T["rootNote",number] = 69
+            break
+
+        case 98,
+            T["sample",string] = "synth/brown_noise.wav"
+            T["rootNote",number] = 69
+            break
+
+        # STANDARD DRUM KIT (default)
+        case 128,
+            local S = table()
+            
+            # 36  Bass Drum / Kick ()
+            local Drum36 = table()
+            Drum36["sample", string] = "instruments/bass.wav"
+            Drum36["rootNote", number] = 36
+            S[1, table] = Drum36
+            
+            # 38  Snare Drum (  )
+            local Drum38 = table()
+            Drum38["sample", string] = "instruments/snare.wav"
+            Drum38["rootNote", number] = 38
+            S[2, table] = Drum38
+            
+            # 42  Closed Hi-Hat ( )
+            local Drum42 = table()
+            Drum42["sample", string] = "instruments/hi_hat.wav"
+            Drum42["rootNote", number] = 42
+            S[3, table] = Drum42
+            
+            # 46  Open Hi-Hat ( )
+            local Drum46 = table()
+            Drum46["sample", string] = "instruments/hi_hat.wav"
+            Drum46["rootNote", number] = 46
+            S[4, table] = Drum46
+            
+            # 49  Crash Cymbal ()
+            local Drum49 = table()
+            Drum49["sample", string] = "instruments/cymbal.wav"
+            Drum49["rootNote", number] = 49
+            S[5, table] = Drum49
+            
+            # 50  High Tom ( -)
+            local Drum50 = table()
+            Drum50["sample", string] = "instruments/high_tom.wav"
+            Drum50["rootNote", number] = 50
+            S[6, table] = Drum50
+            
+            T["samples", table] = S
+            break
+
+        default,
+            T["samples",table] = midiSamples(
+                "synth/square",
+                69,
+                array(440,880,1760)
+            )
+            break
+    }
+
+    return T
+}
+

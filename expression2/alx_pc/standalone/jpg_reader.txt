@@ -22,14 +22,24 @@
     Note: long url may be cut, use input LongURL instead for such case (via string value) 
 ]#
 
+#include "alx_pc/standalone/includes/basicreader"
+#include "alx_pc/standalone/jpg_reader/_init_"
+
 if (first() | duped()) {
-    #include "alx_pc/standalone/jpg_reader/_init_"
+    Command = "!jpg"
     
-    function jpgLoad(Body:string) {
+    Funcs = table()
+    
+    Funcs["readerAbort", function] = function() {
+        print(_HUD_PRINTTALK,"JPG rendering canceled.")     
+        Jpg["state",string] = ""
+    }
+    
+    Funcs["readerLoad", function] = function(Body:string, Size:number, Path:string) {
         jpgInit(Body)
     }
     
-    function number checkDS() {
+    Funcs["readerCheck", function] = function() {
         if (!->DS) {
             print(_HUD_PRINTTALK,"Digital Screen is not connected.") 
             return 0
@@ -39,112 +49,10 @@ if (first() | duped()) {
             "It is located in Wire -> Visuals -> Screens -> Digital Screen.\nThis is NOT EGPv3 screen.") 
             return 0    
         }
-        return 1   
+        return 1  
+    } 
+    
+    Funcs["readerError", function] = function(Error:string, Path:string) {
+        print(_HUD_PRINTTALK, Error)
     }
 }
-
-event chat(Player:entity, Said:string, Team:number) {
-    if (Player==owner()) { 
-        
-        local Find = Said:find(" ")
-        
-        if (Find) {
-                    
-            local Cmd = Said:left(Find-1)
-            local Url = Said:sub(Find+1)
-
-            if (Cmd=="!jpgabort" | Cmd == "!jpg" & Url == "abort") {
-                print(_HUD_PRINTTALK,"JPG rendering canceled.")     
-                Jpg["state",string] = ""
-            } elseif (Cmd == "!jpg") {
-                if (!checkDS()) { exit() }
-                #ifndef httpCanRequest()
-                    print(_HUD_PRINTTALK,"HTTP extension is not enabled. Please enable via wire_expression2_extension_enable http") 
-                #else
-                    if (!httpCanRequest()) {
-                        print("HTTP Busy. Please wait...")
-                        exit()
-                    }
-                        
-                    timer(0.01, function() {
-                        httpRequest(Url) 
-                    })
-                #endif
-            } elseif (Cmd == "!jpgfile") {
-                if (!checkDS()) { exit() }
-                #ifndef fileCanLoad()
-                    print(_HUD_PRINTTALK,"FILE extension is not enabled. Please enable via wire_expression2_extension_enable file") 
-                #else
-                    if (!fileCanLoad()) {
-                        print("File Busy. Please wait...")
-                        exit()
-                    }
-                        
-                    timer(0.01, function() {
-                        try {
-                            fileLoad(Url) 
-                        } catch(E:string) {
-                            print(E)  
-                        }
-                    })
-                #endifw
-            }
-        } elseif (Said=="!jpgabort") {
-            print(_HUD_PRINTTALK,"JPG rendering canceled.")     
-            Jpg["state",string] = ""
-        }
-    }
-}
-
-if (~LongURL & LongURL!="") {
-    if (!checkDS()) { 
-        print(_HUD_PRINTTALK,"Digital Screen is not connected")   
-        exit() 
-    }
-
-    #ifndef httpCanRequest()
-        print(_HUD_PRINTTALK,"HTTP extension is not enabled. Please enable via wire_expression2_extension_enable http")   
-        exit()
-    #else
-        if (!httpCanRequest()) {
-            print(_HUD_PRINTTALK,"HTTP Request Canceled - Please wait a bit...")   
-            exit()
-        }
-        httpRequest(LongURL) 
-    #endif
-}
-
-#ifdef httpCanRequest()
-event httpLoaded(Body:string, Size:number, Url:string)
-{
-    jpgLoad(Body)
-}
-
-event httpErrored(Error:string, Url:string)
-{
-    print(Error)
-}
-#endif
-
-#ifdef fileLoad(string)
-event fileLoaded(Filepath:string,Data:string) {
-    jpgLoad(Data)   
-}
-
-event fileErrored(FilePath:string, Status:number) {
-    switch(Status) {
-        case _FILE_404,
-            print("File Error: Not Found")   
-            break     
-        case _FILE_TIMEOUT,
-            print("File Error: Timeout")   
-            break 
-        case _FILE_TRANSFER_ERROR,
-            print("File Error: Transfer Error")   
-            break 
-        default,
-            print("File Error: Unknown Error ("+Status+")")   
-            break 
-    }
-}
-#endif

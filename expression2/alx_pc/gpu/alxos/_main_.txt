@@ -262,7 +262,7 @@ function alxos_closedialog() {
     local Parent = DialogData[-1,number]
     for(I=Parent,Parent+5) {
         EGP:egpRemove(I)
-    }   
+    }
     local Rm = DialogData[-10,table]
     for(I=1,Rm:count()) {
         EGP:egpRemove(Rm[I,number])
@@ -286,8 +286,10 @@ function alxos_menubg(Title:string,Width,Height,Col:table) {
         EGP:egpSize(Parent+2,vec2(Width-22,Height-22))
         EGP:egpPos(Parent+2,vec2((256+11)-(Width/2),(256+11)-(Height/2)))
         
-        local Sz = Title:length()*12
+        local Sz = Title:length()*12        
         EGP:egpPos(Parent+3,vec2(Width/2-Sz/2,0))
+        # this maginally fixes issue with box
+        EGP:egpSize(Parent+3,vec2(Sz,23))
         EGP:egpSize(Parent+3,vec2(Sz,22))
         
         EGP:egpText(Parent+4,Title,vec2(Width/2,0))
@@ -302,8 +304,8 @@ function alxos_menubg(Title:string,Width,Height,Col:table) {
     
     EGP:egpBoxOutline(LAST_I,vec2((256+11)-(Width/2),(256+11)-(Height/2)),vec2(Width-22,Height-22))
     EGP:egpColor(LAST_I,Col[2,vector4]) LAST_I++
-    
-    local Sz = Title:length()*12
+
+    local Sz = Title:length()*12    
     EGP:egpBox(LAST_I,vec2(Width/2-Sz/2,0),vec2(Sz,22))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,Col[1,vector4]) LAST_I++

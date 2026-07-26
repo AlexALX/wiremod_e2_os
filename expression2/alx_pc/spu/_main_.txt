@@ -25,12 +25,20 @@ function spuClear() {
 }
 
 function playgmsound(Index,Time,Sound:string) {
+    if (Speaker:type()=="gmod_wire_expression2") {
+        dsSendDirect("playgmsound",Speaker,table(Index,Time,Sound))
+        return    
+    }
     #ifdef entity:soundPlay(number,number,string)
     Speaker:soundPlay(Index,Time,Sound)
     #endif
 }
 
 function stopgmsound(Index,FadeTime) {
+    if (Speaker:type()=="gmod_wire_expression2") {
+        dsSendDirect("stopgmsound",Speaker,table(Index,FadeTime))
+        return    
+    }
     #ifdef soundStop(number,number)
     soundStop(Index,FadeTime)
     #endif

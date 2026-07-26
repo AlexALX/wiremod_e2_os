@@ -60,10 +60,10 @@ function jpgInit(Data:string)
     if (jpgU16() != 0xFFD8) {
         timer(0.001,function() {
             Error = "Not JPEG"
+            if (!JPGNoPrint) {
+                print(Error)    
+            }
         })
-        if (!JPGNoPrint) {
-            print(Error)    
-        }
         return
     }
     

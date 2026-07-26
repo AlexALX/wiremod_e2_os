@@ -55,7 +55,12 @@ ALXOS_PROGS["alxos_network_chat",number] = 1
 function alxos_network_chat(FInfo:table) {
     dsSendDirect("alxos_runprog",E2_GPU,table("alxos_network_chat"))
 }
-    
+
+ALXOS_PROGS["alxos_midi_player",number] = 1
+function alxos_midi_player(FInfo:table) {
+    dsSendDirect("alxos_runprog",E2_GPU,table("alxos_midi_player",FInfo))
+}
+
 # program associations, for now hardcoded...
 ALXOS_PROG_ASOC["bmp",string] = "alxos_bmp_reader"
 ALXOS_PROG_ASOC["jpg",string] = "alxos_jpg_reader"
@@ -64,3 +69,4 @@ ALXOS_PROG_ASOC["ini",string] = "alxos_txt_reader"
 ALXOS_PROG_ASOC["e2e",string] = "alxos_txt_reader"
 ALXOS_PROG_ASOC["e2s",string] = "alxos_txt_reader"
 ALXOS_PROG_ASOC["gms",string] = "alxos_soundplay"
+ALXOS_PROG_ASOC["mid",string] = "alxos_midi_player"

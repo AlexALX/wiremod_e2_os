@@ -1,0 +1,855 @@
+@name Midi Player (GPU)
+
+#[
+    ALX Wiremod E2 OS
+    Created by AlexALX
+]#
+
+#include "alx_pc/gpu/alxos/_main_"
+
+function alxos_midi_init(Args:table) {
+    if (!Devices["spu",entity]:isValid()) {
+        "alxos_explorer_error"("No sound card detected!",260)
+        return
+    }
+    
+    DsHandler = "alxos_midi_ds"
+
+    GpuData[1,table] = Args[1,table]
+    GpuData[2,table] = Args[2,table]
+    
+    dsSendDirect("findMidiPlayer",Devices["spu",entity],1)
+    
+    GpuData["midiStart",number] = 0
+}
+
+function alxos_midi_postinit() {
+    local DSType = dsGetType()
+    if (DSType=="table") {
+        local WLT = dsGetTable()
+        GpuData["midiPlayer",wirelink] = WLT[1,wirelink]    
+    } else {
+        "alxos_explorer_handlers"()
+        "alxos_explorer_error"("MIDI Player not connected to your Sound Card.",450)
+        return
+    }
+
+    local FInfo = GpuData[1,table]
+    local ExplorerFS = GpuData[2,table]
+
+    ExplorerCurTask = "midi"
+
+    dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(
+        ExplorerFS,FInfo,0,FInfo["size",number]
+    )))
+
+    local Parent = "alxos_explorer_dialog"("Opening file",400,80,"progress","alxos_midi_clear")[number]
+    
+    GpuData[1,table] = ExplorerFS
+    GpuData[2,table] = FInfo
+    GpuData[5,number] = 0
+
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    DialogData[1,number] = 1
+    DialogData[3,number] = 1
+    DialogData[4,number] = 1
+    runCmd("alxos_midiread_progress",1)    
+}
+
+function alxos_midiread_progress() {
+    local ExplorerFS = GpuData[1,table]
+    
+    local FS = ExplorerFS["hdd_io",wirelink]
+    local Step = DialogData[4,number]
+
+    local CurTask = FS["CurTask",table]
+    local I = CurTask[2,number]
+    local Max = CurTask[1,number]
+    local Last = DialogData[3,number]
+    
+    if (!Step) { return }
+
+    if (Max>0) {
+        local PercID = DialogData[-4,number]
+        local BoxID = DialogData[-5,number]
+        local BoxW = DialogData[-6,number]
+        local CalcP = round(I/Max*100)
+        BoxW = ceil(BoxW/100*CalcP)
+        if (BoxW<1) { BoxW = 1 }
+        EGP:egpSize(BoxID,vec2(BoxW,20))
+        EGP:egpSetText(PercID,CalcP+"%")
+    }
+    
+    runCmd("alxos_midiread_progress",1) 
+}
+
+function number alxos_midi_cmd() {
+    return 0
+}
+
+function number alxos_midi_clear() {
+    if (!checkPerf(7000)) {
+        runCmd("alxos_midi_clear",1)
+        return 0
+    }
+    
+    stopCmd()
+    
+    local ExplorerFS = GpuData[1,table]
+    dsSendDirect("clear",ExplorerFS["hdd_io",wirelink]:entity(),1)
+    
+    dsSendDirect("midiStop",Devices["spu",entity],0)
+
+    "alxos_explorer_handlers"()
+    "alxos_explorer_listcurdir"()
+    return 0
+}
+
+function number alxos_midi_finish(Err:string) {
+    local Height = 60
+    local Pos = vec2(220,18)
+    
+    if (Err=="SPEAKER_UNPLUG") {
+        Err = "Midi Player was disconnected!"    
+    }
+    
+    local NewLines = Err:explode("\n") 
+    
+    if (NewLines:count()>1) {
+        Height += (NewLines:count()-1) * 20
+    }
+    
+    if (Err & NewLines:count()>1) {
+        Pos = vec2(20,18)    
+    }
+
+    if (Err) {        
+       local Parent = "alxos_explorer_dialog"("Midi Player"+(Err!="" ? " Error" : ""),440,Height,"ok","alxos_midi_clear")[number]
+        
+        for(I=1,NewLines:count()) {
+            DialogData[-10,table]:pushNumber(LAST_I)
+            EGP:egpText(LAST_I,NewLines[I,string],Pos)
+            EGP:egpParent(LAST_I,Parent)
+            if (NewLines:count()==1) {
+                EGP:egpAlign(LAST_I,1)   
+            }            
+            EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+            
+            Pos[2] = Pos[2] + 20
+        }
+        "alxos_explorer_handlers"()
+    } else {
+        "alxos_explorer_closedialog"()
+        "alxos_explorer_handlers"()     
+        "alxos_explorer_listcurdir"()     
+    }
+
+    return 0
+}
+
+function number alxos_midi_finish() {
+    if (!checkPerf(7000)) {
+        runCmd("alxos_midi_finish",1)
+        return 0
+    }
+    
+    return alxos_midi_finish("")
+}
+
+function alxos_midi_play(Data:string) {
+    DialogData[4,number] = 0
+    
+    local MidiPlayer = GpuData["midiPlayer",wirelink]    
+    if (MidiPlayer==nowirelink()) {
+        "alxos_explorer_error"("MIDI Player not connected to your Sound Card.",450)
+        return
+    }
+    
+    dsSendDirect("alxos_runprog",Devices["spu",entity],table(
+        "alxos_midi_player",
+        table(Data, entity(), GpuPersistData["MidiMode",string])
+    ))
+
+    local Width = 400
+    local Height = 120
+    
+    local LAST_Y = -22
+    local LeftPos = 20-Width/2
+    
+    local Parent = "alxos_explorer_dialog"("Reading Midi",Width,Height,"progress","alxos_midi_clear")[number]
+
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Current Step: 0 / 5",alxos_dlgPos(-180,-42))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Current Task: Opening Midi",alxos_dlgPos(-180,0))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    DialogData[3,number] = LAST_I
+    EGP:egpText(LAST_I,"",alxos_dlgPos(-3,0))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpBox(LAST_I,alxos_dlgPos(LeftPos,LAST_Y),vec2(Width-40,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,125,125,125,255) LAST_I++
+
+    DialogData[4,number] = LAST_I
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpBox(LAST_I,alxos_dlgPos(LeftPos,LAST_Y),vec2(1,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    DialogData[5,number] = LAST_I
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"0%",alxos_dlgPos(0,LAST_Y))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,200,200,200,255) LAST_I++
+    
+    # change position of main progress bar
+    local PercID = DialogData[-4,number]
+    local BoxID = DialogData[-5,number]
+    EGP:egpPos(BoxID-1,alxos_dlgPos(LeftPos, LAST_Y+45))
+    #EGP:egpPos(BoxID,alxos_dlgPos(LeftPos, LAST_Y))
+    EGP:egpPos(PercID,alxos_dlgPos(0, LAST_Y+45))
+    
+    #runCmd("alxos_midi_progress",1)
+}
+
+function alxos_midi_player_playicon() {
+    local Paused = DialogData["Paused",number]
+    local Index = DialogData["PlayIndex",number]
+    
+    EGP:egpSetText(Index+1, Paused ? "Play" : "Pause")
+    
+    local IconIndex = Index+2
+    local Width = DialogData["DialogW",number]
+    local LastY = DialogData["DialogLastY",number]
+    local Parent = DialogData[-1,number]
+    
+    local CenterX1 = (Width / 3) * 0.9
+    
+    if (Paused) {
+        # Play ICON
+        local PlayW = 30 # Width of the triangle base
+        local PlayH = 30 # Height from base to nose
+        local IconY = LastY + 40
+        
+        # Center of mass offsets for horizontal triangle (facing right)
+        local ToNose = (2 / 3) * PlayH - 5
+        local ToBase = (1 / 3) * PlayH
+        
+        # Perfectly centered Play triangle facing right
+        EGP:egpTriangle(IconIndex, vec2(CenterX1 + ToNose, IconY), vec2(CenterX1 - ToBase, IconY - PlayW/2), vec2(CenterX1 - ToBase, IconY + PlayW/2))
+        EGP:egpParent(IconIndex, Parent)
+        EGP:egpColor(IconIndex, 0, 0, 0, 255) IconIndex++
+        
+        EGP:egpRemove(IconIndex)
+        
+        local FtCmd = GpuData[-100,number]
+        local ID = FtCmd+2        
+        EGP:egpSetText(ID,"Play")
+    } else {
+        # Pause ICON
+        EGP:egpBox(IconIndex, vec2(CenterX1 - 15, LastY+25), vec2(10, 30))
+        EGP:egpParent(IconIndex,Parent)
+        EGP:egpColor(IconIndex, 0,0,0,255) IconIndex++
+        EGP:egpBox(IconIndex, vec2(CenterX1 + 5, LastY+25), vec2(10, 30))
+        EGP:egpParent(IconIndex,Parent)
+        EGP:egpColor(IconIndex, 0,0,0,255) IconIndex++
+        
+        local FtCmd = GpuData[-100,number]
+        local ID = FtCmd+2        
+        EGP:egpSetText(ID,"Pause")
+    }
+    
+}
+
+function alxos_midi_modetext(Mode:string) {
+    
+    local Text = ""
+    
+    if (Mode == "synth") {
+        Text = "Synth Mode plays polyphonic chords using default " +
+               "wiremod waveforms (Sine, Saw, Triangle, Square)."
+    } elseif (Mode == "instrumental") {
+        Text = "Instrumental Mode features acoustic piano, synth bass, " +
+               "and basic percussion (snare, hi-hat, tom, cymbal) " +
+               "in addition to synth waveforms, using " +
+               "default wiremod sounds."
+    } else {
+        Text = "Addon mode is using part of GeneralUser-gs collection " +
+               "included with ALX PC workshop addon, works only " +
+               "if addon installed on server or singleplayer."
+    }
+
+    local Parent = DialogData[-1,number]
+    local Width = DialogData["DialogW",number]
+    local Height = DialogData["DialogH",number]
+
+    if (!DialogData["modeText",number]) {
+        DialogData["modeText",number] = LAST_I
+        
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpTextLayout(LAST_I,Text,vec2(20,165),vec2(Width-40,80))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    } else {
+        local Index = DialogData["modeText",number]
+        EGP:egpSetText(Index,Text)
+    }
+    
+}
+
+function alxos_midi_warning(Warning:string) {
+    DialogData["WarningShown",number] = 1
+
+    local Width = DialogData["DialogW",number]
+    local Height = 90
+    local Title = "Warning"
+
+    local Parent = LAST_I
+    
+    local PosX = 256 - (Width / 2)
+    local PosY = 440 - (Height / 2)
+    
+    local Col = table()
+    Col[1, vector4] = vec4(230, 130, 10, 255) 
+    Col[2, vector4] = vec4(255, 255, 255, 255)  
+
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpBox(LAST_I, vec2(PosX, PosY), vec2(Width, Height))
+    EGP:egpColor(LAST_I, Col[1, vector4]) LAST_I++
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpBoxOutline(LAST_I, vec2(PosX + 8, PosY + 8), vec2(Width - 16, Height - 16))
+    EGP:egpColor(LAST_I, Col[2, vector4]) LAST_I++
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpBoxOutline(LAST_I, vec2(PosX + 11, PosY + 11), vec2(Width - 22, Height - 22))
+    EGP:egpColor(LAST_I, Col[2, vector4]) LAST_I++
+
+    DialogData[-10,table]:pushNumber(LAST_I)
+    local Sz = Title:length() * 12    
+    EGP:egpBox(LAST_I, vec2(Width / 2 - Sz / 2, 0), vec2(Sz, 22))
+    EGP:egpParent(LAST_I, Parent)
+    EGP:egpColor(LAST_I, Col[1, vector4]) LAST_I++
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I, Title, vec2(Width / 2, 0))
+    EGP:egpParent(LAST_I, Parent)
+    EGP:egpAlign(LAST_I, 1)
+    EGP:egpColor(LAST_I, Col[2, vector4]) LAST_I++
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpTextLayout(LAST_I,Warning,vec2(22,18),vec2(Width-40,60))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++
+    
+    DialogData["WarningParent", number] = Parent
+}
+
+function alxos_midi_playprogress() {
+    local MidiPlayer = GpuData["midiPlayer",wirelink]
+    
+    local CurrentState = MidiPlayer["CurrentState",string]
+    local Progress = MidiPlayer["Progress",table]
+    local ProgressText = MidiPlayer["ProgressText",string]
+    local Processing = MidiPlayer["Processing",number]
+    local Error = MidiPlayer["Error",string]
+    local Warning = MidiPlayer["MidiWarning",string]
+    local Mode = MidiPlayer["MidiPlayMode",string]
+    
+    local TW = DialogData[3,number]
+    
+    local CurTask = Progress["progressTask",string]
+    
+    if (Progress["curTime",string]!="") {
+        CurTask += " "+Progress["curTime",string]+" / "+Progress["maxTime",string]  
+    }
+        
+    EGP:egpSetText(TW, "Current Step: "+CurTask)
+    
+    local PercID = DialogData["PercID",number]
+    local BoxID = DialogData["BoxID",number]
+    local BoxW = DialogData["BoxW",number]
+    local CalcP = Progress["progressPercent",number]
+    
+    local Text = Progress["progressCurrent",number] + " / " + Progress["progressMax",number] + " (" + CalcP+"%)"
+    
+    if (CurrentState=="done") {
+        CalcP = 100
+        Text = CalcP+"%"
+        
+        if (!DialogData["Paused",number]) {
+            DialogData["Paused",number] = 1
+            alxos_midi_player_playicon()
+        }
+    }
+    
+    if (CurrentState=="pause" & !DialogData["Paused",number]) {
+        DialogData["Paused",number] = 1
+        alxos_midi_player_playicon()
+    } elseif (CurrentState=="play" & DialogData["Paused",number]) {
+        DialogData["Paused",number] = 0
+        alxos_midi_player_playicon()
+    }
+
+    BoxW = ceil(BoxW/100*CalcP)
+    if (BoxW<1) { BoxW = 1 }
+    EGP:egpSize(BoxID,vec2(BoxW,20))
+    EGP:egpSetText(PercID,Text)
+
+    if (Error | CurrentState=="") {
+        alxos_midi_finish(Error)
+        return
+    }
+    
+    if (Warning!="" & DialogData["WarningShown",number]==0) {
+        alxos_midi_warning(Warning)    
+    }
+    
+    runCmd("alxos_midi_playprogress",100)
+}
+
+function alxos_midi_player() {
+    DialogData[4,number] = 0
+    
+    local Width = 400
+    local Height = 260
+    
+    local Parent = "alxos_explorer_dialog"("Playing Midi",Width,Height,"progress","alxos_midi_clear")[number]
+    
+    "alxos_explorer_ft"(array("Pause","Repeat","Synth","Instr","Addon","","","Quit"))
+    
+    local MidiPlayer = GpuData["midiPlayer",wirelink]
+    local MidiPlayMode = MidiPlayer["MidiPlayMode",string]
+    
+    # fix dialog handlers
+    local PercID = DialogData[-4,number]
+    local BoxID = DialogData[-5,number]
+    local BoxW = DialogData[-6,number]
+    DialogData["PercID",number] = PercID
+    DialogData["BoxID",number] = BoxID
+    DialogData["BoxW",number] = BoxW
+    DialogData["DialogW",number] = Width
+    DialogData["DialogH",number] = Height
+
+    GpuData["midiKeyH",string] = "dialog"
+    
+    KeyHandler = "alxos_midi_key"
+
+    DialogData[3,number] = LAST_I
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Playing",vec2(22,18))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    local LastY = 65
+    DialogData["DialogLastY",number] = LastY
+
+    local Entries = table()
+    local EntID = DialogData[-10,table]
+    
+    local Info = table()
+    
+    local ColWidth = Width / 3
+    local CenterX1 = ColWidth * 0.9
+    local CenterX2 = ColWidth * 1.5
+    local CenterX3 = ColWidth * 2.1
+    
+    # ------------
+    Entries[1,number] = LAST_I   
+    EntID:pushNumber(LAST_I)   
+    
+    DialogData["PlayIndex",number] = LAST_I
+
+    local Txt = "Pause"
+    local Sz = 65
+    
+    EGP:egpBox(LAST_I,vec2(CenterX1 - Sz/2,LastY),vec2(Sz,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,0,168,0,255) LAST_I++
+    
+    EntID:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,Txt,EGP:egpPos(LAST_I-1)+vec2(Sz/2,0))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    # Pause ICON
+    EntID:pushNumber(LAST_I)
+    EGP:egpBox(LAST_I, vec2(CenterX1 - 15, LastY+25), vec2(10, 30))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I, 0,0,0,255) LAST_I++
+    
+    EntID:pushNumber(LAST_I)
+    EGP:egpBox(LAST_I, vec2(CenterX1 + 5, LastY+25), vec2(10, 30))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I, 0,0,0,255) LAST_I++
+    
+    # ------------
+    Entries[2,number] = LAST_I   
+    EntID:pushNumber(LAST_I)   
+    
+    local Txt = "Repeat"
+    local Sz = 65
+    
+    EGP:egpBox(LAST_I,vec2(CenterX2 - Sz/2,LastY),vec2(Sz,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
+    
+    EntID:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,Txt,EGP:egpPos(LAST_I-1)+vec2(Sz/2,0))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    # Repeat ICON
+    local R = 14
+    local StrokeWidth = 4
+    local IconY = LastY + 42
+    
+    EntID:pushNumber(LAST_I)
+    EGP:egpCircleOutline(LAST_I, vec2(CenterX2, IconY), vec2(R, R))
+    EGP:egpParent(LAST_I, Parent)
+    EGP:egpSize(LAST_I, StrokeWidth) #   
+    EGP:egpColor(LAST_I, 0, 0, 0, 255) LAST_I++
+    
+    # Custom arrow settings
+    local ArrowW = 12
+    local ArrowH = 8
+    
+    local ToNose = (2 / 3) * ArrowH
+    local ToBase = (1 / 3) * ArrowH
+    
+    # Top Arrow (Perfectly aligned on CenterX2)
+    EntID:pushNumber(LAST_I)
+    EGP:egpTriangle(LAST_I, vec2(CenterX2 + ToNose, IconY - R), vec2(CenterX2 - ToBase, IconY - R - ArrowW/2), vec2(CenterX2 - ToBase, IconY - R + ArrowW/2))
+    EGP:egpParent(LAST_I, Parent)
+    EGP:egpColor(LAST_I, 0, 0, 0, 255) LAST_I++
+    
+    # Bottom Arrow (Compensated width and height for pixel bleeding)
+    EntID:pushNumber(LAST_I)
+    EGP:egpTriangle(LAST_I, vec2(CenterX2 + ToNose, IconY + R), vec2(CenterX2 - ToBase, IconY + R - ArrowW/2), vec2(CenterX2 - ToBase, IconY + R + ArrowW/2))
+    EGP:egpParent(LAST_I, Parent)
+    EGP:egpAngle(LAST_I, 180)
+    EGP:egpColor(LAST_I, 0, 0, 0, 255) LAST_I++
+    
+    # ------------
+    Entries[3,number] = LAST_I
+    EntID:pushNumber(LAST_I)
+    
+    local Txt = "Stop"
+    local Sz = 65
+    
+    EGP:egpBox(LAST_I,vec2(CenterX3 - Sz/2,LastY),vec2(Sz,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
+    
+    EntID:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,Txt,EGP:egpPos(LAST_I-1)+vec2(Sz/2,0))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    # Stop ICON
+    EntID:pushNumber(LAST_I)
+    EGP:egpBox(LAST_I, vec2(CenterX3 - 15, LastY+25), vec2(30, 30))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I, 0,0,0,255) LAST_I++
+
+    LastY += 70
+    
+    # ------------
+    
+    EntID:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Playing Mode:",vec2(20, LastY))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    # ------------    
+    local LastX = 130
+    
+    Entries[4,number] = LAST_I
+    EntID:pushNumber(LAST_I)
+    
+    local Txt = "Synth"
+    local Sz = 52
+    
+    local Color = vec4(168,168,168,255)
+    if (MidiPlayMode==Txt:lower()) {
+        Color = vec4(0,168,168,255)
+    }
+    
+    DialogData["Text4",string] = Txt
+    
+    EGP:egpBox(LAST_I,vec2(LastX,LastY),vec2(Sz,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,Color) LAST_I++
+    
+    EntID:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,Txt,EGP:egpPos(LAST_I-1)+vec2(5,0))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    LastX += Sz + 5
+    
+    # ------------
+    Entries[5,number] = LAST_I
+    EntID:pushNumber(LAST_I)
+    
+    local Txt = "Instrumental"
+    local Sz = 106
+    
+    local Color = vec4(168,168,168,255)
+    if (MidiPlayMode==Txt:lower()) {
+        Color = vec4(0,168,168,255)
+    }
+    
+    DialogData["Text5",string] = Txt
+    
+    EGP:egpBox(LAST_I,vec2(LastX,LastY),vec2(Sz,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,Color) LAST_I++
+    
+    EntID:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,Txt,EGP:egpPos(LAST_I-1)+vec2(5,0))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    LastX += Sz + 5
+
+    # ------------
+    Entries[6,number] = LAST_I
+    EntID:pushNumber(LAST_I)
+    
+    local Txt = "Addon"
+    local Sz = 56
+    
+    local Color = vec4(168,168,168,255)
+    if (MidiPlayMode==Txt:lower()) {
+        Color = vec4(0,168,168,255)
+    }
+    
+    DialogData["Text6",string] = Txt
+    
+    EGP:egpBox(LAST_I,vec2(LastX,LastY),vec2(Sz,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,Color) LAST_I++
+    
+    EntID:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,Txt,EGP:egpPos(LAST_I-1)+vec2(5,0))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+
+    DialogData[-5,number] = 1 #default option
+    DialogData[-4,table] = Entries
+    
+    alxos_midi_modetext(MidiPlayMode)
+    
+    runCmd("alxos_midi_playprogress",100)
+}
+
+function alxos_midi_progress() {
+    local MidiPlayer = GpuData["midiPlayer",wirelink]
+    
+    local CurrentState = MidiPlayer["CurrentState",string]
+    local Progress = MidiPlayer["Progress",table]
+    local ProgressText = MidiPlayer["ProgressText",string]
+    local Processing = MidiPlayer["Processing",number]
+    local Error = MidiPlayer["Error",string]
+    local Warning = MidiPlayer["MidiWarning",string]
+    local Mode = MidiPlayer["MidiPlayMode",string]
+    
+    local TW = DialogData[3,number]
+        
+    EGP:egpSetText(TW-2, "Current Step: "+Progress["step",number] + " / 3")
+    
+    local PercID = DialogData[5,number]
+    local BoxID = DialogData[4,number]
+    local BoxW = DialogData[-6,number]
+    local CalcP = round(Progress["step",number] * 100 / 3)
+    
+    BoxW = ceil(BoxW/100*CalcP)
+    if (BoxW<1) { BoxW = 1 }
+    EGP:egpSize(BoxID,vec2(BoxW,20))
+    EGP:egpSetText(PercID,CalcP+"%")
+    
+    local PercID = DialogData[-4,number]
+    local BoxID = DialogData[-5,number]
+    local BoxW = DialogData[-6,number]
+    local CalcP = Progress["progressPercent",number]
+    
+    local CurTask = Progress["progressTask",string]
+    
+    if (Progress["curTime",string]!="") {
+        CurTask += " "+Progress["curTime",string]+" / "+Progress["maxTime",string]  
+    }
+    
+    EGP:egpSetText(TW-1, "Current Task: "+CurTask)
+    
+    BoxW = ceil(BoxW/100*CalcP)
+    if (BoxW<1) { BoxW = 1 }
+    EGP:egpSize(BoxID,vec2(BoxW,20))
+    EGP:egpSetText(PercID,Progress["progressCurrent",number] + " / " + Progress["progressMax",number] + " (" + CalcP+"%)")
+    
+    if (Processing==0 & GpuData["midiStart",number] | Error) {
+        if (CurrentState=="done") {
+            timer(0.1,function() {
+                local MidiPlayer = GpuData["midiPlayer",wirelink]
+                alxos_midi_finish(MidiPlayer["Error",string])    
+            })
+        } else {
+            alxos_midi_finish(Error)
+        }
+        return
+    }
+    
+    if (CurrentState=="play") {
+        alxos_midi_player()
+        return       
+    }
+    
+    runCmd("alxos_midi_progress",100)
+}
+
+function alxos_midi_ds(Name:string) {
+    if (Name=="fs_readfile") {
+        alxos_midi_play(dsGetString())
+    } elseif (Name=="clear") {
+        if (!checkPerf(7000)) {
+            runCmd("alxos_midi_clear",1)
+            return
+        }
+        alxos_midi_clear()
+    } elseif (Name=="findMidiPlayer") {
+        alxos_midi_postinit()   
+    } elseif (Name=="midiStart") {
+        GpuData["midiStart",number] = 1  
+        runCmd("alxos_midi_progress",100)
+    }
+}
+
+function alxos_midi_key(Type:string) {
+    if (Type=="play") {
+        dsSendDirect("midiPlayPause",Devices["spu",entity],1)    
+    } elseif (Type=="repeat") {
+        dsSendDirect("midiRepeat",Devices["spu",entity],1)    
+    } elseif (Type=="stop") { 
+        dsSendDirect("midiStop",Devices["spu",entity],1)  
+    }
+}
+
+function alxos_midi_setmode(Mode:string,Index:number) {
+    GpuPersistData["MidiMode",string] = Mode
+                
+    for (I=4,6) {
+        local Col = vec4(168,168,168,255)
+        if (I==Index) { continue }
+        if (Mode==DialogData["Text"+I,string]:lower()) { Col = vec4(0,168,168,255) }
+        EGP:egpColor(DialogData[-4,table][I,number],Col)
+    }
+    
+    alxos_midi_modetext(Mode)
+
+    dsSendDirect("midiSetMode",Devices["spu",entity],Mode)
+}
+
+function alxos_midi_key(Key:string,Pressed) {
+    if (!Pressed) { return }
+    
+    if (Key=="f1") {
+        alxos_midi_key("play")
+    } elseif (Key=="f2") {
+        alxos_midi_key("repeat")
+    } elseif (Key=="f3" | Key=="f4" | Key=="f5") {
+        local Mode = "synth"
+        if (Key=="f4") {
+            Mode = "instrumental"    
+        } elseif (Key=="f5") {
+            Mode = "addon"    
+        }
+        
+        alxos_midi_setmode(Mode,DialogData[-5,number])
+    } elseif (Key=="f8") {
+        stoptimer("cmd")
+        dsSendDirect("clear",GpuData[1,table]["hdd_io",wirelink]:entity(),entity())
+    } elseif (GpuData["midiKeyH",string]=="dialog") {
+        if (Key=="left" | Key=="right" | Key=="tab" | Key=="up" | Key=="down") {
+            local Index = DialogData[-5,number]
+            local OrigIndex = Index
+            
+            local Max = 6 
+            local Ind = Index
+            
+            if (Key=="up" | Key=="down") {
+                if (Key=="down") {
+                    Index += 3
+                    if (Index > Max) { Index -= Max }
+                } else {
+                    Index -= 3
+                    if (Index < 1) { Index += Max }
+                }
+            } else {            
+                if (Key!="left") {
+                    Index = (Index==Max ? 1 : Index+1)
+                } else {
+                    Index = (Index==1 ? Max : Index-1)
+                }
+            }
+            DialogData[-5,number] = Index
+            local CurID = DialogData[-4,table][Index,number]     
+            local PrevID = DialogData[-4,table][Ind,number]  
+            
+            local Color = vec4(168,168,168,255)
+            if (OrigIndex>3) {
+                local MidiPlayer = GpuData["midiPlayer",wirelink]
+                local MidiPlayMode = MidiPlayer["MidiPlayMode",string]            
+                local Txt = DialogData["Text"+OrigIndex,string]
+                
+                if (MidiPlayMode==Txt:lower()) {
+                    Color = vec4(0,168,168,255)
+                }
+            }
+            
+            EGP:egpColor(PrevID,Color)
+            EGP:egpColor(CurID,0,168,0,255)
+        } elseif (Key=="enter") {
+            local Index = DialogData[-5,number]
+            
+            if (Index==1) {
+                alxos_midi_key("play")
+            } elseif (Index==2) {
+                alxos_midi_key("repeat")
+            } elseif (Index==4) {
+                alxos_midi_setmode("synth",Index)
+            } elseif (Index==5) {
+                alxos_midi_setmode("instrumental",Index)
+            } elseif (Index==6) {
+                alxos_midi_setmode("addon",Index)
+            } else {
+                alxos_midi_key("stop")  
+            }
+        }
+    }
+}
+
+

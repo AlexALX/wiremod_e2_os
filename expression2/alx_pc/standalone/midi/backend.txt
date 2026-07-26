@@ -1,0 +1,80 @@
+#include "alx_pc/standalone/midi/_shared_"
+
+function number midiBackendVoiceCount() {
+    return CurrentBackend["voiceCount",number]    
+}
+
+function midiBackendInit() {
+    Midi["voiceCount",number] = midiBackendVoiceCount()
+    
+    CurrentBackend["Init",function]()
+    
+    for (I = 0, Midi["voiceCount",number]) {
+        if (Midi["channelInit",table][I,number]==0) {
+            Midi["channelProgram",table][I,number] = 0
+            Midi["channelVolume",table][I,number] = 100
+            Midi["channelPan",table][I,number] = 64
+            Midi["channelExpression",table][I,number] = 127
+            Midi["channelPitch",table][I,number] = 0
+            Midi["channelSustain",table][I,number] = 0
+            Midi["channelInit",table][I,number] = 1
+        }
+        if (Midi["voices",table][I,table]:count()==0) {
+            Midi["voices",table][I,table] = table()
+        }
+    }
+}
+
+function midiBackendSet(Backend:table) {
+    CurrentBackend = Backend
+    if (CurrentState!="") {
+        midiBackendInit()
+    }
+}
+
+function number midiBackendCheck() {
+    return CurrentBackend["Check",function]()[number]
+}
+
+
+function midiBackendPlay() {
+    CurrentBackend["Play",function]()
+}
+
+function midiBackendStop() {
+    if (CurrentBackend["Stop",function]) {
+        CurrentBackend["Stop",function]()
+    }
+}
+
+function midiBackendPause() {
+    CurrentBackend["Pause",function]()
+}
+
+function midiBackendTickStart() {
+    CurrentBackend["TickStart",function]() 
+}
+
+function midiBackendTickEnd() {
+    CurrentBackend["TickEnd",function]() 
+}
+
+function midiBackendVoiceOn(Voice:number) {
+    CurrentBackend["VoiceOn",function](Voice)
+}
+
+function midiBackendVoiceOff(Voice:number) {
+    CurrentBackend["VoiceOff",function](Voice)
+}
+
+function midiBackendVoiceVolume(Voice:number) {
+    CurrentBackend["VoiceVolume",function](Voice)
+}
+
+function midiBackendVoicePan(Voice:number) {
+    CurrentBackend["VoicePan",function](Voice)
+}
+
+function midiBackendVoiceExpression(Voice:number) {
+    CurrentBackend["VoiceExpression",function](Voice)
+}

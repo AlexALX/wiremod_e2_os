@@ -1,0 +1,72 @@
+@inputs ZSPU:wirelink
+#include "alx_pc/standalone/midi/_shared_"
+
+#[
+    This was never fihished because of ZSPU issues
+]#
+
+function table midiBackendZSPU() {
+    local Backend = table()
+    
+    Backend["Check",function] = function() {
+        if (!->ZSPU) {
+            print(_HUD_PRINTTALK,"ZSPU is not connected.") 
+            return 0
+        }
+        if (ZSPU:entity():type()!="gmod_wire_spu") {
+            print(_HUD_PRINTTALK,"Entity what you did connected is not ZSPU.\n"+
+            "It is located in Wire -> Chip, Gates -> SPU.") 
+            return 1    
+        }
+        return 1  
+    }
+    
+    Backend["TickStart",function] = function() {
+        Midi["zspuWrite",number] = 1
+    }
+    
+    Backend["TickEnd",function] = function() {
+        ZSPU[0] = (Midi["zspuWrite",number] - 1) / 4        
+    }
+        
+    Backend["VoiceOn",function] = function(Voice:number)
+    {
+        local V = Midi["voices",table][Voice,table]
+    
+        local Index = Midi["zspuWrite",number]
+    
+        ZSPU[Index + 0] = 1
+        ZSPU[Index + 1] = Voice
+        ZSPU[Index + 2] = V["program",number]
+        ZSPU[Index + 3] = V["note",number]
+        ZSPU[Index + 4] = V["velocity",number]
+        ZSPU[Index + 5] = V["volume",number]
+        ZSPU[Index + 6] = V["pan",number]
+        ZSPU[Index + 7] = V["expression",number]
+    
+        local NextIndex = Index + 8
+        if (NextIndex > 120) {
+            NextIndex = 1
+        }
+    
+        Midi["zspuWrite",number] = NextIndex
+    
+        ZSPU[0] = ZSPU[0] + 1
+    }
+    
+    Backend["VoiceOff",function] = function(Voice:number)
+    {
+        local Index = Midi["zspuWrite",number]
+    
+        ZSPU[Index + 0] = 2
+        ZSPU[Index + 1] = Voice
+    
+        local NextIndex = Index + 2
+        if (NextIndex > 126) { NextIndex = 1 } # 127 - 1    Voice
+        Midi["zspuWrite", number] = NextIndex
+    
+        ZSPU[0] = ZSPU[0] + 1
+    }
+    
+    return Backend
+}

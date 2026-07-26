@@ -67,3 +67,9 @@ function alxos_network_chat(Args:table) {
     #include "alx_pc/gpu/alxos/nwchat"
     alxos_nwchat_init(Args)
 }
+
+ALXOS_PROGS["alxos_midi_player",number] = 1
+function alxos_midi_player(Args:table) {
+    #include "alx_pc/gpu/alxos/midi"
+    alxos_midi_init(Args)
+}

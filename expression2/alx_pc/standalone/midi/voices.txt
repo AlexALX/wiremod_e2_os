@@ -1,0 +1,192 @@
+#include "alx_pc/standalone/midi/_shared_"
+#include "alx_pc/standalone/midi/backend"
+
+function midiVoiceFree(Voice:number)
+{
+    local V = Midi["voices",table][Voice,table]
+
+    V["active",number] = 0
+    V["channel",number] = 0
+    V["note",number] = 0
+    V["velocity",number] = 0
+    V["program",number] = 0
+
+    V["volume",number] = 0
+    V["pan",number] = 0
+    V["expression",number] = 0
+    V["sustain",number] = 0
+    
+    midiBackendVoiceOff(Voice)
+}
+
+function midiVoiceFreeAll() {
+    for (Voice = 0, Midi["voiceCount",number] - 1) {
+        midiVoiceFree(Voice)
+    }
+}
+
+function number midiVoiceAlloc()
+{
+    local Voices = Midi["voices",table]
+
+    #
+    for (Voice = 0, Midi["voiceCount",number] - 1) {
+
+        if (!Voices[Voice,table]["active",number]) {
+            return Voice
+        }
+    }
+
+    # Round Robin
+    local Voice = Midi["voiceNext",number]
+
+    if (Voices[Voice,table]["active",number]) {
+        midiVoiceFree(Voice)
+    }
+
+    Midi["voiceNext",number] =
+        (Voice + 1) % Midi["voiceCount",number]
+
+    return Voice
+}
+
+function midiVoiceNoteOn(
+    Channel:number,
+    Note:number,
+    Velocity:number
+)
+{    
+    local VoiceId = midiVoiceAlloc()
+
+    local Voice = Midi["voices",table][VoiceId,table]
+
+    Voice["active",number] = 1
+
+    Voice["channel",number] = Channel
+    Voice["note",number] = Note
+    Voice["velocity",number] = Velocity
+
+    Voice["program",number] =
+        Midi["channelProgram",table][Channel,number]
+
+    Voice["volume",number] =
+        Midi["channelVolume",table][Channel,number]
+
+    Voice["pan",number] =
+        Midi["channelPan",table][Channel,number]
+
+    Voice["expression",number] =
+        Midi["channelExpression",table][Channel,number]
+
+    Voice["sustain",number] =
+        Midi["channelSustain",table][Channel,number]
+
+
+    midiBackendVoiceOn(VoiceId)
+}
+
+function midiVoiceNoteOff(
+    Channel:number,
+    Note:number
+)
+{
+    for (VoiceId = 0, Midi["voiceCount",number] - 1) {
+
+        local Voice = Midi["voices",table][VoiceId,table]
+
+        if (
+            Voice["active",number] &
+            Voice["channel",number] == Channel &
+            Voice["note",number] == Note
+        ) {
+
+            midiVoiceFree(VoiceId)
+
+            break
+        }
+    }
+}
+
+function midiVoiceProgram(
+    Channel:number,
+    Program:number
+)
+{
+    Midi["channelProgram",table][Channel,number] = Program
+}
+
+function midiVoiceControl(
+    Channel:number,
+    Controller:number,
+    Value:number
+)
+{
+    switch (Controller) {
+
+        case 7,
+
+            Midi["channelVolume",table][Channel,number] = Value
+
+            for (VoiceId = 0, Midi["voiceCount",number] - 1) {
+
+                if (
+                    Midi["voices",table][VoiceId,table]["active",number] &
+                    Midi["voices",table][VoiceId,table]["channel",number] == Channel
+                ) {
+
+                    Midi["voices",table][VoiceId,table]["volume",number] = Value
+
+                    midiBackendVoiceVolume(VoiceId)
+                }
+            }
+
+            break
+
+
+        case 10,
+
+            Midi["channelPan",table][Channel,number] = Value
+
+            for (VoiceId = 0, Midi["voiceCount",number] - 1) {
+
+                if (
+                    Midi["voices",table][VoiceId,table]["active",number] &
+                    Midi["voices",table][VoiceId,table]["channel",number] == Channel
+                ) {
+
+                    Midi["voices",table][VoiceId,table]["pan",number] = Value
+
+                    midiBackendVoicePan(VoiceId)
+                }
+            }
+
+            break
+
+
+        case 11,
+
+            Midi["channelExpression",table][Channel,number] = Value
+
+            for (VoiceId = 0, Midi["voiceCount",number] - 1) {
+
+                if (
+                    Midi["voices",table][VoiceId,table]["active",number] &
+                    Midi["voices",table][VoiceId,table]["channel",number] == Channel
+                ) {
+
+                    Midi["voices",table][VoiceId,table]["expression",number] = Value
+
+                    midiBackendVoiceExpression(VoiceId)
+                }
+            }
+
+            break
+
+
+        case 64,
+
+            Midi["channelSustain",table][Channel,number] = Value
+
+            break
+    }
+}

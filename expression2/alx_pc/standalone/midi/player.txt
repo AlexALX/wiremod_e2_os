@@ -1,0 +1,181 @@
+#include "alx_pc/standalone/midi/_shared_"
+#include "alx_pc/standalone/midi/voices"
+
+function midiPlay()
+{
+    Midi["playing",number] = 1
+
+    Midi["playIndex",number] = 0
+
+    Midi["currentTick",number] = 0
+    Midi["currentTempo",number] = 500000
+
+    Midi["tickAccumulator",number] = 0
+
+    Midi["lastTime",number] = curtime()
+    Midi["startTime",number] = curtime()
+    
+    Midi["state",string] = "play"
+    
+    # Clear RAM
+    Midi["body",string] = ""
+    
+    Processing = 1
+    
+    midiVoiceFreeAll()
+    midiBackendPlay()
+}
+
+function midiPause()
+{
+    if (Midi["state",string]=="play") {
+        Midi["playing",number] = 0
+        Midi["state",string] = "pause"
+        Midi["pauseStart",number] = curtime()
+        midiBackendPause()
+        midiVoiceFreeAll()
+    } elseif (Midi["state",string]=="pause") {
+        Midi["playing",number] = 1
+        Midi["state",string] = "play"
+        Midi["startTime",number] = Midi["startTime",number] + (curtime() - Midi["pauseStart",number])
+        Midi["lastTime",number] = curtime()
+    } elseif (Midi["state",string]=="done") {
+        midiPlay()
+    }
+}
+
+function midiRepeat() {
+    midiBackendPause()
+    midiPlay()
+}
+
+function midiFinish()
+{
+    if (!MidiNoPrint) {
+        print("MIDI finished")
+    }
+
+    Midi["playing",number] = 0
+    Midi["state",string] = "done"
+    Processing = 0
+    midiBackendStop()
+}
+
+function midiProcessEvent(Event:table)
+{    
+    switch (Event["type",string]) {
+
+        case "NOTE_ON",
+
+            midiVoiceNoteOn(
+                Event["channel",number],
+                Event["note",number],
+                Event["velocity",number]
+            )
+            break
+        case "NOTE_OFF",
+
+            midiVoiceNoteOff(
+                Event["channel",number],
+                Event["note",number]
+            )
+            break
+        case "PROGRAM",
+
+            midiVoiceProgram(
+                Event["channel",number],
+                Event["program",number]
+            )
+            break
+        case "CONTROL",
+
+            midiVoiceControl(
+                Event["channel",number],
+                Event["controller",number],
+                Event["value",number]
+            )
+            break
+        case "META",
+
+            if (Event["metaType",number] == 0x51) {
+
+                Midi["currentTempo",number] =
+                    Event["tempo",number]
+            }
+            break
+    }
+}
+
+function number midiUpdateStep()
+{
+    if (!Midi["playing",number]) {
+        return 0
+    }
+    
+    midiBackendTickStart()
+
+    local Now = curtime()
+    local DeltaTime = Now - Midi["lastTime",number]
+    Midi["lastTime",number] = Now
+
+    local DeltaTicks =
+        DeltaTime *
+        1000000 *
+        Midi["division",number] /
+        Midi["currentTempo",number]
+
+    Midi["tickAccumulator",number] =
+        Midi["tickAccumulator",number] +
+        DeltaTicks
+
+    local WholeTicks = floor(
+        Midi["tickAccumulator",number]
+    )
+
+    Midi["tickAccumulator",number] =
+        Midi["tickAccumulator",number] -
+        WholeTicks
+
+    Midi["currentTick",number] =
+        Midi["currentTick",number] +
+        WholeTicks
+
+    while (
+        Midi["playIndex",number] <
+        Midi["eventCount",number]
+    ) {
+
+        local Event =
+            Midi["events",table][
+                Midi["playIndex",number],
+                table
+            ]
+
+        if (
+            Event["tick",number] >
+            Midi["currentTick",number]
+        ) {
+            break
+        }
+
+        midiProcessEvent(Event)
+
+        Midi["playIndex",number] =
+            Midi["playIndex",number] + 1
+    }
+
+    if (
+        Midi["playIndex",number] >=
+        Midi["eventCount",number]
+    ) {
+
+        midiFinish()
+        return 0
+    }
+    
+    midiBackendTickEnd()
+
+    return 1
+}
+
+

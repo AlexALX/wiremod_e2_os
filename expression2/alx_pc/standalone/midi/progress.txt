@@ -1,0 +1,138 @@
+#include "alx_pc/standalone/midi/_shared_"
+
+function midiProgress(Task:string, Current:number, Max:number)
+{
+    CurrentState = Midi["state",string]
+    
+    Progress["progressTask",string] = Task
+    Progress["progressCurrent",number] = Current
+    Progress["progressMax",number] = Max
+    
+    local Percent = 0
+    
+    ProgressText = Progress["progressTask",string]
+    
+    if (Max > 0) {
+        Percent = floor(Current * 100 / Max)
+        
+        if (Progress["maxTime",string]!="") {
+    
+            ProgressText += 
+                " - " +
+                Progress["curTime",string] +
+                "/" +
+                Progress["maxTime",string] +
+                " ("+Percent + "%)"
+                
+        } else {
+            
+            ProgressText += 
+                " - " +
+                Progress["progressCurrent",number] +
+                "/" +
+                Progress["progressMax",number] +
+                " ("+Percent + "%)"
+            
+        }
+    }
+    
+    Progress["progressPercent",number] = Percent
+    
+    Progress["step",number]
+}
+
+function string midiFormatTime(Seconds:number)
+{
+    local Total = floor(Seconds)
+
+    local Minutes = floor(Total / 60)
+    local Secs = Total % 60
+
+    return
+        (Minutes < 10 ? "0" : "") + toString(Minutes) + ":" +
+        (Secs < 10 ? "0" : "") + toString(Secs)
+}
+
+function midiUpdateProgress()
+{
+    CurrentState = Midi["state",string]
+
+    switch (CurrentState) {
+
+        case "tracks",
+            #Progress["step",number] = 1
+
+            #[midiProgress(
+                "Reading tracks",
+                Midi["trackCurrent",number],
+                Midi["trackCount",number]
+            )]#
+            break
+
+        case "events",
+            Progress["step",number] = 1
+
+            Current =
+                Midi["offset",number] -
+                Midi["trackStart",number]
+            
+            Total =
+                Midi["trackEnd",number] -
+                Midi["trackStart",number]
+
+            midiProgress(
+                "Reading events in Track " + (Midi["trackCurrent",number]+1) + "/"+ Midi["tracks",number],
+                Current,
+                Total
+            )
+            break
+
+        case "sort",
+            Progress["step",number] = 2
+
+            midiProgress(
+                "Sorting events",
+                Midi["mergeIndex",number],
+                Midi["eventCount",number]
+            )
+            break
+        case "time",
+            Progress["step",number] = 3
+
+            midiProgress(
+                "Calculate time",
+                Midi["timeIndex",number],
+                Midi["eventCount",number]
+            )
+            break
+
+
+        case "play",
+        case "pause",
+            Progress["step",number] = 4
+            
+            if (CurrentState != "pause") {
+                Progress["curTime",string] = midiFormatTime(curtime() - Midi["startTime",number])
+                Progress["maxTime",string] = midiFormatTime(Midi["maxSeconds",number])
+            }
+
+            midiProgress(
+                (CurrentState=="pause" ? "Paused" : "Playing"),
+                Midi["currentTick",number],
+                Midi["maxTick",number]
+            )
+            break
+
+        case "done",
+            Progress["step",number] = 5
+            Processing = 0
+
+            midiProgress("Done",0,0)
+            break
+
+        case "error",
+            Processing = 0
+            break
+    }
+}
+

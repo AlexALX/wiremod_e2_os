@@ -1,0 +1,111 @@
+#include "alx_pc/standalone/midi/reader"
+
+function string midiChunkName(Id:string)
+{
+    switch (Id) {
+        case "MThd",
+            return "HEADER"
+
+        case "MTrk",
+            return "TRACK"
+
+        default,
+            return "UNKNOWN (" + Id + ")"
+    }
+}
+
+function number midiSkipChunk()
+{
+    return midiSkip(Midi["chunkLength", number])
+}
+
+function number midiParseHeader()
+{
+    if (midiReadString(4) != "MThd") {
+        return 0
+    }
+
+    local Length = midiReadU32BE()
+
+    if (Length != 6) {
+        return 0
+    }
+
+    Midi["format", number] = midiReadU16BE()
+    Midi["tracks", number] = midiReadU16BE()
+    Midi["division", number] = midiReadU16BE()
+
+    return 1
+}
+
+function number midiReadChunk()
+{
+    if (midiRemaining() < 8) {
+        return 0
+    }
+
+    Midi["chunkId", string] = midiReadString(4)
+    Midi["chunkLength", number] = midiReadU32BE()
+
+    if (Midi["chunkLength", number] < 0) {
+        return 0
+    }
+
+    Midi["chunkStart", number] = midiTell()
+    Midi["chunkEnd", number] = Midi["chunkStart", number] + Midi["chunkLength", number] - 1
+
+    if (Midi["chunkEnd", number] > Midi["length", number]) {
+        return 0
+    }
+
+    return 1
+}
+
+function number midiParseTracksStep()
+{
+    if (Midi["trackCurrent", number] >= Midi["tracks", number]) {
+        Midi["state", string] = "sort"
+        return 1
+    }
+
+
+    if (!midiReadChunk()) {
+        Midi["state", string] = "error"
+        return 1
+    }
+
+
+    if (Midi["chunkId", string] != "MTrk") {
+
+        midiSkipChunk()
+        return 0
+    }
+
+    if (MidiDebug) {
+        print(
+            "Track " +
+            Midi["trackCurrent", number] +
+            " size=" +
+            Midi["chunkLength", number]
+        )
+    }
+
+    #   
+    Midi["trackStart", number] = Midi["offset", number]
+
+    #   
+    Midi["trackEnd",number] = Midi["trackStart",number] + Midi["chunkLength",number]
+
+    Midi["trackEvents",table][Midi["trackCurrent", number],table] = table()
+    Midi["trackEventsCount",table][Midi["trackCurrent", number],number] = 0
+
+    #  event parser
+    Midi["tick", number] = 0
+    Midi["runningStatus", number] = 0
+
+
+    Midi["state", string] = "events"
+
+
+    return 1
+}

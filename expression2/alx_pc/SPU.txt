@@ -32,6 +32,7 @@ Speaker = getentity(SpeakerSocketD)
  
 function shutdown() {
     if (!Init) { return }
+    
     if (ShutHandler!="") {
         ShutHandler()   
         ShutHandler = ""
@@ -44,6 +45,8 @@ function shutdown() {
     #ifdef soundPurge()
     soundPurge()
     #endif
+    
+    dsSendDirect("SHUTDOWN",Speaker,1)
 }
 
 function pci_init() {
@@ -57,6 +60,26 @@ function usb_init() {
     dsSendDirect("usbcontroller",USB_Device,table("spu",wirelink(),table()))
 }
 
+function findMidiPlayer(Step:number) {
+    if (Step==0) {
+        local Caller = dsGetSender()
+        
+        SpuData["midiCaller",entity] = Caller
+    
+        if (Speaker:type()=="gmod_wire_expression2") {
+            dsSendDirect("isMidiPlayer",Speaker,Caller)
+            SpuData["findMidiTimer",string] = timer(0.2,function() {
+                dsSendDirect("findMidiPlayer",Caller,0)     
+            })
+        } else {
+            dsSendDirect("findMidiPlayer",Caller,0)
+        }
+    } else {
+        stoptimer(SpuData["findMidiTimer",string])
+        dsSendDirect("findMidiPlayer",SpuData["midiCaller",entity],dsGetTable())
+    }
+}
+
 }
 
 if (dupefinished()) {
@@ -65,6 +88,10 @@ if (dupefinished()) {
 }
 
 if (~SpeakerSocketD) {
+    if (!SpeakerSocketD) {
+        dsSendDirect("SPEAKER_UNPLUG",Speaker,1)
+    }
+    
     Speaker = getentity(SpeakerSocketD)
     #ifdef soundPurge()
     soundPurge()
@@ -83,6 +110,7 @@ if (!BIOS:isValid()) { exit() }
 
 if (dsClk()) {
     local Name = dsClkName()
+    
     if (Name=="init") {
         local Info = dsGetTable()
         NB = Info[1,string]
@@ -110,6 +138,10 @@ if (dsClk()) {
         stopgmsound(Info[1,number],Info[2,number])
     } elseif (Name=="SHUTDOWN") {
         shutdown()
+    } elseif (Name=="findMidiPlayer") {
+        findMidiPlayer(0)
+    } elseif (Name=="isMidiPlayer") {
+        findMidiPlayer(1)
     } elseif (Name=="alxos_runprog") {
         local Info = dsGetTable()
         if (ALXOS_PROGS:exists(Info[1,string])) {

@@ -1,0 +1,131 @@
+@name Midi Player By AlexALX
+@inputs MidiSetPlayMode:string MidiPlayPause:number MidiStop:number MidiRepeat:number
+@strict
+
+#[
+    Midi Player
+    Created by AlexALX (c) 2026
+    -------------------
+    Midi Parser specifications:
+    - Support MIDI Type 0 and 1 (multiple tracks)
+    - Have 3 play modes with different sound set
+    - Due to gmod limitations it actually plays 9-10 channels only :(
+    - May not play all notes simultaneously :(
+    - Sound quality for complex midi pretty poor
+    
+    Usage:
+    - Spawn Midi Reader (this file)
+    - Create 16 any props (entities)
+    - Connect it to e2 via VoiceX inputs individually
+    
+    Chat commands:
+    !midi http://url_with_midi_file - open midi file from the web
+        Note: long url may be cut, use input LongURL instead for such case (via string value) 
+
+    !midifile filename.mid.txt - open midi file from a garrysmod/data/e2files/ folder, file extension must be renamed to .txt
+    !midiabort - abort playing
+    !midipause - pause or resume
+    !midirepeat - repeat midi from start
+    
+    !midimode mode - change playing mode, available modes: synth, instrumental, addon
+    
+    Modes works on any server: 
+        Synth - use default wiremod synth files
+        Instrumental - use additional wiremod files, adds piano, bass and few percussion instruments
+            
+    Special mode works only if installed on server/singleplayer:
+        Addon - use part of GeneralUser-gs collection included in ALX PC workshop addon
+    
+    Where to get midi files?
+    There is few sites in web, you can check for example https://vgmusic.com/
+]#
+
+#include "alx_pc/standalone/includes/basicreader"
+#include "alx_pc/standalone/midi/_init_"
+#include "alx_pc/standalone/midi/backends/e2"
+
+if (first() | duped()) {
+    local Mode = "addon"
+    
+    if (MidiSetPlayMode) {
+        Mode = MidiSetPlayMode
+    }
+    
+    # use synth mode not in singleplayer as default
+    if (!isSinglePlayer()) {
+        Mode = "synth"
+    }
+    
+    print("Midi Player ready, playing mode: "+Mode)    
+    midiBackendSet(midiBackendE2(Mode))
+    
+    Command = "!midi"
+
+    Funcs = table()
+    
+    Funcs["readerAbort", function] = function() {
+        print(_HUD_PRINTTALK,"MIDI playing canceled.")
+        midiAbort()
+    }
+    
+    Funcs["readerLoad", function] = function(Body:string, Size:number, Path:string) {
+        midiInit(Body)
+    }
+    
+    Funcs["readerCheck", function] = function() {
+        return midiBackendCheck()
+    } 
+    
+    Funcs["readerError", function] = function(Error:string, Path:string) {
+        print(_HUD_PRINTTALK, Error)
+    }
+}
+
+function midiSetMode(Mode:string) {
+    if (Mode=="instrumental") {
+        midiBackendSet(midiBackendE2("instrumental"))
+        print(_HUD_PRINTTALK,"MIDI playing mode changed to Instrumental.")
+    } elseif (Mode=="synth") {
+        midiBackendSet(midiBackendE2("synth"))
+        print(_HUD_PRINTTALK,"MIDI playing mode changed to Synth.")
+    } elseif (Mode=="addon") {
+        midiBackendSet(midiBackendE2("addon"))
+        print(_HUD_PRINTTALK,"MIDI playing mode changed to Addon.\nNote: this mode works only if ALX PC addon installed on server")
+    } else {
+        print(_HUD_PRINTTALK,"Invalid MIDI playing mode.\nAvailable modes: synth, instrumental, addon.")
+    }    
+}
+
+event chat(Player:entity, Said:string, Team:number) {
+    if (!Command) { exit() }
+    
+    if (Player==owner()) { 
+        
+        local Find = Said:lower():find(" ")
+        
+        if (Find) {
+            local Cmd = Said:left(Find-1)
+            local Mode = Said:sub(Find+1)
+
+            if (Cmd==Command+"mode") { 
+                midiSetMode(Mode:lower())
+            }
+        } elseif (Said==Command+"pause") {
+            midiPause()        
+        } elseif (Said==Command+"repeat") {
+            midiRepeat()    
+        }
+    }
+}
+
+event input(Name:string) {
+    if (Name=="MidiSetPlayMode" & MidiSetPlayMode) {
+        midiSetMode(MidiSetPlayMode:lower()) 
+    } elseif (Name=="MidiPlayPause" & MidiPlayPause) {
+        midiPause()   
+    } elseif (Name=="MidiRepeat" & MidiRepeat) {
+        midiRepeat()   
+    } elseif (Name=="MidiStop" & MidiStop) {
+        midiAbort()   
+    }
+}

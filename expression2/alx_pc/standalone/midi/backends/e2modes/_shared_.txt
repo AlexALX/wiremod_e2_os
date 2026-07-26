@@ -1,0 +1,56 @@
+function table midiSamples(Base:string, DefRootNote:number, Freqs:array)
+{
+    local Samples = table()
+    
+    if (Freqs:count() == 0) {
+        
+        local Sample = table()
+
+        Sample["sample",string] = Base + ".wav"
+        Sample["rootNote",number] = DefRootNote
+    
+        Samples[0,table] = Sample
+    
+        return Samples
+    }
+
+    for (I = 0, Freqs:count() - 1) {
+
+        local Freq = Freqs[I,number]
+
+        local Sample = table()
+
+        Sample["sample",string] =
+            Base + "_" + toString(Freq) + ".wav"
+
+        Sample["rootNote",number] =
+            round(69 + 12 * log2(Freq / 440))
+
+        Samples[I,table] = Sample
+    }
+
+    return Samples
+}
+
+function table midiSelectSample(Instrument:table, Program:number, Note:number)
+{
+    local Samples = Instrument["samples",table]
+
+    local Best = Samples[0,table]
+    local BestDist = abs(Note - Best["rootNote",number])
+
+    for (I = 1, Samples:count() - 1) {
+
+        local Sample = Samples[I,table]
+        local Dist = abs(Note - Sample["rootNote",number])
+
+        if (Dist < BestDist) {
+            Best = Sample
+            BestDist = Dist
+
+            if (!Dist) { break }
+        }
+    }
+
+    return Best
+}
