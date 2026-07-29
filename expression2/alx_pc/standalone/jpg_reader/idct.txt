@@ -1,4 +1,4 @@
-@persist JpgIDCT:table
+@persist JpgIDCT:table IDCT_Cos:array
 
 #include "alx_pc/standalone/jpg_reader/_shared_"
 
@@ -12,6 +12,14 @@ if (first() | duped()) {
     JpgIDCT["C5",number] = cosr(5 * _PI / 16)
     JpgIDCT["C6",number] = cosr(6 * _PI / 16)
     JpgIDCT["C7",number] = cosr(7 * _PI / 16)
+    
+    for (X = 0, 7) {
+        for (U = 0, 7) {
+            local Index = X * 8 + U + 1
+            IDCT_Cos[Index, number] = cosr((2 * X + 1) * U * _PI / 16)
+        }
+    }
+    
 }
 
 function table jpgIDCT1D(Input:table)
@@ -30,10 +38,8 @@ function table jpgIDCT1D(Input:table)
                 C = sqrt(0.5)
             }
 
-            Sum = Sum
-                + C
-                * Input[U,number]
-                * cosr((2 * X + 1) * U * _PI / 16)
+            local CosVal = IDCT_Cos[X * 8 + U + 1, number]
+            Sum = Sum + C * Input[U,number] * CosVal
         }
 
         Output[X,number] = Sum / 2
@@ -57,6 +63,28 @@ function number jpgIDCTStep(Block:table)
         State["index",number] = 0
 
         State["temp",table] = table()
+        
+        # optimize
+        local IsSolidColor = 1
+        
+        for (I = 1, 63) { 
+            if (Block[I,number] != 0) {
+                IsSolidColor = 0
+                break
+            }
+        }
+        
+        if (IsSolidColor) {    
+            local DCValue = floor(Block[0,number] / 8) + 128
+            DCValue = clamp(DCValue, 0, 255)
+
+            for (I = 0, 63) {
+                Block[I,number] = DCValue
+            }
+
+            return 1
+        }
+        
     }
 
     local Temp = State["temp",table]

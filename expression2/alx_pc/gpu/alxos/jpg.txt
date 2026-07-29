@@ -32,22 +32,127 @@ function alxos_jpg_init(Args:table) {
         "alxos_explorer_error"("JPG Accelerator not found, please insert PCI card and reboot.",490)
         return
     }
-
+    
+    KeyHandler = "alxos_jpg_key"
+    
     local FInfo = Args[1,table]
     local ExplorerFS = Args[2,table]
+    
+    GpuData[1,table] = ExplorerFS
+    GpuData[2,table] = FInfo
+    GpuData[5,number] = 0
+    
+    local Width = 450
+    local Height = 155
+    
+    local Parent = "alxos_explorer_dialog"("JPG Mode",Width,Height,"","alxos_jpg_close")[number]
+    
+    DialogData[7,number] = LAST_I
+    DialogData[-10,table]:pushNumber(LAST_I)
+    
+    Txt = "Please choose JPG Draw Mode:\n\n"+
+    "Normal - no preview, fastest render\n"+
+    "Preview - first AC scan preview\n"+
+    "Full Preview - every scan rerender (slow)\n"+
+    "Note: this mode works only for progressive images"
+      
+    EGP:egpTextLayout(LAST_I,Txt,vec2(22,18),vec2(Width-40,120))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    local Entries = table()
+    
+    local EntID = DialogData[-10,table]
+    
+    local JpgMode = GpuPersistData["jpgMode",number]
+    
+    Entries[1,number] = LAST_I
+    EntID:pushNumber(LAST_I)   
+    
+    local Sz = 65
+    local Txt = "Normal"
+    
+    local CenterX = (Width / 3) * 0.8
+    
+    local Col = vec4(168,168,168,255)
+    if (JpgMode==0) {
+        Col = vec4(0,168,0,255)  
+    }
+    
+    EGP:egpBox(LAST_I,vec2(CenterX - Sz/2,Height-22),vec2(Sz,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,Col) LAST_I++
+    
+    EntID:pushNumber(LAST_I)        
+    EGP:egpText(LAST_I,Txt,EGP:egpPos(LAST_I-1)+vec2(5,0))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    Entries[2,number] = LAST_I
+    EntID:pushNumber(LAST_I)  
+    
+    local Sz = 70
+    local Txt = "Preview"
+    
+    local CenterX = (Width / 3) * 1.5
+    
+    local Col = vec4(168,168,168,255)
+    if (JpgMode==1) {
+        Col = vec4(0,168,0,255)      
+    }
+    
+    EGP:egpBox(LAST_I,vec2(CenterX - Sz/2,Height-22),vec2(Sz,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,Col) LAST_I++
+    
+    EntID:pushNumber(LAST_I)        
+    EGP:egpText(LAST_I,Txt,EGP:egpPos(LAST_I-1)+vec2(5,0))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    Entries[3,number] = LAST_I
+    EntID:pushNumber(LAST_I)  
+    local Sz = 103
+    local Txt = "Full Preview"
+    
+    local CenterX = (Width / 3) * 2.3
+    
+    local Col = vec4(168,168,168,255)
+    if (JpgMode==2) {
+        Col = vec4(0,168,0,255)  
+    }
+    
+    EGP:egpBox(LAST_I,vec2(CenterX - Sz/2,Height-22),vec2(Sz,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,Col) LAST_I++
+    
+    EntID:pushNumber(LAST_I)        
+    EGP:egpText(LAST_I,Txt,EGP:egpPos(LAST_I-1)+vec2(5,0))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+
+    DialogData[-5,number] = JpgMode+1
+    DialogData[-4,table] = Entries
+
+}
+
+function alxos_jpg_postinit() {
+
     DsHandler = "alxos_jpg_ds"
 
     ExplorerCurTask = "jpg"
+    
+    local ExplorerFS = GpuData[1,table]
+    local FInfo = GpuData[2,table]
 
     dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(
         ExplorerFS,FInfo,0,FInfo["size",number]
     )))     
 
     local Parent = "alxos_explorer_dialog"("Opening file",400,80,"progress","alxos_jpg_clear")[number]
-    
-    GpuData[1,table] = ExplorerFS
-    GpuData[2,table] = FInfo
-    GpuData[5,number] = 0
 
     DialogData[-10,table]:pushNumber(LAST_I)
     EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
@@ -114,6 +219,12 @@ function number alxos_jpg_clear() {
     return 0
 }
 
+function number alxos_jpg_close() {
+    "alxos_explorer_handlers"()
+    "alxos_explorer_listcurdir"()
+    return 0
+}
+
 function number alxos_jpg_finish(Err:string) {
     local Height = 60
     local Pos = vec2(220,18)
@@ -173,7 +284,7 @@ function alxos_jpg_draw(Data:string) {
     GpuData["jpgAccelerator",array] = JPGAccelerator
     
     dsSendDirect("drawJpg",JPGAccelerator[3,entity],table(
-        DS, Data, entity(), TickQuota
+        DS, entity(), TickQuota, Data, GpuPersistData["jpgMode",number]
     ))
 
     local Width = 400
@@ -185,7 +296,7 @@ function alxos_jpg_draw(Data:string) {
     local Parent = "alxos_explorer_dialog"("Reading JPG",Width,Height,"progress","alxos_jpg_clear")[number]
 
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Current Step: 0 / 10",alxos_dlgPos(-180,-42))
+    EGP:egpText(LAST_I,"Current Step: 0 / 0",alxos_dlgPos(-180,-42))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
 
@@ -236,12 +347,12 @@ function alxos_jpg_progress(Info:table) {
     
     local TW = DialogData[3,number]
         
-    EGP:egpSetText(TW-2, "Current Step: "+Progress["step",number] + " / 10")
+    EGP:egpSetText(TW-2, "Current Step: "+Progress["step",number] + " / "+Progress["stepTotal",number])
     
     local PercID = DialogData[5,number]
     local BoxID = DialogData[4,number]
     local BoxW = DialogData[-6,number]
-    local CalcP = round(Progress["step",number] * 100 / 10)
+    local CalcP = round(Progress["step",number] * 100 / Progress["stepTotal",number])
     
     BoxW = ceil(BoxW/100*CalcP)
     if (BoxW<1) { BoxW = 1 }
@@ -289,10 +400,47 @@ function alxos_jpg_ds(Name:string) {
     }
 }
 
-function alxos_jpg_key(Key:string,Pressed) {
-    if (!Pressed) { return }
-    if (Key=="f8") {
+function number alxos_jpg_key(Key:string,Pressed) {
+    if (!Pressed) { return 0 }
+    
+    local Index = DialogData[-5,number]
+    local Type = DialogData[-2,string]
+    
+    if (Key=="left" | Key=="right" | Key=="tab") {
+        local Max = 3
+        local Ind = Index
+        if (Key!="left") {
+            Index = (Index==Max ? 1 : Index+1)
+        } else {
+            Index = (Index==1 ? Max : Index-1)
+        }
+        DialogData[-5,number] = Index
+        local CurID = DialogData[-4,table][Index,number]     
+        local PrevID = DialogData[-4,table][Ind,number]  
+        EGP:egpColor(PrevID,168,168,168,255)
+        EGP:egpColor(CurID,0,168,0,255)
+        return 1
+    } elseif (Key=="f8") {
         stoptimer("cmd")
         dsSendDirect("clear",GpuData[1,table]["hdd_io",wirelink]:entity(),entity())
+    
+        local JPGAccelerator = alxos_jpg_findAccelerator()
+        dsSendDirect("SHUTDOWN",JPGAccelerator[3,entity],0)  
+        
+        alxos_jpg_close()
+    } elseif (Key=="enter") {
+        local Index = DialogData[-5,number]
+        
+        if (Index==1) {
+            GpuPersistData["jpgMode",number] = 0
+        } elseif (Index==2) {
+            GpuPersistData["jpgMode",number] = 1
+        } elseif (Index==3) {
+            GpuPersistData["jpgMode",number] = 2
+        }
+        "alxos_explorer_closedialog"()
+        alxos_jpg_postinit()
     }
+    
+    return 0
 }

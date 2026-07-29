@@ -1,23 +1,27 @@
 @name JPG Reader Main Chip
 
 #include "alx_pc/standalone/jpg_reader/_shared_"
-#include "alx_pc/standalone/jpg_reader/jpg_parser"
-#include "alx_pc/standalone/jpg_reader/draw"
+#include "alx_pc/standalone/jpg_reader/parser"
 #include "alx_pc/standalone/jpg_reader/decoder"
+#include "alx_pc/standalone/jpg_reader/draw"
 #include "alx_pc/standalone/jpg_reader/progress"
 
-function jpgInit(Data:string)
+function jpgInit(Data:string, ProgressivePreview:number)
 {
     Processing = 0
     
     Jpg = table()
     
+    Jpg["progressivePreview",number] = ProgressivePreview
+    
     Jpg["data",string] = Data
     Jpg["size",number] = Data:length()
+    
     Jpg["pos",number] = 1
     Jpg["active",number] = 0
     
     Jpg["scanCount",number] = 0
+    Jpg["scanSavedCount",number] = 0
     Jpg["scanBytes",number] = 0
     Jpg["scans",table] = table()
     Jpg["state",string] = ""
@@ -30,8 +34,14 @@ function jpgInit(Data:string)
     Jpg["scanComponents",table] = table()
     Jpg["blocks",table] = table()
     Jpg["blockIndex",table] = table()
+    Jpg["coefficients",table] = table()
     
-    Jpg["mcuDecoded",number] = 0
+    Jpg["dirtyBlocks",table] = table()
+    
+    Jpg["progressiveBuild",table] = table()
+    
+    Jpg["decodedMCU",number] = 0
+    Jpg["scanMCU",number] = 0
     Jpg["mcuDecode",table] = table()
     
     Jpg["blockDecode",table] = table()
@@ -54,6 +64,8 @@ function jpgInit(Data:string)
     Jpg["draw",table] = table()
     
     Progress = table()
+    Progress["step",number] = 1
+    Progress["stepTotal",number] = 9
     
     Error = ""
     
@@ -79,78 +91,74 @@ function jpgInit(Data:string)
     }
 }
 
+# clear e2 memory
+function jpgClear() {
+    Jpg = table()    
+}
+
 event tick()
 {
-    if (Jpg["state",string] == "parse" | Jpg["state",string] == "parse_scan") {
-
-        jpgParse()
-
-    } elseif (Jpg["state",string] == "alloc_blocks") {
-
-        if (jpgAllocateBlocksStep()) {
-            afterAllocateBlocks()      
-        }
-
-    } elseif (Jpg["state",string] == "alloc_planes") {
-
-        if (jpgAllocatePlanesStep()) {
-            Jpg["state",string] = "alloc_pixels"
-        }
-
-    } elseif (Jpg["state",string] == "alloc_pixels") {
-
-        if (jpgAllocatePixelsStep()) {
-            Jpg["state",string] = "scan"
-        }
-
-    } elseif (Jpg["state",string] == "scan") {
-
-        if (jpgDecodeScan()) {
-            Jpg["state",string] = "assemble"
-        }
+    if (Jpg["state",string]=="" | Jpg["state",string]=="done" | Error) {
+        exit()
+    }
     
-    } elseif (Jpg["state",string] == "assemble") {
+    while(perf(90)) {
+        if (Jpg["state",string] == "parse" | Jpg["state",string] == "parse_scan") {
+            jpgParse()
+        } elseif (Jpg["state",string] == "alloc_blocks") {
     
-        if (jpgAssembleImageStep()) {
-            Jpg["state",string] = "fullplanes"
-        }
+            if (jpgAllocateBlocksStep()) {
+                afterAllocateBlocks()      
+            }
     
-    } elseif (Jpg["state",string] == "fullplanes") {
+        } elseif (Jpg["state",string] == "alloc_planes") {
     
-        if (jpgInitFullPlanes()) {
-            Jpg["state",string] = "rgb"
-        }
+            if (jpgAllocatePlanesStep()) {
+                Jpg["state",string] = "scan"
+            }
+    
+        } elseif (Jpg["state",string] == "scan") {
+            local Result = jpgDecodeScan()
+            if (Result!=0) {
+                jpgAfterDecodeScan(Result)    
+            }
+        } elseif (Jpg["state",string] == "progressive_build") {
+    
+            if (jpgProgressiveBuildBlocksStep()) {
+                Jpg["state",string] = "assemble"
+            }    
+        } elseif (Jpg["state",string] == "assemble") {
         
-    } elseif (Jpg["state",string] == "rgb") {
-
-        if (jpgYCbCrToRGBStep()) {
-            Jpg["state",string] = "draw"
-        }
-
-    } elseif (Jpg["state",string] == "draw") {
-
-        if (jpgDrawStep()) {
-            Jpg["state",string] = "done"
+            if (jpgAssembleImageStep()) {
+                Jpg["state",string] = "fullplanes"
+            }
+        
+        } elseif (Jpg["state",string] == "fullplanes") {
+        
+            if (jpgInitFullPlanes()) {
+                Jpg["state",string] = "draw"
+            }
             
-            Processing = 0            
-            jpgUpdateProgress()
-        }
-
+        } elseif (Jpg["state",string] == "draw") {
+    
+            if (jpgDrawStep()) {
+                if (Jpg["progressivePreview",number] & Jpg["marker",number] != 0xFFD9) {      
+                    Jpg["dirtyBlocks",table] = table()      
+                    Jpg["state",string] = "parse_scan"
+                } else {
+                    Jpg["state",string] = "done"
+                
+                    Processing = 0            
+                    jpgUpdateProgress()
+                    
+                    jpgClear()
+                }
+            }
+    
+        }        
     }
     
     if (Jpg["state",string] & Jpg["state",string]!="done") {
-        jpgUpdateProgress()
-    }
-}
-
-if (dsClk()) {
-    local DSName = dsClkName()    
-    if (DSName=="drawJpg") {
-        JPGNoPrint = 1    
-        jpgInit(dsGetString())    
-    } elseif (DSName=="abortJpg") {
-        Jpg["state",string] = ""
-        Processing = 0
         jpgUpdateProgress()
     }
 }

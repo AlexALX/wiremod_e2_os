@@ -1,5 +1,5 @@
 @persist Jpg:table
-#include "alx_pc/standalone/jpg_reader/jpg_parser"
+#include "alx_pc/standalone/jpg_reader/parser"
 
 if (first() | duped()) {
     Jpg = table()    

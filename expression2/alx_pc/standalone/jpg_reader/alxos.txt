@@ -1,0 +1,16 @@
+@name ALX OS JPG Reader
+
+#include "alx_pc/standalone/jpg_reader/_init_"
+
+if (dsClk()) {
+    local DSName = dsClkName()    
+    if (DSName=="drawJpg") {
+        JPGNoPrint = 1
+        local Info = dsGetTable()
+        jpgInit(Info[1,string],Info[2,number])    
+    } elseif (DSName=="abortJpg") {
+        Jpg["state",string] = ""
+        Processing = 0
+        jpgUpdateProgress()
+    }
+}

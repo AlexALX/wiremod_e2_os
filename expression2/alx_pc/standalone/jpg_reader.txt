@@ -1,4 +1,6 @@
 @name JPG Reader By AlexALX
+@inputs ProgressivePreview:number
+@persist PreviewMode:number
 @strict
 
 #[
@@ -7,9 +9,10 @@
     -------------------
     JPG Parser, specifications:
     - Max resolution is up to 512x512 (Digital Screen limitation)
-    - Support ONLY baseline JPG 
+    - Support Baseline and Progressive JPG
     - Support YUV 4:2:0 4:2:2 4:2:2v 4:4:4
     - Slow, no multithread
+    - Support progressive preview mode
     
     Usage:
     - Spawn one JPG Reader (this file)
@@ -17,9 +20,19 @@
     
     Chat commands:
     !jpg http://url_with_jpg_file - open jpg file from the web
-    !jpgfile filename.jpg - open jpg file from a garrysmod/data/e2files/ folder
-    !jpgabort - abort rendering
     Note: long url may be cut, use input LongURL instead for such case (via string value) 
+    
+    !jpgfile filename.jpg - open jpg file from a garrysmod/data/e2files/ folder
+    
+    !jpgabort - abort rendering
+    
+    !jpgmode - normal, preview, fullpreview
+
+    Modes:
+     normal - no preview, fastest render
+     preview - first AC scan preview
+     fullpreview - every scan rerender (slow)
+    Note: this mode works only for progressive images 
 ]#
 
 #include "alx_pc/standalone/includes/basicreader"
@@ -36,7 +49,7 @@ if (first() | duped()) {
     }
     
     Funcs["readerLoad", function] = function(Body:string, Size:number, Path:string) {
-        jpgInit(Body)
+        jpgInit(Body, PreviewMode)
     }
     
     Funcs["readerCheck", function] = function() {
@@ -55,4 +68,51 @@ if (first() | duped()) {
     Funcs["readerError", function] = function(Error:string, Path:string) {
         print(_HUD_PRINTTALK, Error)
     }
+    
+    PreviewMode = ProgressivePreview
+}
+
+event chat(Player:entity, Said:string, Team:number) {
+    if (!Command) { exit() }
+    
+    if (Player==owner()) { 
+        
+        local Find = Said:lower():find(" ")
+        
+        if (Find) {
+            local Cmd = Said:left(Find-1)
+            local Mode = Said:sub(Find+1):lower()
+
+            if (Cmd==Command+"mode") { 
+                if (Mode == "fullpreview") {
+                    PreviewMode = 2
+                    print(_HUD_PRINTTALK,
+                        "Jpg mode set to fullpreview\n"+
+                        "Every scan read will rerender image\n"+
+                        "This mode is very slow\n"+
+                        "Note: this mode works only for progressive images"
+                    ) 
+                } elseif (Mode == "preview") {
+                    PreviewMode = 1    
+                    print(_HUD_PRINTTALK,
+                        "Jpg mode set to preview\n"+
+                        "Image preview will display once after the 2nd scan\n"+
+                        "This mode balances speed and visualization\n"+
+                        "Note: this mode works only for progressive images"
+                    ) 
+                } else {
+                    PreviewMode = 0 
+                    print(_HUD_PRINTTALK,
+                        "Jpg mode set to normal\n"+
+                        "No preview will be displayed, rendering only the final image\n"+
+                        "This mode is fastest"
+                    ) 
+                }
+            }
+        }
+    }
+}
+
+if (~ProgressivePreview) {
+    PreviewMode = ProgressivePreview
 }

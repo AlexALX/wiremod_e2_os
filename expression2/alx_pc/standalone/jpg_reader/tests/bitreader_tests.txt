@@ -104,7 +104,7 @@ function test_readbyte_end()
         return
     }
 
-    if (!assertCase(Name, 4, Jpg["marker",number], 0xD9)) {
+    if (!assertCase(Name, 4, Jpg["earlyMarker",number], 0xFFD9)) {
         return
     }
 

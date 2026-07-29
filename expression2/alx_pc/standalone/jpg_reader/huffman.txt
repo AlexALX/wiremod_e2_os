@@ -1,10 +1,5 @@
 #include "alx_pc/standalone/jpg_reader/bitreader"
 
-function number jpgHuffmanKey(Bits:number, Code:number)
-{
-    return Bits * 65536 + Code
-}
-
 function jpgBuildHuffman(HT:table)
 {
     local Lengths = HT["lengths",table]
@@ -38,14 +33,8 @@ function jpgBuildHuffman(HT:table)
 
             Codes[Index,table] = Entry
 
-            Lookup[jpgHuffmanKey(Bits,Code), number] = Symbol
-#[
-            print(  
-                "Code=" + Code +
-                " Bits=" + Bits +
-                " Symbol=" + Symbol
-            )
-]#
+            Lookup[(Bits << 16) + Code, number] = Symbol + 1
+
             Code = Code + 1
             Index = Index + 1
         }
@@ -75,13 +64,14 @@ function number jpgHuffmanRead(HT:table)
         }
 
         Code = (Code << 1) || Bit
-
-        local Key = jpgHuffmanKey(Bits, Code)
-
-        if (Lookup:exists(Key)) {
-            return Lookup[Key,number]
+        
+        local Key = (Bits << 16) + Code
+        
+        local Val = Lookup[Key, number]
+        if (Val) {
+            return Val - 1
         }
     }
-    
-    return -1
+
+    return -100 # huffman error
 }

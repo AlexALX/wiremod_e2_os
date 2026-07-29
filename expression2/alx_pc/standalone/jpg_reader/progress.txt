@@ -1,4 +1,5 @@
 #include "alx_pc/standalone/jpg_reader/_shared_"
+#include "alx_pc/standalone/jpg_reader/reader"
 
 function jpgProgress(Task:string, Current:number, Max:number)
 {
@@ -22,14 +23,14 @@ function jpgProgress(Task:string, Current:number, Max:number)
     }
     
     Progress["progressPercent",number] = Percent
-    
-    Progress["step",number]
 }
 
 
 function jpgUpdateProgress()
 {
     CurrentState = Jpg["state",string]
+    
+    local IsPreviewRender = Jpg["progressivePreview",number] & (Jpg["marker",number] != 0xFFD9)
 
     switch (CurrentState) {
 
@@ -38,43 +39,22 @@ function jpgUpdateProgress()
             
             jpgProgress("Parsing JPEG", 0, 0)
             break
-            
-        case "parse_scan",
-            Progress["step",number] = 2
-            
-            jpgProgress("Decoding scan", 0, 0)
-            break
 
         case "alloc_blocks",
-            Progress["step",number] = 3
+            Progress["step",number] = 2
             
             local S = Jpg["allocBlocks",table]
 
             jpgProgress("Allocating block "+S["component",number],
-                S["index",number],
-                S["count",number]
+                S["component",number],
+                S["componentCount",number]
             )
-            break
+            break 
 
         case "alloc_planes",
-            Progress["step",number] = 4
+            Progress["step",number] = 3
 
             local S = Jpg["allocPlanes",table]
-
-            local Max = 0
-
-            if (
-                S["component",number] <= Jpg["componentCount",number] &
-                Jpg["components",table]:exists(S["component",number])
-            ) {
-
-                local C =
-                    Jpg["components",table][S["component",number],table]
-
-                Max =
-                    C["width",number] *
-                    C["height",number]
-            }
             
             local Component = S["component",number]
 
@@ -84,34 +64,70 @@ function jpgUpdateProgress()
 
             jpgProgress(
                 "Allocating plane "+Component,
-                S["index",number],
-                Max
+                Component,
+                Jpg["componentCount",number]
             )
 
             break
-
-        case "alloc_pixels",
-            Progress["step",number] = 5
-
-            jpgProgress(
-                "Allocating pixels",
-                Jpg["allocPixels",table]["index",number],
-                Jpg["width",number] * Jpg["height",number]
-            )
             
+        case "parse_scan",
+            if (!Jpg["progressive",number]) {
+                Progress["step",number] = 4
+                jpgProgress("Decoding scan", 0, 0)
+            }
             break
 
         case "scan",
-            Progress["step",number] = 6
+            Progress["step",number] = 5
+            
+            if (Jpg["progressive",number]) {
+                local ScanCount = " - Scan "+Jpg["scanCount",number]    
+                
+                local FirstOffset = Jpg["firstScanOffset", number]
+                
+                local TotalCurrent = jpgTell() - FirstOffset
+                local TotalMax = Jpg["size", number] - FirstOffset
+                
+                jpgProgress("Decoding JPEG"+ScanCount,
+                    TotalCurrent,
+                    TotalMax
+                )
+                
+            } else {
+                jpgProgress("Decoding Baseline JPEG",
+                    Jpg["scanMCU",number],
+                    Jpg["scanMCUCount",number]
+                )
+            }
+            break
 
-            jpgProgress("Decoding JPEG",
-                Jpg["mcuDecoded",number],
-                Jpg["mcuCount",number]
-            )
+        case "progressive_build",
+            Progress["step",number] = (IsPreviewRender ? 5 : 6)
+        
+            local S = Jpg["progressiveBuild",table]
+        
+            if (IsPreviewRender) {
+                local CompID = S["component",number]
+                local CurrentCompMax = Jpg["components",table][CompID,table]["blockCount",number]
+                
+                # Preview mode: shows current block index inside the active component
+                jpgProgress(
+                    "Building progressive blocks C"+CompID,
+                    S["block",number],
+                    CurrentCompMax
+                )
+            } else {
+                jpgProgress(
+                    "Building progressive blocks C"+S["component",number],
+                    S["totalBlocks",number],
+                    Jpg["totalBlocks",number]
+                )
+            }
+        
             break
 
         case "assemble",
-            Progress["step",number] = 7
+            Progress["step",number] = (IsPreviewRender ? 5 : 7)
 
             local S = Jpg["assemble",table]
 
@@ -124,7 +140,7 @@ function jpgUpdateProgress()
             break
 
         case "fullplanes",
-            Progress["step",number] = 8
+            Progress["step",number] = (IsPreviewRender ? 5 : 8)
 
             jpgProgress(
                 "Expanding planes",
@@ -134,19 +150,8 @@ function jpgUpdateProgress()
             
             break
 
-        case "rgb",
-            Progress["step",number] = 9
-
-            jpgProgress(
-                "Converting RGB",
-                Jpg["rgb",table]["index",number],
-                Jpg["width",number] * Jpg["height",number]
-            )
-            
-            break
-
         case "draw",
-            Progress["step",number] = 10
+            Progress["step",number] = (IsPreviewRender ? 5 : 9)
 
             local S = Jpg["draw",table]
 
@@ -167,4 +172,5 @@ function jpgUpdateProgress()
             jpgProgress("", 0, 0)
     }
 }
+
 

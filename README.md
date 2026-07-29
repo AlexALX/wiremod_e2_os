@@ -25,7 +25,7 @@ Main features:
 * **Low-level WM1 File System** what works with wire dupable HDDs/EEPROM. 
 * **WCD File System** what used for wiremod CD Discs. 
 * Expression2 **BMP Reader**, draw on wire Digital Screen (up to 512x512). 
-* Expression2 **Baseline JPG Reader** for Digital Screen.
+* Expression2 Baseline and Progressive **JPG Reader** for Digital Screen.
 * **Midi player** with 3 play modes (synth, instrumental, addon).
 * Few programs: Console, Burning software, file manager, network chat, partitions manager. 
 * Simple directory listing/file managing interface (DOS style).

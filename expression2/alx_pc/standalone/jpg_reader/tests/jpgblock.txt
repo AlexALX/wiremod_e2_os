@@ -2,6 +2,7 @@
 
 #include "alx_pc/standalone/jpg_reader/tests/_shared_"
 #include "alx_pc/standalone/jpg_reader/tests/_jpg_shared_"
+#include "alx_pc/standalone/jpg_reader/decoder"
 
 function table decodeBlock()
 {
@@ -80,6 +81,7 @@ function test_decodeblock_dc()
 
     jpgDecodeBlockBegin(
         1,
+        0,
         DCHT,
         ACHT
     )
@@ -162,6 +164,7 @@ function test_decodeblock_ac_only()
 
     jpgDecodeBlockBegin(
         1,
+        0,
         DCHT,
         ACHT
     )
@@ -232,6 +235,7 @@ function test_decodeblock_mixed()
     
     jpgDecodeBlockBegin(
         1,
+        0,
         DCHT,
         ACHT
     )

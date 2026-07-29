@@ -1,5 +1,5 @@
 #include "alx_pc/standalone/jpg_reader/_shared_"
-#include "alx_pc/standalone/jpg_reader/jpg_reader"
+#include "alx_pc/standalone/jpg_reader/reader"
 
 # ----------------------------------------------------
 # JPEG Bit Reader
@@ -33,49 +33,64 @@ function number jpgReadByte()
     }
 
     # End of entropy stream
-    Jpg["marker",number] = Next
+    Jpg["earlyMarker",number] = 0xFF00 || Next
 
     return -1
 }
 
 function number jpgBit()
 {
-    
-    local Count = Jpg["bitCount",number]
+    local Buffer = Jpg["bitBuffer",number]
+    local Count  = Jpg["bitCount",number]
 
     if (Count == 0) {
 
+        local Pos = jpgTell()
         local Byte = jpgReadByte()
 
         if (Byte < 0) {
             return Byte
         }
 
-        Jpg["bitBuffer",number] = Byte
+        Buffer = Byte
         Count = 8
     }
 
     Count = Count - 1
 
     Jpg["bitCount",number] = Count
+    Jpg["bitBuffer",number] = Buffer
 
-    return (Jpg["bitBuffer",number] >> Count) && 1
+    return (Buffer >> Count) && 1
 }
 
 function number jpgBits(Bits:number)
 {
     local Value = 0
+    
+    local Buffer = Jpg["bitBuffer",number]
+    local Count  = Jpg["bitCount",number]
 
     for (I = 1, Bits) {
-
-        local Bit = jpgBit()
-
-        if (Bit < 0) {
-            return Bit
+        if (Count == 0) {
+            local Byte = jpgReadByte()
+            if (Byte < 0) {
+                Jpg["bitCount",number] = 0
+                Jpg["bitBuffer",number] = Buffer
+                return Byte
+            }
+            Buffer = Byte
+            Count = 8
         }
 
+        Count = Count - 1
+
+        local Bit = (Buffer >> Count) && 1
         Value = (Value << 1) || Bit
     }
+
+    Jpg["bitCount",number] = Count
+    Jpg["bitBuffer",number] = Buffer
 
     return Value
 }
@@ -84,4 +99,34 @@ function jpgAlignByte()
 {
     Jpg["bitBuffer",number] = 0
     Jpg["bitCount",number] = 0
+}
+
+function jpgDebugBytes(Pos:number, Count:number)
+{
+    local Save = Jpg["pos",number]
+
+    Jpg["pos",number] = Pos
+
+    print("Bytes DUMP", Pos, Count)
+
+    for (I = 0, Count - 1) {
+
+        local Byte = jpgReadByte()
+        
+        print(
+            Pos + I,
+            Byte
+        )
+    }
+
+    Jpg["pos",number] = Save
+}
+
+function jpgDebugRaw(Start:number, Count:number)
+{
+    jpgSeek(Start)
+
+    for (I = 0, Count - 1) {
+        print(Start + I, jpgU8())
+    }
 }

@@ -51,6 +51,10 @@ function number assertHuffmanEntry(
     return 1
 }
 
+function jpgHuffmanKey(Bits, Code) {
+    return (Bits << 16) + Code   
+}
+
 function test_huffman_build_simple()
 {
     local Name = "HUFFMAN BUILD SIMPLE"
@@ -103,19 +107,19 @@ function test_huffman_build_simple()
     # Lookup
     #
 
-    if (!assertCase(Name, 5, Lookup[jpgHuffmanKey(1,0),number], 10)) {
+    if (!assertCase(Name, 5, Lookup[jpgHuffmanKey(1,0),number], 11)) {
         return
     }
 
-    if (!assertCase(Name, 6, Lookup[jpgHuffmanKey(2,2),number], 20)) {
+    if (!assertCase(Name, 6, Lookup[jpgHuffmanKey(2,2),number], 21)) {
         return
     }
 
-    if (!assertCase(Name, 7, Lookup[jpgHuffmanKey(2,3),number], 30)) {
+    if (!assertCase(Name, 7, Lookup[jpgHuffmanKey(2,3),number], 31)) {
         return
     }
 
-    if (!assertCase(Name, 8, Lookup[jpgHuffmanKey(3,8),number], 40)) {
+    if (!assertCase(Name, 8, Lookup[jpgHuffmanKey(3,8),number], 41)) {
         return
     }
 

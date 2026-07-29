@@ -31,20 +31,29 @@ function displayHelp() {
 "
 JPG Parser, specifications:
 - Max resolution is up to 512x512 (DS limit) 
-- Support ONLY baseline JPG 
+- Support Baseline and Progressive JPG 
 - Support YUV 4:2:0 4:2:2 4:2:2v 4:4:4
 - Slow, no multithread
+- Support progressive preview mode
 
 Usage via chat commands:
 !jpg http://url - open jpg file from the web
+
+Note: long url may be cut, use input LongURL 
+instead for such case (via string value) 
 
 !jpgfile filename.jpg - open jpg file from 
 garrysmod/data/e2files/ folder
 
 !jpgabort - abort rendering
 
-Note: long url may be cut, use input LongURL 
-instead for such case (via string value) 
+!jpgmode - normal, preview, fullpreview
+
+Modes:
+ normal - no preview, fastest render
+ preview - first AC scan preview
+ fullpreview - every scan rerender (slow)
+
 "
 
     dsDrawTextStart(2, 0, Text)
@@ -97,6 +106,12 @@ function displayProgress()
     local Max = Progress["progressMax", number]
     local Perc = Progress["progressPercent", number]
     local CurrentTask = Progress["progressTask",string]
+    local Drew = Progress["progressDrew",number]
+    
+    # if DS drew preview
+    if (Drew) {
+        return    
+    }
     
     local FontLine = DsFontHeight + DsFontSpacing
     
@@ -110,7 +125,7 @@ function displayProgress()
     
     BlockDraw = 1
     
-    dsDrawCachedText(2, 4 * FontLine, Step + " / 10")
+    dsDrawCachedText(2, 4 * FontLine, Step + " / "+Progress["stepTotal",number])
     dsDrawCachedText(2, 7 * FontLine, CurrentTask)
     dsDrawCachedText(2, 10 * FontLine, Current + " / " + Max + " ("+Perc+"%)")
     

@@ -2,7 +2,7 @@
 
 #include "alx_pc/standalone/jpg_reader/tests/_shared_"
 #include "alx_pc/standalone/jpg_reader/tests/_jpg_shared_"
-#include "alx_pc/standalone/jpg_reader/decoder"
+#include "alx_pc/standalone/jpg_reader/draw"
 
 function test_jpgInitFullPlanes()
 {
@@ -109,7 +109,7 @@ function test_jpgInitFullPlanes()
     Scan[2,table] = S2
     Scan[3,table] = S3
     
-    Jpg["scanComponents",table] = Scan
+    Jpg["frameComponents",table] = Scan
 
     Jpg["maxH",number] = 2
     Jpg["maxV",number] = 2

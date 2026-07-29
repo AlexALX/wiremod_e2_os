@@ -77,15 +77,15 @@ if (dsClk()) {
     
     if (Name=="drawJpg") {
         local Info = dsGetTable()
-        E2_GPU = Info[3,entity]
-        TickQuota = Info[4,number]
-        Init = 1
         DS = Info[1,wirelink]
+        E2_GPU = Info[2,entity]
+        TickQuota = Info[3,number]
+        Init = 1
         
         if (JPGReader == nowirelink()) {
             dsSendDirect("JpgReaderError",E2_GPU,1)
         } else {        
-            dsSendDirect("drawJpg", JPGReader:entity(), Info[2,string])
+            dsSendDirect("drawJpg", JPGReader:entity(), table(Info[4,string],Info[5,number]))
         }
     } elseif (Name=="pci") {
         pci_init()

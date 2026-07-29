@@ -29,3 +29,76 @@ function jpgError(Msg:string) {
         print(Error)
     }
 }
+
+
+function number jpgScanMode()
+{
+    if (!Jpg["progressive",number]) {
+        return 0 # Baseline
+    }
+
+    local Ss = Jpg["scanSs",number]
+    local Ah = Jpg["scanAh",number]
+
+    if (Ss == 0) {
+
+        if (Ah == 0) {
+            return 1 # DC First
+        }
+
+        return 3 # DC Refine
+    }
+
+    if (Ah == 0) {
+        return 2 # AC First
+    }
+
+    return 4 # AC Refine
+}
+
+function jpgResetScanState()
+{
+    local State = Jpg["mcuDecode",table]
+
+    State["component",number] = 1
+    State["x",number] = 1
+    State["y",number] = 1
+    State["active",number] = 1
+    State["stage",number] = 0
+}
+
+function number jpgComponentBlockIndex(
+    Component:table,
+    MCU:number,
+    Block:number
+)
+{
+    local H = Component["h",number]
+    local V = Component["v",number]
+
+    local BlocksX = Component["blocksX",number]
+    local BlocksY = Component["blocksY",number]
+
+    local MCUGridX = Jpg["mcuX",number]
+
+    local MCUPosX = MCU % MCUGridX
+    local MCUPosY = floor(MCU / MCUGridX)
+
+    local BlockX =
+        MCUPosX * H +
+        (Block % H)
+
+    local BlockY =
+        MCUPosY * V +
+        floor(Block / H)
+
+    if (
+        BlockX >= BlocksX |
+        BlockY >= BlocksY
+    ) {
+        return -1
+    }
+
+    return BlockY * BlocksX + BlockX
+}
+

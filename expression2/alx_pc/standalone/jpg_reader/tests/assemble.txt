@@ -4,7 +4,7 @@
 
 #include "alx_pc/standalone/jpg_reader/tests/_shared_"
 #include "alx_pc/standalone/jpg_reader/tests/_jpg_shared_"
-#include "alx_pc/standalone/jpg_reader/decoder"
+#include "alx_pc/standalone/jpg_reader/draw"
 
 
 if (first() | duped()) {
@@ -42,24 +42,30 @@ function setupAssembleTest()
     Y["id",number] = 1
     Y["h",number] = 2
     Y["v",number] = 2
+    Y["blocksX",number] = 2
+    Y["blocksY",number] = 2
 
     local Cb = table()
     Cb["id",number] = 2
     Cb["h",number] = 1
     Cb["v",number] = 1
+    Cb["blocksX",number] = 1
+    Cb["blocksY",number] = 1
+
 
     local Cr = table()
     Cr["id",number] = 3
     Cr["h",number] = 1
     Cr["v",number] = 1
-
+    Cr["blocksX",number] = 1
+    Cr["blocksY",number] = 1
 
     Components[1,table] = Y
     Components[2,table] = Cb
     Components[3,table] = Cr
 
 
-    Jpg["scanComponents",table] = Components
+    Jpg["frameComponents",table] = Components
     
     Y["width",number] = 16
     Y["height",number] = 16

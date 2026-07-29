@@ -2,15 +2,25 @@
 
 #include "alx_pc/standalone/jpg_reader/tests/_shared_"
 #include "alx_pc/standalone/jpg_reader/tests/_jpg_shared_"
-#include "alx_pc/standalone/jpg_reader/decoder"
+#include "alx_pc/standalone/jpg_reader/draw"
+
+function vector getRGBVec(P:number) {
+
+    local R = floor(P / 65536)
+    local G = floor(P / 256) % 256
+    local B = P % 256    
+    
+    return vec(R,G,B)
+}
 
 function test_jpgYCbCrToRGBStep()
 {
     local Name = "YCbCrToRGB"
-
+    JPG_NoKeepAR = 1
 
     Jpg["width",number] = 1
     Jpg["height",number] = 1
+    Jpg["test_YCbCrToRGB",number] = 1
 
 
     local Full = table()
@@ -25,11 +35,8 @@ function test_jpgYCbCrToRGBStep()
 
     Jpg["planesFull",table] = Full
 
-
     local Pixels = table()
-
     Jpg["pixels",table] = Pixels
-
 
     # WHITE
 
@@ -40,11 +47,10 @@ function test_jpgYCbCrToRGBStep()
     Cr[0,number] = 128
 
 
-    while (jpgYCbCrToRGBStep() == 0) {}
+    while (jpgDrawStep() == 0) {}
 
 
-    local P = Pixels[0,vector]
-
+    local P = getRGBVec(Pixels[0,number])
 
     if (
         assertNear(P[1],255,1) &
@@ -77,11 +83,10 @@ function test_jpgYCbCrToRGBStep()
     Cr[0,number] = 128
 
 
-    while (jpgYCbCrToRGBStep() == 0) {}
+    while (jpgDrawStep() == 0) {}
 
 
-    P = Pixels[0,vector]
-
+    P = getRGBVec(Pixels[0,number])
 
     if (
         assertNear(P[1],0,1) &
@@ -114,10 +119,10 @@ function test_jpgYCbCrToRGBStep()
     Cr[0,number] = 255
 
 
-    while (jpgYCbCrToRGBStep() == 0) {}
+    while (jpgDrawStep() == 0) {}
 
 
-    P = Pixels[0,vector]
+    P = getRGBVec(Pixels[0,number])
 
 
     if (

@@ -7,7 +7,7 @@ function test_receive_zero()
 
     jpgTestData("")
 
-    if (!assertCase(Name, 1, jpgReceive(0), 0)) {
+    if (!assertCase(Name, 1, jpgBits(0), 0)) {
         return
     }
 
@@ -27,11 +27,11 @@ function test_receive()
         toChar(0xD2)
     )
 
-    if (!assertCase(Name, 1, jpgReceive(3), 6)) {
+    if (!assertCase(Name, 1, jpgBits(3), 6)) {
         return
     }
 
-    if (!assertCase(Name, 2, jpgReceive(5), 18)) {
+    if (!assertCase(Name, 2, jpgBits(5), 18)) {
         return
     }
 
