@@ -1,6 +1,6 @@
 #include "alx_pc/standalone/jpg_reader/_shared_"
 #include "alx_pc/standalone/jpg_reader/bitreader"
-#include "alx_pc/standalone/jpg_reader/decoder"
+#include "alx_pc/standalone/jpg_reader/huffman"
 
 function string jpgMarkerName(Marker:number) {
     switch (Marker) {
@@ -81,6 +81,106 @@ function jpgParseDRI()
     }
 }
 
+function jpgBuildMCU()
+{
+    local MaxH = Jpg["maxH",number]
+    local MaxV = Jpg["maxV",number]
+
+    local Width = Jpg["width",number]
+    local Height = Jpg["height",number]
+
+    local MCUWidth = MaxH * 8
+    local MCUHeight = MaxV * 8
+
+    local MCUX = ceil(Width / MCUWidth)
+    local MCUY = ceil(Height / MCUHeight)
+
+    Jpg["mcuWidth",number] = MCUWidth
+    Jpg["mcuHeight",number] = MCUHeight
+
+    Jpg["mcuX",number] = MCUX
+    Jpg["mcuY",number] = MCUY
+
+    Jpg["mcuCount",number] = MCUX * MCUY
+
+    if (JPGDebug) {
+        print("--------------------------")
+        print("MCU")
+        print("--------------------------")
+        print("MCU Size: " + MCUWidth + "x" + MCUHeight)
+        print("Grid: " + MCUX + " x " + MCUY)
+        print("Total MCU: " + MCUX * MCUY)   
+    }
+}
+
+function number jpgAllocatePlanesStep()
+{
+    local State = Jpg["allocPlanes",table]
+
+    if (State["active",number] == 0) {
+
+        Jpg["planes",table] = table()
+        Jpg["planesFull",table] = table()
+
+        State["active",number] = 1
+        State["component",number] = 1
+
+        if (JPGDebug) {
+            print("--------------------------")
+            print("Planes")
+            print("--------------------------")
+        }
+    }
+
+    local Components = Jpg["components",table]
+    
+    local ID = State["component",number]
+    
+    if (ID > Jpg["componentCount",number]) {   
+        State["active",number] = 0
+        return 1
+    }
+    
+    local Component = Components[ID,table]
+
+    if (!Jpg["planes",table]:exists(ID)) {
+
+        local Width = Jpg["width",number]
+        local Height = Jpg["height",number]
+
+        local MaxH = Jpg["maxH",number]
+        local MaxV = Jpg["maxV",number]
+
+        local H = Component["h",number]
+        local V = Component["v",number]
+
+        Component["width",number] = ceil(Width * H / MaxH)
+        Component["height",number] = ceil(Height * V / MaxV)
+        
+        Jpg["planeWidth",table][ID,number] =
+            Component["width",number]
+        
+        Jpg["planeHeight",table][ID,number] =
+            Component["height",number]
+
+        Jpg["planes",table][ID,table] = table()
+
+        if (JPGDebug) {
+            print(
+                "Component " + ID +
+                " = " +
+                Component["width",number] +
+                "x" +
+                Component["height",number]
+            )
+        }
+    }
+     
+    State["component",number] = ID + 1
+
+    return 0
+}
+
 function jpgParseSOF(Type:number)
 {
     local Length = jpgU16()
@@ -95,12 +195,14 @@ function jpgParseSOF(Type:number)
         return -1
     }
     
-    if (Type == 2) {
-        jpgError("Progressive JPEG is not supported")
-        return -1
+    Jpg["progressive",number] = (Type == 2)
+    if (!Jpg["progressive",number]) {
+        Jpg["progressivePreview",number] = 0
     }
     
-    Jpg["progressive",number] = (Type == 2)
+    if (!JPGNoPrint) {
+        print(Jpg["progressive",number] ? "Decoding Progressive JPEG" : "Decoding Baseline JPEG")    
+    }
 
     local Components = jpgU8()
     
@@ -108,6 +210,8 @@ function jpgParseSOF(Type:number)
     
     local MaxH = 0
     local MaxV = 0
+    
+    Jpg["frameComponents",table] = table()
 
     for (I = 1, Components) {
     
@@ -146,6 +250,8 @@ function jpgParseSOF(Type:number)
                 "  QT=" + QT
             )
         }
+        
+        Jpg["frameComponents",table][I,table] = Component
     }
     
     Jpg["maxH",number] = MaxH
@@ -165,99 +271,135 @@ function jpgParseSOF(Type:number)
 }
 
 function afterAllocateBlocks() {
-    local Index = table()
-
-    local Components = Jpg["components",table]
-    
-    for (ID = 1, Jpg["componentCount",number]) {
-    
-        if (Components:exists(ID)) {
-            Index[ID,number] = 0
-        }
-    }
-    
-    Jpg["blockIndex",table] = Index   
-    
+    Jpg["blockIndex",table] = table()  
     Jpg["state",string] = "parse_scan"   
 }
 
-function jpgParseSOS()
+function number jpgParseSOSStep()
 {
-    local Length = jpgU16()
+    switch (Jpg["scanState",number]) {
 
-    local Components = jpgU8()
+        case 0,
+
+            Jpg["scanLength",number] = jpgU16()
+
+            local Components = jpgU8()
+
+            Jpg["scanComponentsCount",number] = Components
+            Jpg["scanComponentIndex",number] = 1
+            Jpg["scanComponents",table] = table()
+            Jpg["scanIsSingleComponent",number] = (Components == 1)
+            
+            if (Jpg["firstScanOffset", number] == 0) {
+                Jpg["firstScanOffset", number] = jpgTell()
+            }
+
+            if (JPGDebug) {
+                print("--------------------------------")
+                print("Start Of Scan")
+                print("--------------------------------")
+                print("Components: " + Components)
+            }
+
+            Jpg["scanState",number] = 1
+            Jpg["scanEOBRun",number] = 0
+            break
+
+        case 1,
+
+            if (Jpg["scanComponentIndex",number] <= Jpg["scanComponentsCount",number]) {
+
+                local ID = jpgU8()
+                local Tables = jpgU8()
+
+                local Component = table()
+
+                Component["id",number] = ID
+                Component["dc",number] = Tables >> 4
+                Component["ac",number] = Tables && 15
+
+                Jpg["scanComponents",table][Jpg["scanComponentIndex",number],table] = Component
+
+                if (JPGDebug) {
+                    print(
+                        "Component ID=" + ID +
+                        " DC=" + Component["dc",number] +
+                        " AC=" + Component["ac",number]
+                    )
+                }
+
+                Jpg["scanComponentIndex",number] = Jpg["scanComponentIndex",number] + 1
+                break
+            }
+
+            Jpg["scanState",number] = 2
+            break
+
+        case 2,
+
+            local Ss = jpgU8()
+            local Se = jpgU8()
+            local AhAl = jpgU8()
+
+            Jpg["scanSs",number] = Ss
+            Jpg["scanSe",number] = Se
+            Jpg["scanAh",number] = AhAl >> 4
+            Jpg["scanAl",number] = AhAl && 15
+            Jpg["scanEOBRun",number] = 0
+            Jpg["scanStart",number] = jpgTell()
+
+            if (JPGDebug) {
+                print(
+                    "Spectral: Ss=" + Ss +
+                    " Se=" + Se +
+                    " Ah=" + Jpg["scanAh",number] +
+                    " Al=" + Jpg["scanAl",number]
+                )
+
+                print("Scan Mode: " + jpgScanMode())
+            }
+
+            Jpg["scanMCU",number] = 0
+            Jpg["restartPending",number] = 0
+            Jpg["scanState",number] = 0
+
+            local ScanCount = Jpg["scanComponentsCount",number]
     
-    Jpg["scanStart",number] = jpgTell()
-    Jpg["scanComponentsCount",number] = Components
-    
-    Jpg["lastDC",table][1,number] = 0
-    Jpg["lastDC",table][2,number] = 0
-    Jpg["lastDC",table][3,number] = 0
-    
-    if (JPGDebug) {
-        print("--------------------------------")
-        print("Start Of Scan")
-        print("--------------------------------")
-    
-        print("Components: " + Components)
+            if (ScanCount == 1) {
+
+                local Scan = Jpg["scanComponents",table][1,table]
+                local ID = Scan["id",number]
+
+                local Component = Jpg["components",table][ID,table]
+
+                Jpg["scanMCUCount",number] =
+                    Jpg["mcuCount",number] *
+                    Component["h",number] *
+                    Component["v",number]
+
+            } else {
+                Jpg["scanMCUCount",number] = Jpg["mcuCount",number]
+            }
+            
+            if (JPGDebug) {
+                print(
+                    "Scan MCU count: " +
+                    Jpg["scanMCUCount",number]
+                )
+            }
+
+            return 1
+            break
     }
-    
-    local ScanComponents = table()
 
-    for (I = 1, Components) {
-
-        local ID = jpgU8()
-        local Table = jpgU8()
-
-        local DC = Table >> 4
-        local AC = Table && 15
-
-        local Component = table()
-        
-        Component["id",number] = ID
-        Component["dc",number] = DC
-        Component["ac",number] = AC
-        
-        ScanComponents[I,table] = Component
-        
-        if (JPGDebug) {
-            print(
-                "Component ID=" + ID +
-                " DC=" + DC +
-                " AC=" + AC
-            )
-        }
-    }
-    
-    Jpg["scanComponents",table] = ScanComponents
-
-    local Ss = jpgU8()
-    local Se = jpgU8()
-    local AhAl = jpgU8()
-
-    local Ah = AhAl >> 4
-    local Al = AhAl && 15
-    
-    Jpg["scanSs",number] = Ss
-    Jpg["scanSe",number] = Se
-    Jpg["scanAh",number] = Ah
-    Jpg["scanAl",number] = Al
-
-    if (JPGDebug) {
-        print(
-            "Spectral: Ss=" + Ss +
-            " Se=" + Se +
-            " Ah=" + Ah +
-            " Al=" + Al
-        )
-    }
+    return 0
 }
 
 
 function jpgSaveScan()
 {
-    local Count = Jpg["scanCount",number] + 1
-    Jpg["scanCount",number] = Count
+    local Count = Jpg["scanSavedCount",number] + 1
+    Jpg["scanSavedCount",number] = Count
 
     local Scan = table()
 
@@ -334,6 +476,9 @@ function number jpgParseDHT()
         local Length = jpgU16()
         
         if (JPGDebug) {
+            print("--------------------------------")
+            print("DHT")
+            print("--------------------------------")
             print("DHT length = " + Length)
         }
         
@@ -347,10 +492,6 @@ function number jpgParseDHT()
     }
     
     local Length = Jpg["dhtLength",number]
-    
-    if (JPGDebug) {
-        print("DHT length = " + Length)
-    }
     
     local End = Jpg["dhtEnd",number]
 
@@ -417,15 +558,13 @@ function number jpgParseDHT()
 
 function number jpgParse()
 {
-    while (perf(90)) {
-
+    while (perf(90)) {      
         switch (Jpg["parseState",number]) {
 
             #
             # Read next marker
             #
             case 0,
-
                 if (jpgEOF()) {
                     return 1
                 }
@@ -444,29 +583,15 @@ function number jpgParse()
             # Process marker
             #
             case 1,
-
+    
                 local Marker = Jpg["marker",number]
 
                 switch (Marker) {
 
                     case 0xFFC0,
-                    
-                        local Result = jpgParseSOF(0)
-                    
-                        if (Result == -1) {
-                            return 0
-                        }
-                    
-                        if (Result == 1) {
-                            Jpg["parseState",number] = 0
-                            return 0
-                        }
-                    
-                        break
-                    
                     case 0xFFC2,
                     
-                        local Result = jpgParseSOF(2)
+                        local Result = jpgParseSOF(Marker==0xFFC0 ? 0 : 2)
                     
                         if (Result == -1) {
                             return 0
@@ -484,7 +609,7 @@ function number jpgParse()
                         break
 
                     case 0xFFC4,
-                        if (jpgParseDHT()) {
+                        if (jpgParseDHT()) {              
                             Jpg["DHTactive",number] = 0  
                         } else {
                             return 0   
@@ -496,18 +621,35 @@ function number jpgParse()
                         break
 
                     case 0xFFDA,
-
-                        jpgParseSOS()
-
-                        jpgBitInit()
-                        jpgInitMCU()
-
-                        Jpg["state",string] = "alloc_planes"
-
-                        Jpg["parseState",number] = 0
-
+                        if (jpgParseSOSStep()) {
+                            jpgBitInit()
+                            jpgResetScanState()
+                            
+                            if (Jpg["scanCount",number] == 0) {
+                                Jpg["state",string] = "alloc_planes"
+                            } else {
+                                Jpg["state",string] = "scan"
+                            }
+                            
+                            Jpg["scanCount",number] = Jpg["scanCount",number] + 1    
+                            Jpg["parseState",number] = 0
+                        }
                         return 0
-
+                        break
+                        
+                    case 0xFFD9,
+                    
+                        if (Jpg["progressive",number]) {
+                            Jpg["state",string] = "progressive_build"
+                        } else {
+                            Jpg["state",string] = "done"
+                        }
+    
+                        Jpg["parseState",number] = 0
+                    
+                        return 1
+                        break
+                        
                     default,
 
                         if (jpgHasLength(Marker)) {
@@ -520,6 +662,7 @@ function number jpgParse()
                         break
                 }
 
+                Jpg["marker",number] = 0
                 Jpg["parseState",number] = 0
                 break
         }
@@ -527,3 +670,4 @@ function number jpgParse()
 
     return 0
 }
+
