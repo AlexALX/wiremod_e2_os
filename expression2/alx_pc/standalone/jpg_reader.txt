@@ -9,7 +9,7 @@
     -------------------
     JPG Parser, specifications:
     - Max resolution is up to 512x512 (Digital Screen limitation)
-    - Support Baseline and Progressive JPG
+    - Support Baseline (8/12bits) and Progressive JPG
     - Support YUV 4:2:0 4:2:2 4:2:2v 4:4:4
     - Slow, no multithread
     - Support progressive preview mode
