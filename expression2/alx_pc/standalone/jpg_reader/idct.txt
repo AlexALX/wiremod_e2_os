@@ -75,7 +75,14 @@ function number jpgIDCTStep(Block:table)
         }
         
         if (IsSolidColor) {    
-            local DCValue = floor(Block[0,number] / 8) + 128
+            
+            local Precision = Jpg["precision", number]
+            
+            local DCValue = (Block[0,number] / 8) + Jpg["levelShift",number]
+            
+            if (Jpg["outputShift",number] > 0) {
+                DCValue = floor(DCValue / Jpg["outputShift",number])  
+            }
             DCValue = clamp(DCValue, 0, 255)
 
             for (I = 0, 63) {
@@ -134,16 +141,13 @@ function number jpgIDCTStep(Block:table)
     Col = jpgIDCT1D(Col)
 
     for (Y = 0, 7) {
-
-        local Value = Col[Y,number] + 128
-
-        if (Value < 0) {
-            Value = 0
+        
+        local Value = Col[Y,number] + Jpg["levelShift",number]
+        
+        if (Jpg["outputShift",number] > 0) {
+            Value = floor(Value / Jpg["outputShift",number])  
         }
-
-        if (Value > 255) {
-            Value = 255
-        }
+        Value = clamp(Value, 0, 255)
 
         Block[Y * 8 + X,number] = floor(Value)
     }

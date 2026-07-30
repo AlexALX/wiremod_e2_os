@@ -94,7 +94,9 @@ function jpgUpdateProgress()
                 )
                 
             } else {
-                jpgProgress("Decoding Baseline JPEG",
+                local PreciptionTxt = (Jpg["precision",number]!=8 ? Jpg["precision",number]+"bit " : "")
+                
+                jpgProgress("Decoding Baseline "+PreciptionTxt+"JPEG",
                     Jpg["scanMCU",number],
                     Jpg["scanMCUCount",number]
                 )

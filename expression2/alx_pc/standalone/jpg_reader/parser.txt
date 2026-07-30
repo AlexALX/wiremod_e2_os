@@ -22,8 +22,41 @@ function string jpgMarkerName(Marker:number) {
         case 0xFFC3,
             return "SOF3"
 
+        case 0xFFC5,
+            return "SOF5"
+
+        case 0xFFC6,
+            return "SOF6"
+
+        case 0xFFC7,
+            return "SOF7"
+
+        case 0xFFC9,
+            return "SOF9"
+
+        case 0xFFCA,
+            return "SOF10"
+
+        case 0xFFCB,
+            return "SOF11"
+
+        case 0xFFCD,
+            return "SOF13"
+
+        case 0xFFCE,
+            return "SOF14"
+
+        case 0xFFCF,
+            return "SOF15"
+            
+        case 0xFFC8,
+            return "Reserved"
+
         case 0xFFC4,
             return "DHT"
+
+        case 0xFFCC,
+            return "DAC"
 
         case 0xFFDB,
             return "DQT"
@@ -31,11 +64,23 @@ function string jpgMarkerName(Marker:number) {
         case 0xFFDA,
             return "SOS"
 
+        case 0xFFDC,
+            return "DNL"
+
+        case 0xFFDD,
+            return "DRI"
+
+        case 0xFFDE,
+            return "DHP"
+
+        case 0xFFDF,
+            return "EXP"
+
         case 0xFFFE,
             return "COM"
             
-        case 0xFFDD,
-            return "DRI"
+        case 0xFF01,
+            return "TEM"
 
         default,
             if (Marker >= 0xFFE0 & Marker <= 0xFFEF) {
@@ -195,7 +240,11 @@ function jpgParseSOF(Type:number)
         return -1
     }
     
-    Jpg["progressive",number] = (Type == 2)
+    Jpg["precision",number] = Precision
+    Jpg["levelShift", number] = 1 << (Precision - 1)
+    Jpg["outputShift", number] = 1 << (Precision - 8)
+    
+    Jpg["progressive",number] = (Type == 0xFFC2)
     if (!Jpg["progressive",number]) {
         Jpg["progressivePreview",number] = 0
     }
@@ -589,9 +638,10 @@ function number jpgParse()
                 switch (Marker) {
 
                     case 0xFFC0,
+                    case 0xFFC1,
                     case 0xFFC2,
                     
-                        local Result = jpgParseSOF(Marker==0xFFC0 ? 0 : 2)
+                        local Result = jpgParseSOF(Marker)
                     
                         if (Result == -1) {
                             return 0
@@ -603,6 +653,19 @@ function number jpgParse()
                         }
                     
                         break
+                        
+                    case 0xFFC3,
+                    case 0xFFC5,
+                    case 0xFFC6,
+                    case 0xFFC7,
+                    case 0xFFC9,
+                    case 0xFFCA,
+                    case 0xFFCB,
+                    case 0xFFCD,
+                    case 0xFFCE,
+                    case 0xFFCF,
+                        jpgError("Unsupported JPEG (" + jpgMarkerName(Marker) + ")")
+                        return 1
 
                     case 0xFFDB,
                         jpgParseDQT()
