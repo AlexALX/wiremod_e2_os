@@ -7,6 +7,7 @@ function jpgBuildHuffman(HT:table)
 
     local Codes = table()
     local Lookup = table()
+    local Lookahead = table()
 
     local Code = 0
     local Index = 0
@@ -34,6 +35,16 @@ function jpgBuildHuffman(HT:table)
             Codes[Index,table] = Entry
 
             Lookup[(Bits << 16) + Code, number] = Symbol + 1
+            
+            if (Bits <= 8) {
+                local Shift = 8 - Bits
+                local BaseLookaheadCode = Code << Shift
+                local LookaheadCount = 1 << Shift
+                
+                for (L = 0, LookaheadCount - 1) {
+                    Lookahead[BaseLookaheadCode + L, number] = ((Symbol + 1) << 8) || Bits
+                }
+            }
 
             Code = Code + 1
             Index = Index + 1
@@ -44,34 +55,52 @@ function jpgBuildHuffman(HT:table)
 
     HT["codes",table] = Codes
     HT["lookup",table] = Lookup
+    HT["lookahead",table] = Lookahead
     HT["maxBits",number] = MaxBits
 }
 
 function number jpgHuffmanRead(HT:table)
 {
     local Lookup = HT["lookup",table]
-    
     local MaxBits = HT["maxBits",number]
 
     local Code = 0
+    
+    local Buffer = Jpg["bitBuffer",number]
+    local Count  = Jpg["bitCount",number]
 
     for (Bits = 1, MaxBits) {
 
-        local Bit = jpgBit()
+        if (Count == 0) {
+            local Byte = jpgReadByte()
 
-        if (Bit < 0) {
-            return Bit
+            if (Byte < 0) {
+                Jpg["bitCount",number] = 0
+                Jpg["bitBuffer",number] = Buffer
+                return Byte
+            }
+
+            Buffer = Byte
+            Count = 8
         }
 
+        Count = Count - 1
+  
+        local Bit = (Buffer >> Count) && 1
         Code = (Code << 1) || Bit
         
         local Key = (Bits << 16) + Code
-        
         local Val = Lookup[Key, number]
+        
         if (Val) {
+            Jpg["bitCount",number] = Count
+            Jpg["bitBuffer",number] = Buffer
             return Val - 1
         }
     }
 
-    return -100 # huffman error
+    #            
+    Jpg["bitCount",number] = Count
+    Jpg["bitBuffer",number] = Buffer
+    return -100
 }

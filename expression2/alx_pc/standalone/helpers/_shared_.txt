@@ -1,0 +1,74 @@
+@persist Header:string BlockDraw:number
+@inputs DS:wirelink
+@strict
+
+#include "alx_pc/standalone/ds_gfx/_init_"
+#include "alx_pc/standalone/ds_gfx/font_5x7"
+#include "alx_pc/standalone/ds_gfx/font_8x8"
+
+function displayInit(FontMode) {
+    BlockDraw = 0
+    
+    if (FontMode==1) {
+        dsInit(DS, 400, 300)
+        dsSetFont(dsFont8x8())
+    } else {    
+        dsInit(DS, 200, 150)
+        dsSetFont(dsFont5x7())
+    }
+}
+
+function displayInit() {
+    displayInit(0)    
+}
+
+function displayBlockDraw(Seconds:number) {
+    BlockDraw = 1
+    
+    if (timerExists("blockDraw")) {
+        timerAdjust("blockDraw",Seconds,1)
+    } else {
+        timer("blockDraw",Seconds,function() {
+            BlockDraw = 0    
+        })    
+    }
+}
+
+function table stringWordWrap(Msg:string, MaxLen:number) {
+    local OutputLines = table()
+    local CurrentLine = ""
+    local LineIndex = 1
+    
+    local Paragraphs = Msg:explode("\n")
+    
+    for (P = 1, Paragraphs:count()) {
+        local Words = Paragraphs[P, string]:explode(" ")
+        
+        for (W = 1, Words:count()) {
+            local Word = Words[W, string]
+            
+            local CheckLine = (CurrentLine == "" ? Word : CurrentLine + " " + Word)
+            
+            if (CheckLine:length() > MaxLen) {
+                if (CurrentLine == "") {
+                    OutputLines[LineIndex, string] = Word
+                    LineIndex++
+                } else {
+                    OutputLines[LineIndex, string] = CurrentLine
+                    LineIndex++
+                    CurrentLine = Word
+                }
+            } else {
+                CurrentLine = CheckLine
+            }
+        }
+
+        if (CurrentLine != "") {
+            OutputLines[LineIndex, string] = CurrentLine
+            LineIndex++
+            CurrentLine = ""
+        }
+    }
+    
+    return OutputLines
+}

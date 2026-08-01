@@ -1,0 +1,105 @@
+#include "alx_pc/standalone/gif_reader/_shared_"
+
+function gifProgress(Task:string, Current:number, Max:number)
+{
+    Progress["progressTask",string] = Task
+    Progress["progressCurrent",number] = Current
+    Progress["progressMax",number] = Max
+    
+    local Percent = 0
+    ProgressText = Progress["progressTask",string]
+    
+    if (Max > 0) {
+        Percent = floor(Current * 100 / Max)
+        
+        # Standard E2 string concatenation without append operators
+        ProgressText = ProgressText + 
+            " - " + 
+            Progress["progressCurrent",number] + 
+            "/" + 
+            Progress["progressMax",number] + 
+            " (" + Percent + "%)"
+    }
+    
+    Progress["progressPercent",number] = Percent
+}
+
+function gifUpdateProgress()
+{
+    CurrentState = Gif["state", string]
+
+    switch (CurrentState) {
+
+        case "count_frames",
+            Progress["step",number] = 1
+            gifProgress("Counting GIF Frames", Gif["pos",number], Gif["size",number])
+            break
+
+        case "read_block_header",
+            Progress["step",number] = (Gif["looping",number] ? 3 : 2)
+            gifProgress("Parsing GIF Header", Gif["pos",number], Gif["size",number])
+            break
+
+        case "read_subblocks",
+            Progress["step",number] = 2
+            gifProgress("Reading Data Subblocks", Gif["pos",number], Gif["size",number])
+            break
+
+        case "decompress_lzw",
+            Progress["step",number] = 2
+            
+            local S = Gif["lzwState", table]
+            local TotalPixels = Gif["frameWidth", number] * Gif["frameHeight", number]
+            
+            gifProgress(
+                "Decompressing LZW - Frame "+(Gif["frameProcessed",number]+1) + "/" + Gif["frameTotal",number], 
+                S["pixelIndex", number], 
+                TotalPixels
+            )
+            break
+            
+        case "wait_next_frame",
+            Progress["step",number] = 2
+        
+            gifProgress(
+                "Waiting Next Frame Input - "+Gif["frameProcessed",number] + "/" + Gif["frameTotal",number], 
+                Gif["frameProcessed",number], 
+                Gif["frameTotal",number]
+            )
+        
+            break
+            
+        case "frame_delay",
+            Progress["step",number] = (Gif["looping",number] ? 3 : 2)
+            
+            local Delay = Gif["nextFrameDelay", number]
+            local CurrentTime = curtime() - Gif["nextFrameStart", number]
+            
+            gifProgress(
+                "Waiting Frame Draw - "+(Gif["frameProcessed",number]+1) + "/" + Gif["frameTotal",number], 
+                round(CurrentTime,2), 
+                round(Delay,2)
+            )
+            break
+
+        case "render_frame",
+            Progress["step",number] = (Gif["looping",number] ? 3 : 2)
+            
+            local TotalPixels = Gif["frameWidth", number] * Gif["frameHeight", number]
+            
+            gifProgress(
+                "Drawing GIF - Frame "+(Gif["frameProcessed",number]+1) + "/" + Gif["frameTotal",number], 
+                Gif["renderIndex", number], 
+                TotalPixels
+            )
+            break
+
+        case "done",
+            Progress["step",number] = 3
+            gifProgress("Done", 0, 0)
+            break
+
+        default,
+            gifProgress("", 0, 0)
+    }
+}

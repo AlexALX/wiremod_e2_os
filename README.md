@@ -26,6 +26,7 @@ Main features:
 * **WCD File System** what used for wiremod CD Discs. 
 * Expression2 **BMP Reader**, draw on wire Digital Screen (up to 512x512). 
 * Expression2 Baseline (8/12bits) and Progressive **JPG Reader** for Digital Screen.
+* Expression2 **GIF Reader** with animations support for Digital Screen.
 * **Midi player** with 3 play modes (synth, instrumental, addon).
 * Few programs: Console, Burning software, file manager, network chat, partitions manager. 
 * Simple directory listing/file managing interface (DOS style).
@@ -34,7 +35,7 @@ Main features:
 * Satellite internet device, what provides access to real internet (http e2 extension) for files downloading.
 * Switch/router network system, also with laser transferer and two-way radio devices.
 * Basic **GFX lib** for draw text on Digital Screen.
-* Standalone BMP, JPG Readers and Midi Player.
+* Standalone BMP, JPG, GIF Readers and Midi Player.
 * And some other features and devices!
 
 Also includes PHP version of WM1 File System.

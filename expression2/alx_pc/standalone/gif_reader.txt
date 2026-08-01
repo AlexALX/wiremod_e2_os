@@ -1,0 +1,220 @@
+@name GIF Reader By AlexALX
+@inputs AnimateMode:string NextFrame:number GifMinDelay:number GifSizeLimit:number GifNoKeepAR:number
+@persist Animate:number MinDelay:number SizeLimit:number NoKeepAR:number
+@strict
+
+#[
+    GIF Reader
+    Created by AlexALX (c) 2026
+    -------------------
+    GIF Parser, specifications:
+    - Max resolution is unlimited, but will be automatically resized to 512x512 (DS limit)
+    - Baseline and Interlace files supported
+    - Animation support with few modes
+    - Loop and Disposal support
+    - Due to digital screen speed issues animations 
+       work properly only on very small images
+       or you can resize output by GifSizeLimit
+
+    Usage:
+    - Spawn one GIF Reader (this file)
+    - Connect this E2 to Digital Screen (this is not EGP screen! located in Wire -> Visuals -> Screens -> Digital Screen)
+    
+    Chat commands:
+    !gif http://url_with_gif_file - open gif file from the web
+    Note: long url may be cut, use input LongURL instead for such case (via string value) 
+    
+    !giffile filename.gif.txt - open gif file from a garrysmod/data/e2files/ folder, file extension must be renamed to .txt
+    
+    !gifabort - abort rendering
+    
+    !gifmode - animation mode
+
+    Animation Modes:
+     normal - no animation, just first frame
+     manual - play animation manually via input (button or command)
+     animate - play animation, but it's slow (1 frame per few seconds)
+    
+    !gifnext - play next frame in manual mode
+    
+    !gifsize - set maximum image dimensions before scaling (1 to 512)
+    !gifdelay - set minimum delay between animation frames (min 0.1)
+    !gifkeepar - set image Aspect Ratio mode (0 or 1)
+    
+    Additional Wire Inputs:
+    GifMinDelay - Minimum delay between animations (2 sec default)
+    GifSizeLimit - Maximum image dimensions before scale (default and max are 512)
+     This can be used to scale down any image before drawing
+    GifNoKeepAR - Do not keep Aspect Ratio of image
+    
+]#
+
+#include "alx_pc/standalone/includes/basicreader"
+#include "alx_pc/standalone/gif_reader/_init_"
+
+function animateMode(ModeString:string) {
+    local Mode = 0
+    if (ModeString=="manual") {
+        Mode = 1
+    } elseif (ModeString=="animate") {
+        Mode = 2    
+    }        
+    return Mode
+}
+
+if (first() | duped()) {
+    Command = "!gif"
+    
+    Funcs = table()
+    
+    Funcs["readerAbort", function] = function() {
+        print(_HUD_PRINTTALK,"GIF rendering canceled.")     
+        gifAbort()
+    }
+    
+    Funcs["readerLoad", function] = function(Body:string, Size:number, Path:string) {
+        gifInit(Body,Animate,SizeLimit,NoKeepAR,MinDelay)
+    }
+    
+    Funcs["readerCheck", function] = function() {
+        if (!->DS) {
+            print(_HUD_PRINTTALK,"Digital Screen is not connected.") 
+            return 0
+        }
+        if (DS:entity():type()!="gmod_wire_digitalscreen") {
+            print(_HUD_PRINTTALK,"The entity you connected is not a Digital Screen.\n"+
+            "It is located in Wire -> Visuals -> Screens -> Digital Screen.\nThis is NOT EGPv3 screen.") 
+            return 0    
+        }
+        return 1  
+    } 
+    
+    Funcs["readerError", function] = function(Error:string, Path:string) {
+        print(_HUD_PRINTTALK, Error)
+    }
+    
+    Animate = animateMode(AnimateMode)
+    MinDelay = GifMinDelay
+    SizeLimit = GifSizeLimit
+    NoKeepAR = GifNoKeepAR
+}
+
+function gifNextCommand() {
+    local Result = gifNextManualFrame()
+    
+    if (Result==1) {    
+        print(_HUD_PRINTTALK,
+            "Processing next frame - "+(Gif["frameProcessed",number]+1)+"/"+Gif["frameTotal",number]
+        )
+    } elseif (Result==2) {    
+        print(_HUD_PRINTTALK,
+            "Gif animation already finished."
+        )
+    } elseif (Result==-2) {
+        print(_HUD_PRINTTALK,
+            "Gif is not running"
+        ) 
+    } elseif (Result==-1) {
+        print(_HUD_PRINTTALK,
+            "Current Gif mode is not manual\n"+
+            "Please restart gif reader."
+        ) 
+    } else {
+        print(_HUD_PRINTTALK,
+            "GIF Reader is busy, please wait."
+        )
+    }
+}
+
+event chat(Player:entity, Said:string, Team:number) {
+    if (!Command) { exit() }
+    
+    if (Player==owner()) { 
+        
+        local Find = Said:lower():find(" ")
+        
+        if (Find) {
+            local Cmd = Said:left(Find-1)
+            local Mode = Said:sub(Find+1):lower()
+
+            if (Cmd==Command+"mode") { 
+                if (Mode == "manual") {
+                    Animate = 1
+                    print(_HUD_PRINTTALK,
+                        "Gif mode set to manual\n"+
+                        "Next frame will be read after input"
+                    )
+                } elseif (Mode == "animate") {
+                    Animate = 2
+                    print(_HUD_PRINTTALK,
+                        "Gif mode set to animated\n"+
+                        "Every frame read will be rendered automatically\n"+
+                        "This mode is very slow\n"+
+                        "STRONGLY recommend set !gifsize 128 for this mode!"
+                    ) 
+                } elseif(Mode == "normal") {
+                    Animate = 0
+                    print(_HUD_PRINTTALK,
+                        "Gif mode set to normal\n"+
+                        "No animation will be displayed, rendering only the first frame"
+                    ) 
+                } else {
+                    print(_HUD_PRINTTALK,
+                        "Invalid GIF mode"
+                    ) 
+                }
+            } elseif (Cmd==Command+"size") {
+                local Size = Mode:toNumber()                
+                SizeLimit = clamp(Size,1,512)
+                print(_HUD_PRINTTALK,
+                    "Gif max size set to "+SizeLimit
+                ) 
+                if (Size>512) {
+                    print(_HUD_PRINTTALK,
+                        "Size clamped, Digital Screen support max 512x512"
+                    ) 
+                }
+            } elseif (Cmd==Command+"delay") {
+                local Size = Mode:toNumber()
+                MinDelay = max(Size,0.1)
+                print(_HUD_PRINTTALK,
+                    "Minimum delay between animations set to "+MinDelay
+                ) 
+            } elseif (Cmd==Command+"keepar") {
+                if (Mode=="false" | Mode=="0" | Mode=="nokeep" | Mode=="off") {
+                    NoKeepAR = 1    
+                    print(_HUD_PRINTTALK,
+                        "Aspect Ratio: DISABLED (Stretch to fit)"
+                    ) 
+                } else {
+                    NoKeepAR = 0   
+                    print(_HUD_PRINTTALK,
+                        "Aspect Ratio: ENABLED (Preserve proportions)"
+                    ) 
+                }
+            }
+        } elseif (Said:lower()=="!gifnext") {
+            gifNextCommand()
+        }
+    }
+}
+
+if (~AnimateMode) {
+    Animate = animateMode(AnimateMode)
+}
+
+if (~GifSizeLimit) {
+    SizeLimit = GifSizeLimit
+}
+
+if (~GifMinDelay) {
+    MinDelay = GifMinDelay
+}
+
+if (~GifNoKeepAR) {
+    NoKeepAR = GifNoKeepAR
+}
+
+if (~NextFrame & NextFrame) {
+    gifNextCommand()
+}

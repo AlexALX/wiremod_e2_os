@@ -38,61 +38,50 @@ function number jpgReadByte()
     return -1
 }
 
+function number jpgBits(Bits:number)
+{
+    if (Bits == 0) { return 0 }
+
+    local Buffer = Jpg["bitBuffer",number]
+    local Count  = Jpg["bitCount",number]
+
+    while (Count < Bits) {
+        local Byte = jpgReadByte()
+        if (Byte < 0) {
+            Jpg["bitCount",number] = 0
+            Jpg["bitBuffer",number] = Buffer
+            return Byte
+        }
+        Buffer = (Buffer << 8) || Byte
+        Count += 8
+    }
+
+    Count = Count - Bits
+    local Value = (Buffer >> Count) && ((1 << Bits) - 1)
+
+    Jpg["bitCount",number] = Count
+    Jpg["bitBuffer",number] = Buffer
+
+    return Value
+}
+
 function number jpgBit()
 {
     local Buffer = Jpg["bitBuffer",number]
     local Count  = Jpg["bitCount",number]
 
     if (Count == 0) {
-
-        local Pos = jpgTell()
         local Byte = jpgReadByte()
-
-        if (Byte < 0) {
-            return Byte
-        }
-
+        if (Byte < 0) { return Byte }
         Buffer = Byte
         Count = 8
     }
 
     Count = Count - 1
-
     Jpg["bitCount",number] = Count
     Jpg["bitBuffer",number] = Buffer
 
     return (Buffer >> Count) && 1
-}
-
-function number jpgBits(Bits:number)
-{
-    local Value = 0
-    
-    local Buffer = Jpg["bitBuffer",number]
-    local Count  = Jpg["bitCount",number]
-
-    for (I = 1, Bits) {
-        if (Count == 0) {
-            local Byte = jpgReadByte()
-            if (Byte < 0) {
-                Jpg["bitCount",number] = 0
-                Jpg["bitBuffer",number] = Buffer
-                return Byte
-            }
-            Buffer = Byte
-            Count = 8
-        }
-
-        Count = Count - 1
-
-        local Bit = (Buffer >> Count) && 1
-        Value = (Value << 1) || Bit
-    }
-
-    Jpg["bitCount",number] = Count
-    Jpg["bitBuffer",number] = Buffer
-
-    return Value
 }
 
 function jpgAlignByte()

@@ -2972,7 +2972,7 @@ function alxos_explorer_unplug() {
             alxos_explorer_msg("Disk was unplugged.",200,"Information")
         } elseif (
             ExplorerCurTask=="paste" | ExplorerCurTask=="mkfile" | ExplorerCurTask=="reader" | ExplorerCurTask=="bmp" | 
-            ExplorerCurTask=="sound" | ExplorerCurTask=="jpg"
+            ExplorerCurTask=="sound"
         ) {
             if (ExplorerCurTask=="sound") {
                 alxos_explorer_stopsound()    
@@ -2982,9 +2982,18 @@ function alxos_explorer_unplug() {
             alxos_explorer_handlers()
             alxos_explorer_msg("Disk was unplugged.",200,"Information")
         }
+        
         if (ExplorerFS["hddinfo",table]["type",number]==1) {
             dsSendDirect("stopdiskrot",dsGetTable()[3,table]["ent",entity],1)    
+        } else {
+            dsSendDirect("clear",ExplorerOldFs["hdd_io",wirelink]:entity(),entity())    
         }
+        
+        if (ExplorerCurTask:find("alxos_prog_")!=0) {
+            local CmdName = ExplorerCurTask+"_unplug"
+            CmdName()
+        }
+        
     } elseif (ExplorerCurTask=="paste") {
         local Step = DialogData[4,number]
         if (Step==1 & !ExplorerCopy["hddinfo",table]:count()) {
@@ -2994,7 +3003,7 @@ function alxos_explorer_unplug() {
             alxos_explorer_handlers()
             alxos_explorer_msg("Disk was unplugged.",200,"Information")
         }
-    }    
+    } 
 }
 
 function alxos_explorer_onplug(Name:string) {

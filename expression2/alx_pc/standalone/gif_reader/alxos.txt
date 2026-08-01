@@ -1,0 +1,23 @@
+@name ALX OS GIF Reader
+@outputs WL:wirelink
+
+#include "alx_pc/standalone/gif_reader/_init_"
+
+if (first() | duped()) {
+    # fix wirelink wiring reset on crash
+    WL = wirelink()
+}
+
+if (dsClk()) {
+    local DSName = dsClkName()    
+    if (DSName=="drawImage") {
+        GIFNoPrint = 1
+        local Info = dsGetTable()
+        gifInit(Info[1,string],Info[2,number],Info[3,number],Info[4,number],Info[5,number])  
+        dsSendDirect("initImage",dsGetSender(),table(wirelink()))  
+    } elseif (DSName=="abortImage") {
+        gifAbort()
+    } elseif (DSName=="nextFrame") {
+        gifNextManualFrame()
+    }
+}

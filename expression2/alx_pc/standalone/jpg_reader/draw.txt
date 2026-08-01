@@ -6,35 +6,41 @@ function number jpgDrawStep()
 
     local Width = Jpg["width",number]
     local Height = Jpg["height",number]
+    
+    local NoKeepAR = Jpg["NoKeepAR",number]
 
     if (State["active",number] == 0) {
         State["active",number] = 1
         State["index",number] = 0
         
         if (!Jpg["DS_Inited",number]) {
+            
+            local ScreenWidth = Jpg["screenWidth",number]
+            local ScreenHeight = Jpg["screenHeight",number]
+            
             Jpg["DS_Inited",number] = 1
             
-            # for preview modes
             Progress["progressDrew",number] = 1
             
             DS[1048569] = 2
             DS[1048574] = 0
             DS[1048575] = 1
             
-            if (!JPG_NoKeepAR) {
-                local SWH = (Width>Height ? Width : Height)
-                Jpg["Xadd",number] = (Height>Width ? floor((Height-Width)/2) : 0 )
-                Jpg["Yadd",number] = (Width>Height ? floor((Width-Height)/2) : 0 )
+            if (!NoKeepAR) {
+                local SWH = (ScreenWidth>ScreenHeight ? ScreenWidth : ScreenHeight)
+                Jpg["Xadd",number] = (ScreenHeight>ScreenWidth ? floor((SWH-ScreenWidth)/2) : 0 )
+                Jpg["Yadd",number] = (ScreenWidth>ScreenHeight ? floor((SWH-ScreenHeight)/2) : 0 )
+                Jpg["posMul", number] = SWH  
                 DS[1048573] = SWH
-                DS[1048572] = SWH
+                DS[1048572] = SWH          
             } else {
                 Jpg["Xadd",number] = 0
                 Jpg["Yadd",number] = 0
-                DS[1048573] = Width
-                DS[1048572] = Height
+                Jpg["posMul", number] = ScreenWidth
+                DS[1048573] = ScreenWidth
+                DS[1048572] = ScreenHeight
             }
         }
-        
     }
 
     local Planes = Jpg["planesFull",table]
@@ -48,74 +54,76 @@ function number jpgDrawStep()
     local Xadd = Jpg["Xadd",number]
     local Yadd = Jpg["Yadd",number]
     
-    local ComponentBlocksX = Jpg["components",table][1,table]["blocksX",number]
+    local PosMul = Jpg["posMul",number]
     
-    local PosMul = (Xadd>Yadd ? Height : Width)
+    local IsProgressive = Jpg["progressivePreview",number]
+    local TestYCbCr = Jpg["test_YCbCrToRGB",number]
+    local PixelsTable = Jpg["pixels",table]
+    local Dirty = Jpg["dirtyBlocks",table]
+
+    local CompY = Jpg["components",table][1,table]
+    local CompY_BX = CompY["blocksX",number]
+
+    local CompCb = Jpg["components",table][2,table]
+    local CompCb_BX = CompCb["blocksX",number]
+    local CbScaleX = CompCb["h",number] / Jpg["maxH",number]
+    local CbScaleY = CompCb["v",number] / Jpg["maxV",number]
+
+    local CompCr = Jpg["components",table][3,table]
+    local CompCr_BX = CompCr["blocksX",number]
+    local CrScaleX = CompCr["h",number] / Jpg["maxH",number]
+    local CrScaleY = CompCr["v",number] / Jpg["maxV",number]
+
+    local Scale = Jpg["globalScale", number]
+    local InvScale = Jpg["invScale", number]
+    local StepX = floor(Scale)
+    if (StepX < 1) { StepX = 1 }
+
+    local LastX = -1
+    local LastY = -1
 
     while (perf(90)) {
 
         local I = State["index",number]
 
-
         if (I >= Count) {
-
             State["active",number] = 0
             return 1
         }
         
-        if (Jpg["progressivePreview",number]) {
-            local PixelX = I % Width
-            local PixelY = floor(I / Width)
-    
-            #
-            # 1. Calculate block index for Y (ID = 1) - Full Resolution Grid
-            #
-            local CompY = Jpg["components",table][1,table]
-            local BlockX_Y = floor(PixelX / 8)
-            local BlockY_Y = floor(PixelY / 8)
-            local BlockIdx_Y = BlockY_Y * CompY["blocksX",number] + BlockX_Y
-            local KeyY = 1 * 10000 + BlockIdx_Y
+        local PixelX = I % Width
+        local PixelY = floor(I / Width)
+        
+        if (IsProgressive) {
+            local BlockIdx_Y = floor(PixelY >> 3) * CompY_BX + floor(PixelX >> 3)
+            local KeyY = 10000 + BlockIdx_Y
             
-            #
-            # 2. Calculate block index for Cb (ID = 2) - Accounts for chroma subsampling scale
-            #
-            local CompCb = Jpg["components",table][2,table]
-            local CbScaleX = CompCb["h",number] / Jpg["maxH",number]
-            local CbScaleY = CompCb["v",number] / Jpg["maxV",number]
-            local BlockX_Cb = floor((PixelX * CbScaleX) / 8)
-            local BlockY_Cb = floor((PixelY * CbScaleY) / 8)
-            local BlockIdx_Cb = BlockY_Cb * CompCb["blocksX",number] + BlockX_Cb
-            local KeyCb = 2 * 10000 + BlockIdx_Cb
-            
-            #
-            # 3. Calculate block index for Cr (ID = 3) - Accounts for chroma subsampling scale
-            #
-            local CompCr = Jpg["components",table][3,table]
-            local CrScaleX = CompCr["h",number] / Jpg["maxH",number]
-            local CrScaleY = CompCr["v",number] / Jpg["maxV",number]
-            local BlockX_Cr = floor((PixelX * CrScaleX) / 8)
-            local BlockY_Cr = floor((PixelY * CrScaleY) / 8)
-            local BlockIdx_Cr = BlockY_Cr * CompCr["blocksX",number] + BlockX_Cr
-            local KeyCr = 3 * 10000 + BlockIdx_Cr
-         
-            #
-            # Skip the 8-pixel horizontal segment ONLY if none of the components changed in this block
-            #
-            if (!Jpg["dirtyBlocks",table][KeyY,number] & 
-                !Jpg["dirtyBlocks",table][KeyCb,number] & 
-                !Jpg["dirtyBlocks",table][KeyCr,number]) {
+            if (!Dirty[KeyY,number]) {
+                local BlockIdx_Cb = floor((PixelY * CbScaleY) / 8) * CompCb_BX + floor((PixelX * CbScaleX) / 8)
+                local KeyCb = 20000 + BlockIdx_Cb
                 
-                local SkipPixels = 8 - (PixelX % 8)
-       
-                # Prevent skipping beyond the current texture boundary row
-                if ((PixelX + SkipPixels) > Width) {
-                    SkipPixels = Width - PixelX
+                if (!Dirty[KeyCb,number]) {
+                    local BlockIdx_Cr = floor((PixelY * CrScaleY) / 8) * CompCr_BX + floor((PixelX * CrScaleX) / 8)
+                    local KeyCr = 30000 + BlockIdx_Cr
+                    
+                    if (!Dirty[KeyCr,number]) {
+                        local SkipPixels = 8 - (PixelX % 8)
+               
+                        if ((PixelX + SkipPixels) > Width) {
+                            SkipPixels = Width - PixelX
+                        }
+            
+                        if (Scale > 1) {
+                            local RawNextRow = floor((I + SkipPixels) / Width)
+                            local AlignedNextRow = (floor(RawNextRow / StepX) + 1) * StepX
+
+                            State["index",number] = AlignedNextRow * Width
+                        } else {
+                            State["index",number] = I + SkipPixels
+                        }
+                        continue 
+                    }
                 }
-    
-                # Perform the multi-pixel skip forward
-                State["index",number] = I + SkipPixels
-                
-                continue 
             }
         }
         
@@ -123,37 +131,58 @@ function number jpgDrawStep()
         local Cb = CbPlane[I,number] - 128
         local Cr = CrPlane[I,number] - 128
         
-        local R = Y + 1.402 * Cr
-        local G = Y - 0.344136 * Cb - 0.714136 * Cr
-        local B = Y + 1.772 * Cb
-                
-        R = clamp(R, 0, 255)
-        G = clamp(G, 0, 255)
-        B = clamp(B, 0, 255)
+        local R = clamp(Y + 1.402 * Cr, 0, 255)
+        local G = clamp(Y - 0.344136 * Cb - 0.714136 * Cr, 0, 255)
+        local B = clamp(Y + 1.772 * Cb, 0, 255)
         
         local DSIndex = I
         
-        if (!JPG_NoKeepAR) {
-            local X = I % Width
-            local Y = floor(I / Width)
+        if (Scale > 1) {
+            local FinalX = floor(PixelX * InvScale)
+            local FinalY = floor(PixelY * InvScale)
             
-            DSIndex = (X + Xadd) + (Y + Yadd) * PosMul
-        }
-        
-        local PackedRGB = 
-            floor(R) * 65536 +
-            floor(G) * 256 +
-            floor(B)
-
-        if (Jpg["test_YCbCrToRGB",number]) {
-            Jpg["pixels",table][DSIndex,number] = PackedRGB
+            if (FinalX != LastX | FinalY != LastY) {
+                LastX = FinalX
+                LastY = FinalY
+                
+                if (!NoKeepAR) {
+                    DSIndex = (FinalX + Xadd) + (FinalY + Yadd) * PosMul
+                } else {
+                    DSIndex = FinalX + FinalY * PosMul
+                }
+                
+                local PackedRGB = (floor(R) << 16) || (floor(G) << 8) || floor(B)
+                if (TestYCbCr) {
+                    PixelsTable[DSIndex,number] = PackedRGB
+                } else {
+                    DS[DSIndex] = PackedRGB
+                }
+            }
         } else {
-            DS[DSIndex] = PackedRGB
+            if (!NoKeepAR) {
+                DSIndex = (PixelX + Xadd) + (PixelY + Yadd) * PosMul
+            }
+            local PackedRGB = (floor(R) << 16) || (floor(G) << 8) || floor(B)
+            if (TestYCbCr) {
+                PixelsTable[DSIndex,number] = PackedRGB
+            } else {
+                DS[DSIndex] = PackedRGB
+            }
         }
 
-        State["index",number] = I + 1
+        if (Scale > 1) {
+            local SpaceInRow = Width - PixelX - 1
+            if (SpaceInRow >= StepX) {
+                State["index",number] = I + StepX
+            } else {
+                local CurrentRow = floor(I / Width)
+                local NextRow = CurrentRow + StepX
+                State["index",number] = NextRow * Width
+            }
+        } else {
+            State["index",number] = I + 1
+        }
     }
-
 
     return 0
 }
@@ -182,26 +211,19 @@ function number jpgInitFullPlanes()
         Jpg["planesFull",table] = Full
     }
 
-
     local Width = Jpg["width",number]
     local Height = Jpg["height",number]
 
-
     local Planes = Jpg["planes",table]
-
     local Cb = Planes[2,table]
     local Cr = Planes[3,table]
 
-
     local Full = Jpg["planesFull",table]
-
     local CbFull = Full[2,table]
     local CrFull = Full[3,table]
 
-
     local Count = Width * Height
     
-    # optimize
     local Scan = Jpg["frameComponents",table]
     local JpgComp = Jpg["components",table]
     
@@ -219,6 +241,10 @@ function number jpgInitFullPlanes()
     
     local CrScaleX = CrInfo["h",number] / Jpg["maxH",number]
     local CrScaleY = CrInfo["v",number] / Jpg["maxV",number]
+
+    local Scale = Jpg["globalScale", number]
+    local StepX = floor(Scale)
+    if (StepX < 1) { StepX = 1 }
 
     while (perf(90)) {
 
@@ -241,7 +267,18 @@ function number jpgInitFullPlanes()
         CbFull[I,number] = Cb[CbY * CbW + CbX, number]
         CrFull[I,number] = Cr[CrY * CrW + CrX, number]
 
-        State["index",number] = I + 1
+        if (Scale > 1) {
+            local SpaceInRow = Width - X - 1
+            if (SpaceInRow >= StepX) {
+                State["index",number] = I + StepX
+            } else {
+                local CurrentRow = floor(I / Width)
+                local NextRow = CurrentRow + StepX
+                State["index",number] = NextRow * Width
+            }
+        } else {
+            State["index",number] = I + 1
+        }
     }
 
     return 0
@@ -292,48 +329,47 @@ function jpgCopyBlockToPlane(
 
 function number jpgAssembleImageStep()
 {
-    local State = Jpg["assemble",table]
+    local State = Jpg["assemble", table]
 
-    if (State["active",number] == 0) {
-        State["active",number] = 1
-        State["mcu",number] = 0
-        State["component",number] = 1
-        State["block",number] = 0     
-        State["processed",number] = 0
+    if (State["active", number] == 0) {
+        State["active", number] = 1
+        State["mcu", number] = 0
+        State["component", number] = 1
+        State["block", number] = 0     
+        State["processed", number] = 0
     }
 
-    local Components = Jpg["frameComponents",table]
+    local Components = Jpg["frameComponents", table]
+    local CompCount = Components:count()    
     
-    local JpgBlocks = Jpg["blocks",table]
-    local JpgComponents = Jpg["components",table]
-    local McuXCount = Jpg["mcuX",number]
+    local JpgBlocks = Jpg["blocks", table]
+    local JpgComponents = Jpg["components", table]
+    local McuXCount = Jpg["mcuX", number]
+    local McuCount = Jpg["mcuCount", number]
+    local IsProgressive = Jpg["progressivePreview", number]
+    local DirtyBlocks = Jpg["dirtyBlocks", table] 
 
     while (perf(90)) {
 
-        local MCU = State["mcu",number]
+        local MCU = State["mcu", number]
 
-        #
-        #   MCU finished
-        #
-
-        if (MCU >= Jpg["mcuCount",number]) {
-            State["active",number] = 0
+        if (MCU >= McuCount) {
+            State["active", number] = 0
             return 1
         }
 
-        local ComponentIndex = State["component",number]
-        local Scan = Components[ComponentIndex,table]
-        local ComponentID = Scan["id",number]
+        local ComponentIndex = State["component", number]
+        local Scan = Components[ComponentIndex, table]
+        local ComponentID = Scan["id", number]
         
-        local Component = JpgComponents[ComponentID,table]
+        local Component = JpgComponents[ComponentID, table]
 
-        local H = Component["h",number]
-        local V = Component["v",number]
+        local H = Component["h", number]
+        local V = Component["v", number]
         local BlocksPerMCU = H * V
 
-        local Storage = JpgBlocks[ComponentID,table]
-        
-        local BlockNum = State["block",number]
+        local Storage = JpgBlocks[ComponentID, table]
+        local BlockNum = State["block", number]
 
         local Index = jpgComponentBlockIndex(
             Component,
@@ -341,22 +377,23 @@ function number jpgAssembleImageStep()
             BlockNum
         )
 
-        if (Jpg["progressivePreview",number]) {
+        if (IsProgressive) {
             local Key = ComponentID * 10000 + Index
-            if (!Jpg["dirtyBlocks",table][Key,number]) {
+            
+            if (!DirtyBlocks[Key, number]) {
                 
-                State["processed",number] = State["processed",number] + 1
+                State["processed", number] = State["processed", number] + 1
                 BlockNum = BlockNum + 1
-                State["block",number] = BlockNum
+                State["block", number] = BlockNum
     
                 if (BlockNum >= BlocksPerMCU) {
-                    State["block",number] = 0
+                    State["block", number] = 0
                     ComponentIndex = ComponentIndex + 1
-                    State["component",number] = ComponentIndex
+                    State["component", number] = ComponentIndex
     
-                    if (ComponentIndex > Components:count()) {
-                        State["component",number] = 1
-                        State["mcu",number] = MCU + 1
+                    if (ComponentIndex > CompCount) {
+                        State["component", number] = 1
+                        State["mcu", number] = MCU + 1
                     }
                 }
                 
@@ -364,7 +401,7 @@ function number jpgAssembleImageStep()
             }
         }
         
-        local Block = Storage[Index,table]  
+        local Block = Storage[Index, table]  
 
         local McuX = MCU % McuXCount
         local McuY = floor(MCU / McuXCount)
@@ -372,8 +409,8 @@ function number jpgAssembleImageStep()
         local BlockX = BlockNum % H
         local BlockY = floor(BlockNum / H)
         
-        local FinalX = (McuX * H + BlockX) * 8
-        local FinalY = (McuY * V + BlockY) * 8
+        local FinalX = (McuX * H + BlockX) << 3
+        local FinalY = (McuY * V + BlockY) << 3
         
         jpgCopyBlockToPlane(
             Block,
@@ -382,23 +419,19 @@ function number jpgAssembleImageStep()
             FinalY
         )
         
-        State["processed",number] = State["processed",number] + 1
+        State["processed", number] = State["processed", number] + 1
         BlockNum = BlockNum + 1
-        State["block",number] = BlockNum
+        State["block", number] = BlockNum
 
         if (BlockNum >= BlocksPerMCU) {
 
-            State["block",number] = 0
+            State["block", number] = 0
             ComponentIndex = ComponentIndex + 1
-            State["component",number] = ComponentIndex
+            State["component", number] = ComponentIndex
 
-            #
-            #   Next MCU
-            #
-
-            if (ComponentIndex > Components:count()) {
-                State["component",number] = 1
-                State["mcu",number] = MCU + 1
+            if (ComponentIndex > CompCount) {
+                State["component", number] = 1
+                State["mcu", number] = MCU + 1
             }
         }
     }

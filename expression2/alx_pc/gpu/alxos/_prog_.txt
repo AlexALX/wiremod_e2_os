@@ -44,6 +44,12 @@ function alxos_jpg_reader(Args:table) {
     alxos_jpg_init(Args)
 }
 
+ALXOS_PROGS["alxos_gif_reader",number] = 1
+function alxos_gif_reader(Args:table) {
+    #include "alx_pc/gpu/alxos/gif"
+    alxos_gif_init(Args)
+}
+
 ALXOS_PROGS["alxos_cd_burner",number] = 1
 function alxos_cd_burner(Args:table) {
     #include "alx_pc/gpu/alxos/cdburn"

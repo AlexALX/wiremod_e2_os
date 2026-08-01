@@ -6,13 +6,15 @@
 #include "alx_pc/standalone/jpg_reader/draw"
 #include "alx_pc/standalone/jpg_reader/progress"
 
-function jpgInit(Data:string, ProgressivePreview:number)
+function jpgInit(Data:string, ProgressivePreview:number, MaxSize:number, NoKeepAR:number)
 {
     Processing = 0
     
     Jpg = table()
-    
+    Jpg["start", number] = curtime()
     Jpg["progressivePreview",number] = ProgressivePreview
+    Jpg["MaxSize", number] = MaxSize
+    Jpg["NoKeepAR", number] = NoKeepAR
     
     Jpg["data",string] = Data
     Jpg["size",number] = Data:length()
@@ -68,6 +70,7 @@ function jpgInit(Data:string, ProgressivePreview:number)
     Progress["stepTotal",number] = 9
     
     Error = ""
+    Warning = ""
     
     if (jpgU16() != 0xFFD8) {
         timer(0.001,function() {
@@ -83,8 +86,8 @@ function jpgInit(Data:string, ProgressivePreview:number)
     
     # we must delay a bit or it will not trigger proper outputs
     timer(0.001,function() {
-        Jpg["state",string] = "parse"    
         Processing = 1
+        Jpg["state",string] = "parse"    
     })
     if (!JPGNoPrint) {
         print("JPEG detected")
@@ -94,6 +97,34 @@ function jpgInit(Data:string, ProgressivePreview:number)
 # clear e2 memory
 function jpgClear() {
     Jpg = table()    
+}
+
+function jpgAbort() {
+    Jpg["state",string] = ""
+    CurrentState = ""
+    Progress = table()
+    ProgressText = ""
+    Error = ""
+    Processing = 0
+    jpgClear()
+}
+
+function jpgDone() {
+    Jpg["state", string] = "done"
+    
+    jpgUpdateProgress()
+    Processing = 0
+    
+    local RenderTime = round(curtime() - Jpg["start", number],2)
+    
+    Progress["renderTime",number] = RenderTime
+    
+    if (!JPGNoPrint) {
+        print("JPG Finished, render time: "+RenderTime+"s")
+    }
+    
+    # clear memory
+    jpgClear()
 }
 
 event tick()
@@ -146,12 +177,7 @@ event tick()
                     Jpg["dirtyBlocks",table] = table()      
                     Jpg["state",string] = "parse_scan"
                 } else {
-                    Jpg["state",string] = "done"
-                
-                    Processing = 0            
-                    jpgUpdateProgress()
-                    
-                    jpgClear()
+                    jpgDone()
                 }
             }
     

@@ -1,4 +1,4 @@
-@persist JpgIDCT:table IDCT_Cos:array
+@persist JpgIDCT:table IDCT_Cos:array SQRT_05:number
 
 #include "alx_pc/standalone/jpg_reader/_shared_"
 
@@ -13,38 +13,27 @@ if (first() | duped()) {
     JpgIDCT["C6",number] = cosr(6 * _PI / 16)
     JpgIDCT["C7",number] = cosr(7 * _PI / 16)
     
+    SQRT_05 = sqrt(0.5)
+    
     for (X = 0, 7) {
         for (U = 0, 7) {
             local Index = X * 8 + U + 1
             IDCT_Cos[Index, number] = cosr((2 * X + 1) * U * _PI / 16)
         }
     }
-    
 }
 
 function table jpgIDCT1D(Input:table)
 {
     local Output = table()
-
     for (X = 0, 7) {
-
         local Sum = 0
-
         for (U = 0, 7) {
-
-            local C = 1
-
-            if (U == 0) {
-                C = sqrt(0.5)
-            }
-
-            local CosVal = IDCT_Cos[X * 8 + U + 1, number]
-            Sum = Sum + C * Input[U,number] * CosVal
+            local C = (U == 0 ? SQRT_05 : 1)
+            Sum = Sum + C * Input[U,number] * IDCT_Cos[X * 8 + U + 1, number]
         }
-
         Output[X,number] = Sum / 2
     }
-
     return Output
 }
 
@@ -55,18 +44,13 @@ function number jpgIDCTStep(Block:table)
     #
     # INIT
     #
-
     if (State["active",number] == 0) {
-
         State["active",number] = 1
         State["stage",number] = 0
         State["index",number] = 0
-
         State["temp",table] = table()
         
-        # optimize
         local IsSolidColor = 1
-        
         for (I = 1, 63) { 
             if (Block[I,number] != 0) {
                 IsSolidColor = 0
@@ -75,11 +59,7 @@ function number jpgIDCTStep(Block:table)
         }
         
         if (IsSolidColor) {    
-            
-            local Precision = Jpg["precision", number]
-            
             local DCValue = (Block[0,number] / 8) + Jpg["levelShift",number]
-            
             if (Jpg["outputShift",number] > 0) {
                 DCValue = floor(DCValue / Jpg["outputShift",number])  
             }
@@ -88,74 +68,118 @@ function number jpgIDCTStep(Block:table)
             for (I = 0, 63) {
                 Block[I,number] = DCValue
             }
-
             return 1
         }
-        
     }
 
     local Temp = State["temp",table]
 
     #
-    # ROWS
+    #  ROWS
     #
-
     if (State["stage",number] == 0) {
-
         local Y = State["index",number]
+        local RowOffset = Y * 8
 
-        local Row = table()
+        if (Block[RowOffset + 1, number] == 0 & Block[RowOffset + 2, number] == 0 & Block[RowOffset + 3, number] == 0 & Block[RowOffset + 4, number] == 0 & Block[RowOffset + 5, number] == 0 & Block[RowOffset + 6, number] == 0 & Block[RowOffset + 7, number] == 0) {
+            local ShortSum = (SQRT_05 * Block[RowOffset, number]) / 2
+            Temp[RowOffset+0, number] = ShortSum, Temp[RowOffset+1, number] = ShortSum
+            Temp[RowOffset+2, number] = ShortSum, Temp[RowOffset+3, number] = ShortSum
+            Temp[RowOffset+4, number] = ShortSum, Temp[RowOffset+5, number] = ShortSum
+            Temp[RowOffset+6, number] = ShortSum, Temp[RowOffset+7, number] = ShortSum
+        } else {
+            local B0 = Block[RowOffset+0, number] * SQRT_05
+            local B1 = Block[RowOffset+1, number], local B2 = Block[RowOffset+2, number]
+            local B3 = Block[RowOffset+3, number], local B4 = Block[RowOffset+4, number]
+            local B5 = Block[RowOffset+5, number], local B6 = Block[RowOffset+6, number]
+            local B7 = Block[RowOffset+7, number]
 
-        for (X = 0, 7) {
-            Row[X,number] = Block[Y * 8 + X,number]
-        }
-
-        Row = jpgIDCT1D(Row)
-        
-        for (X = 0, 7) {
-            Temp[Y * 8 + X,number] = Row[X,number]
+            # X = 0 (1..8)
+            Temp[RowOffset+0, number] = (B0 + B1*IDCT_Cos[2,number] + B2*IDCT_Cos[3,number] + B3*IDCT_Cos[4,number] + B4*IDCT_Cos[5,number] + B5*IDCT_Cos[6,number] + B6*IDCT_Cos[7,number] + B7*IDCT_Cos[8,number]) / 2
+            # X = 1 (9..16)
+            Temp[RowOffset+1, number] = (B0 + B1*IDCT_Cos[10,number] + B2*IDCT_Cos[11,number] + B3*IDCT_Cos[12,number] + B4*IDCT_Cos[13,number] + B5*IDCT_Cos[14,number] + B6*IDCT_Cos[15,number] + B7*IDCT_Cos[16,number]) / 2
+            # X = 2 (17..24)
+            Temp[RowOffset+2, number] = (B0 + B1*IDCT_Cos[18,number] + B2*IDCT_Cos[19,number] + B3*IDCT_Cos[20,number] + B4*IDCT_Cos[21,number] + B5*IDCT_Cos[22,number] + B6*IDCT_Cos[23,number] + B7*IDCT_Cos[24,number]) / 2
+            # X = 3 (25..32)
+            Temp[RowOffset+3, number] = (B0 + B1*IDCT_Cos[26,number] + B2*IDCT_Cos[27,number] + B3*IDCT_Cos[28,number] + B4*IDCT_Cos[29,number] + B5*IDCT_Cos[30,number] + B6*IDCT_Cos[31,number] + B7*IDCT_Cos[32,number]) / 2
+            # X = 4 (33..40)
+            Temp[RowOffset+4, number] = (B0 + B1*IDCT_Cos[34,number] + B2*IDCT_Cos[35,number] + B3*IDCT_Cos[36,number] + B4*IDCT_Cos[37,number] + B5*IDCT_Cos[38,number] + B6*IDCT_Cos[39,number] + B7*IDCT_Cos[40,number]) / 2
+            # X = 5 (41..48)
+            Temp[RowOffset+5, number] = (B0 + B1*IDCT_Cos[42,number] + B2*IDCT_Cos[43,number] + B3*IDCT_Cos[44,number] + B4*IDCT_Cos[45,number] + B5*IDCT_Cos[46,number] + B6*IDCT_Cos[47,number] + B7*IDCT_Cos[48,number]) / 2
+            # X = 6 (49..56)
+            Temp[RowOffset+6, number] = (B0 + B1*IDCT_Cos[50,number] + B2*IDCT_Cos[51,number] + B3*IDCT_Cos[52,number] + B4*IDCT_Cos[53,number] + B5*IDCT_Cos[54,number] + B6*IDCT_Cos[55,number] + B7*IDCT_Cos[56,number]) / 2
+            # X = 7 (57..64)
+            Temp[RowOffset+7, number] = (B0 + B1*IDCT_Cos[58,number] + B2*IDCT_Cos[59,number] + B3*IDCT_Cos[60,number] + B4*IDCT_Cos[61,number] + B5*IDCT_Cos[62,number] + B6*IDCT_Cos[63,number] + B7*IDCT_Cos[64,number]) / 2
         }
 
         State["index",number] = Y + 1
-
         if (State["index",number] >= 8) {
             State["stage",number] = 1
             State["index",number] = 0
         }
-
         return 0
     }
 
     #
-    # COLS
+    #  COLS
     #
-
     local X = State["index",number]
+    local OutShift = Jpg["outputShift",number]
+    local LvlShift = Jpg["levelShift",number]
 
-    local Col = table()
+    if (Temp[X+8, number] == 0 & Temp[X+16, number] == 0 & Temp[X+24, number] == 0 & Temp[X+32, number] == 0 & Temp[X+40, number] == 0 & Temp[X+48, number] == 0 & Temp[X+56, number] == 0) {
+        local ShortSum = (SQRT_05 * Temp[X, number]) / 2
+        local Value = ShortSum + LvlShift
+        if (OutShift > 0) { Value = floor(Value / OutShift) }
+        Value = clamp(floor(Value), 0, 255)
 
-    for (Y = 0, 7) {
-        Col[Y,number] = Temp[Y * 8 + X,number]
-    }
+        Block[X+0,  number] = Value, Block[X+8,  number] = Value
+        Block[X+16, number] = Value, Block[X+24, number] = Value
+        Block[X+32, number] = Value, Block[X+40, number] = Value
+        Block[X+48, number] = Value, Block[X+56, number] = Value
+    } else {
+        local T0 = Temp[X+0, number] * SQRT_05
+        local T1 = Temp[X+8, number],  local T2 = Temp[X+16, number]
+        local T3 = Temp[X+24, number], local T4 = Temp[X+32, number]
+        local T5 = Temp[X+40, number], local T6 = Temp[X+48, number]
+        local T7 = Temp[X+56, number]
 
-    Col = jpgIDCT1D(Col)
+        local V0=0, local V1=0, local V2=0, local V3=0, local V4=0, local V5=0, local V6=0, local V7=0
 
-    for (Y = 0, 7) {
-        
-        local Value = Col[Y,number] + Jpg["levelShift",number]
-        
-        if (Jpg["outputShift",number] > 0) {
-            Value = floor(Value / Jpg["outputShift",number])  
+        # Y = 0 (1..8)
+        V0 = (T0 + T1*IDCT_Cos[2,number] + T2*IDCT_Cos[3,number] + T3*IDCT_Cos[4,number] + T4*IDCT_Cos[5,number] + T5*IDCT_Cos[6,number] + T6*IDCT_Cos[7,number] + T7*IDCT_Cos[8,number]) / 2 + LvlShift
+        # Y = 1 (9..16)
+        V1 = (T0 + T1*IDCT_Cos[10,number] + T2*IDCT_Cos[11,number] + T3*IDCT_Cos[12,number] + T4*IDCT_Cos[13,number] + T5*IDCT_Cos[14,number] + T6*IDCT_Cos[15,number] + T7*IDCT_Cos[16,number]) / 2 + LvlShift
+        # Y = 2 (17..24)
+        V2 = (T0 + T1*IDCT_Cos[18,number] + T2*IDCT_Cos[19,number] + T3*IDCT_Cos[20,number] + T4*IDCT_Cos[21,number] + T5*IDCT_Cos[22,number] + T6*IDCT_Cos[23,number] + T7*IDCT_Cos[24,number]) / 2 + LvlShift
+        # Y = 3 (25..32)
+        V3 = (T0 + T1*IDCT_Cos[26,number] + T2*IDCT_Cos[27,number] + T3*IDCT_Cos[28,number] + T4*IDCT_Cos[29,number] + T5*IDCT_Cos[30,number] + T6*IDCT_Cos[31,number] + T7*IDCT_Cos[32,number]) / 2 + LvlShift
+        # Y = 4 (33..40)
+        V4 = (T0 + T1*IDCT_Cos[34,number] + T2*IDCT_Cos[35,number] + T3*IDCT_Cos[36,number] + T4*IDCT_Cos[37,number] + T5*IDCT_Cos[38,number] + T6*IDCT_Cos[39,number] + T7*IDCT_Cos[40,number]) / 2 + LvlShift
+        # Y = 5 (41..48)
+        V5 = (T0 + T1*IDCT_Cos[42,number] + T2*IDCT_Cos[43,number] + T3*IDCT_Cos[44,number] + T4*IDCT_Cos[45,number] + T5*IDCT_Cos[46,number] + T6*IDCT_Cos[47,number] + T7*IDCT_Cos[48,number]) / 2 + LvlShift
+        # Y = 6 (49..56)
+        V6 = (T0 + T1*IDCT_Cos[50,number] + T2*IDCT_Cos[51,number] + T3*IDCT_Cos[52,number] + T4*IDCT_Cos[53,number] + T5*IDCT_Cos[54,number] + T6*IDCT_Cos[55,number] + T7*IDCT_Cos[56,number]) / 2 + LvlShift
+        # Y = 7 (57..64)
+        V7 = (T0 + T1*IDCT_Cos[58,number] + T2*IDCT_Cos[59,number] + T3*IDCT_Cos[60,number] + T4*IDCT_Cos[61,number] + T5*IDCT_Cos[62,number] + T6*IDCT_Cos[63,number] + T7*IDCT_Cos[64,number]) / 2 + LvlShift
+
+        if (OutShift > 0) {
+            V0 = floor(V0/OutShift), V1 = floor(V1/OutShift), V2 = floor(V2/OutShift), V3 = floor(V3/OutShift)
+            V4 = floor(V4/OutShift), V5 = floor(V5/OutShift), V6 = floor(V6/OutShift), V7 = floor(V7/OutShift)
         }
-        Value = clamp(Value, 0, 255)
 
-        Block[Y * 8 + X,number] = floor(Value)
+        Block[X+0,number]  = clamp(floor(V0), 0, 255)
+        Block[X+8,number]  = clamp(floor(V1), 0, 255)
+        Block[X+16,number] = clamp(floor(V2), 0, 255)
+        Block[X+24,number] = clamp(floor(V3), 0, 255)
+        Block[X+32,number] = clamp(floor(V4), 0, 255)
+        Block[X+40,number] = clamp(floor(V5), 0, 255)
+        Block[X+48,number] = clamp(floor(V6), 0, 255)
+        Block[X+56,number] = clamp(floor(V7), 0, 255)
     }
 
     State["index",number] = X + 1
-
     if (State["index",number] >= 8) {
-
         State["active",number] = 0
         State["temp",table] = table()
         return 1
@@ -163,4 +187,3 @@ function number jpgIDCTStep(Block:table)
 
     return 0
 }
-

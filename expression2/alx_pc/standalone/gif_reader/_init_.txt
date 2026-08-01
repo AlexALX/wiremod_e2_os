@@ -1,0 +1,365 @@
+@name GIF Reader Main Chip
+@persist Gif:table
+
+#include "alx_pc/standalone/gif_reader/_shared_"
+#include "alx_pc/standalone/gif_reader/reader"
+#include "alx_pc/standalone/gif_reader/lzw"
+#include "alx_pc/standalone/gif_reader/draw"
+#include "alx_pc/standalone/gif_reader/progress"
+
+function number gifInit(Data:string,AnimateMode:number,SizeLimit:number,NoKeepAR:number,MinDelay:number) {
+    Gif = table()
+    
+    Gif["start", number] = curtime()
+    Gif["NoKeepAR", number] = NoKeepAR
+    Gif["data", string] = Data
+    Gif["size", number] = Data:length()
+    Gif["pos", number] = 1
+    
+    Gif["animate",number] = clamp(AnimateMode,0,2)
+    
+    Error = ""
+    Progress = table()
+    Processing = 0
+    Warning = ""
+    
+    local Sig = ""
+    for (I = 1, 6) {
+        Sig = Sig + toChar(gifU8())
+    }
+    
+    if (Sig != "GIF89a" & Sig != "GIF87a") {
+        gifError("File is not a valid GIF image!")
+        return 0
+    }
+    
+    timer(0.001,function() {
+        Gif["state", string] = "count_frames"
+        Processing = 1
+    })
+    if (!GIFNoPrint) {
+        print("GIF Image")
+    }
+    
+    Progress["stepTotal",number] = 3
+    Gif["lzwState", table] = table()
+    Gif["subBlockState", table] = table()
+    Gif["lzw", table] = table()
+    Gif["lzw", table]["prefix", array] = array()
+    Gif["lzw", table]["suffix", array] = array()
+    Gif["framePixels", array] = array()
+    Gif["gct", table] = table()
+    Gif["currentPalette", table] = table()
+    Gif["draw", table] = table()
+    Gif["drawCache", table] = table()
+    
+    local Width = gifU16()
+    local Height = gifU16()
+    
+    local WH = Width > Height ? Width : Height
+
+    local GifMaxWidth = 512 # DS Limit
+    
+    if (SizeLimit>0) {
+        GifMaxWidth = min(512,SizeLimit)  
+    }
+    
+    Gif["maxWidth",number] = GifMaxWidth
+    
+    # minumum animation delay
+    local GifMinDelay = 2
+    if (MinDelay>0) {
+        GifMinDelay = max(MinDelay,0.1)    
+    }    
+    
+    Gif["minimumFrameDelay",number] = GifMinDelay
+    
+    Gif["screenAr", number] = Width / Height
+    if (WH > GifMaxWidth) {
+        local Scale = WH / GifMaxWidth
+        local ResizedWidth  = floor(Width / Scale)
+        local ResizedHeight = floor(Height / Scale)
+        
+        Gif["globalScale",number] = Scale
+        Gif["screenWidth", number] = ResizedWidth
+        Gif["screenHeight", number] = ResizedHeight
+
+        if (WH>512 & GifMaxWidth==512) {
+            timer(0.001,function() {
+                Warning = "Your image is larger than Digital Screen supports\n"+
+                "Your image will be resized to: "+ResizedWidth+"x"+ResizedHeight
+                
+                if (!GIFNoPrint) {
+                    print(Warning)    
+                }
+            })
+        }
+            
+    } else {
+        Gif["globalScale",number] = 1
+        Gif["screenWidth", number] = Width
+        Gif["screenHeight", number] = Height
+    }
+    
+    local PackedFields = gifU8()
+    local HasGCT = (PackedFields >> 7) && 1  
+    local ColorResolution = ((PackedFields >> 4) && 7) + 1
+    local SortFlag = (PackedFields >> 3) && 1
+    local GCTSize = 1 << ((PackedFields && 7) + 1)
+    
+    Gif["backgroundIndex", number] = gifU8()
+    local AspectRatio = gifU8()
+    
+    # Global Color Table
+    if (HasGCT) {
+        local Gct = table()
+        for (I = 0, GCTSize - 1) {
+            Gct[I, number] = (gifU8() << 16) || (gifU8() << 8) || gifU8()
+        }
+        Gif["gct", table] = Gct
+    }
+    
+    return 1
+}
+
+function gifClear() {
+    Gif = table()    
+}
+
+function gifAbort() {
+    Gif["state",string] = ""
+    CurrentState = ""
+    Progress = table()
+    ProgressText = ""
+    Error = ""
+    Processing = 0
+    gifClear()
+}
+
+function gifNextFrame() {
+    Gif["state", string] = "read_subblocks"
+}
+
+function gifDone() {
+    Gif["state", string] = "done"
+    
+    gifUpdateProgress()
+    Processing = 0
+    
+    local RenderTime = round(curtime() - Gif["start", number],2)
+    
+    Progress["renderTime",number] = RenderTime
+    
+    if (!GIFNoPrint) {
+        print("GIF Finished, render time: "+RenderTime+"s")
+    }
+    
+    # clear memory
+    gifClear()
+}
+
+function gifDoneLoop() {
+    local RenderTime = round(curtime() - Gif["start", number],2)
+    Progress["renderTime",number] = RenderTime
+    if (!GIFNoPrint) {
+        print("GIF Finished and looped, render time: "+RenderTime+"s")
+    }   
+    
+    Gif["looping",number] = 1
+    Progress["looping",number] = 1
+}
+
+function number gifNextManualFrame() {
+    if (Gif["state",string]=="") {
+        return -2
+    }
+    
+    if (Gif["state",string]!="wait_next_frame") {
+        return 0 
+    }
+    
+    if (Gif["state",string]=="done") {
+        return 2
+    }
+    
+    if (Gif["animate",number]!=1) {
+        return -1
+    }
+    
+    local WaitDuration = curtime() - Gif["pauseTime", number]
+    Gif["start", number] =  Gif["start", number] + WaitDuration
+    Gif["paused",number] = 0
+    gifNextFrame()     
+    
+    return 1  
+}
+
+function gifWait() {
+    if (!Gif["paused",number]) {
+        
+        if (!GIFNoPrint) {
+            print("GIF Frame Rendered ("+Gif["frameProcessed",number]+"/"+Gif["frameTotal",number]+").\nWaiting for Next Frame - use !gifnext")       
+        }
+        
+        Gif["state", string] = "wait_next_frame"
+        Gif["pauseTime", number] = curtime()
+        Gif["paused",number] = 1
+    }
+}
+
+function number gifDelay() {
+    if (Gif["animate",number]!=2) { return 0 }
+    
+    if (Gif["nextFrameTime", number] > 0) {
+        local TargetTime = Gif["nextFrameTime", number]
+        local TimeLeft = TargetTime - curtime()
+              
+        if (TimeLeft > 0) {
+            
+            if (!Gif["paused",number]) {
+                Gif["state",string] = "frame_delay"
+                Gif["paused",number] = 1
+                Gif["pauseTime", number] = curtime()
+            }
+            return 1
+        }
+    }
+    
+    if (Gif["paused",number]) {
+        
+        if (Gif["looping",number] & Gif["frameProcessed",number]==0) {
+            # Clear whole screen
+            DS[1048574] = 1
+        }
+        
+        local WaitDuration = curtime() - Gif["pauseTime", number]
+        Gif["start", number] =  Gif["start", number] + WaitDuration
+        Gif["paused",number] = 0
+        Gif["state",string] = "render_frame"
+    }
+    
+    return 0
+}
+
+event tick() {
+    local CurrentState = Gif["state", string]
+    if (CurrentState == "" | CurrentState == "wait_next_frame" | CurrentState == "done" | Error) {
+        exit()
+    }
+    
+    if (CurrentState=="frame_delay") {
+        if (gifDelay()) {
+            gifUpdateProgress()
+            exit()        
+        } else {
+            # refresh
+            CurrentState = Gif["state", string]
+        }
+    }
+    
+    while (perf(90)) {
+                
+        if (CurrentState == "count_frames") {
+            if (gifCountTotalFramesStep()) {
+                Gif["state", string] = "read_block_header"
+                Gif["currentFrameIndex", number] = 0
+            }
+        }
+                
+        if (Gif["state", string] == "read_block_header") { 
+            if (Gif["looping",number]) {              
+                Gif["state", string] = "render_frame"
+                if (Gif["frameProcessed", number] >= Gif["frameTotal", number]) {
+                    
+                    if (Gif["loopCount", number] > 0) {
+                        Gif["loopCounter", number] = Gif["loopCounter", number] - 1
+                        if (Gif["loopCounter", number] <= 0) {
+                            gifDone()
+                            exit()
+                        }
+                    }
+                    Gif["frameProcessed", number] = 0
+                }
+                Gif["renderIndex", number] = 0
+                break
+            }
+            
+            local Result = gifReaderBlockStep()    
+            local AnimateMode = Gif["animate",number]                 
+            if (Result==1) {                
+                if (AnimateMode==2 & Gif["loopMode", number]) {
+                    gifDoneLoop()
+                    continue
+                } else {               
+                    gifDone()
+                    exit()
+                }
+            } elseif (Result==2) {
+                # always process first frame
+                if (Gif["frameProcessed",number]==0) {
+                    gifNextFrame()    
+                } else {                    
+                    if (AnimateMode==1) {
+                        gifWait()
+                        break
+                    } elseif (AnimateMode==2) {
+                        gifNextFrame()
+                    } else {
+                        gifDone()
+                        exit()
+                    }                    
+                } 
+            }
+        }
+        
+        if (Gif["state", string] == "read_subblocks") {        
+            if (gifReadSubBlocksStep()) {
+                Gif["state", string] = "decompress_lzw"
+            }
+        }
+        
+        if (Gif["state", string] == "decompress_lzw") {
+            if (gifDecompressStep()) {
+                if (gifDelay()) {
+                    break     
+                }
+                
+                # fix buggy frame count    
+                if (Gif["frameProcessed",number]+1 > Gif["frameTotal", number]) {
+                    Gif["frameTotal", number] = Gif["frameProcessed",number]+1        
+                    Progress["frameTotal", number] = Gif["frameTotal", number]  
+                }
+                
+                Gif["state", string] = "render_frame"
+                Gif["renderIndex", number] = 0                
+            }
+        }
+        
+        if (Gif["state", string] == "render_frame") {     
+            if (Gif["looping",number] & gifDelay()) {
+                break     
+            }
+            
+            local Result = gifDrawStep()
+            
+            if (Result<0) {
+                break
+            }
+                       
+            if (Result) {                
+                Gif["frameProcessed",number] = Gif["frameProcessed",number]+1
+                Progress["frameProcessed",number] = Gif["frameProcessed",number]
+                                    
+                Gif["state", string] = "read_block_header"
+                
+                local DelaySec = (Gif["delayTime", number] * 10) / 1000        
+                DelaySec = max(Gif["minimumFrameDelay",number],DelaySec)
+                Gif["nextFrameTime", number] = curtime() + DelaySec
+                Gif["nextFrameDelay", number] = DelaySec
+                Gif["nextFrameStart", number] = curtime()
+            }
+        }
+    }
+
+    gifUpdateProgress()
+}

@@ -1,15 +1,9 @@
 @name BMP Helper for DS
 @persist Header:string 
-@inputs DS:wirelink Error:string
+@inputs Error:string
 @strict
 
-#include "alx_pc/standalone/ds_gfx/_init_"
-#include "alx_pc/standalone/ds_gfx/font_8x8"
-
-function displayInit() {
-    dsInit(DS, 420, 310)
-    dsSetFont(dsFont8x8())
-}
+#include "alx_pc/standalone/helpers/_shared_"
 
 function displayHelp() {
     displayInit()

@@ -63,6 +63,8 @@ function test_idct_step()
         Block[7,number] = -1
 
         Jpg["idct",table] = table()
+        Jpg["levelShift", number] = 128
+        Jpg["outputShift", number] = 1
 
         TestStage = 1
     }

@@ -54,6 +54,9 @@ function test_idct()
     Block[0,number]=80
     
     Jpg["idct",table] = table()
+    Jpg["levelShift", number] = 128
+    Jpg["outputShift", number] = 1
+    
     while(jpgIDCTStep(Block) == 0) {}
 
     for(I=0,63){

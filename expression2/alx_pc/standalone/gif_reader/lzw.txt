@@ -1,0 +1,148 @@
+#include "alx_pc/standalone/gif_reader/_shared_"
+#include "alx_pc/standalone/gif_reader/bitreader"
+
+function gifResetLZWTable() {
+    local Lzw = Gif["lzw", table]
+    Lzw["prefix", array] = array()  
+    Lzw["suffix", array] = array()
+    
+    local MinCodeSize = Gif["minCodeSize", number]
+    local ClearCode = 1 << MinCodeSize
+    
+    for (I = 0, ClearCode - 1) {
+        Lzw["prefix", array][I + 1, number] = -1
+        Lzw["suffix", array][I + 1, number] = I
+    }
+    
+    Gif["lzwCurrentSize", number] = MinCodeSize + 1
+    Gif["lzwNextCode", number] = ClearCode + 2
+}
+
+function number gifDecompressStep() {
+    local S = Gif["lzwState", table]
+    local MinCodeSize = Gif["minCodeSize", number]
+    local ClearCode = 1 << MinCodeSize
+    local EoiCode = ClearCode + 1
+    
+    if (S["active", number] == 0) {
+        S["active", number] = 1
+        S["stage", number] = 0   
+        S["pixelIndex", number] = 0     
+        gifBitInit()
+        gifResetLZWTable()
+    }
+    
+    local Lzw = Gif["lzw", table]
+    local Prefix = Lzw["prefix", array]
+    local Suffix = Lzw["suffix", array]
+    local OutPix = Gif["framePixels", array]
+    
+    # Cache state values locally to reduce table lookups inside critical loop
+    local Stage = S["stage", number]
+    local PixelIdx = S["pixelIndex", number]
+    local FirstCall = S["firstCall", number]
+    local OldCode = S["oldCode", number]
+    local FirstChar = S["firstChar", number]
+    local CurrentCode = S["currentCode", number]
+    local Code = S["code", number]
+    local StackPtr = S["stackPtr", number]
+    local Stack = S["stack", array]
+    local NextCode = Gif["lzwNextCode", number]
+    local CodeBits = Gif["lzwCurrentSize", number]
+    
+    while (perf(90)) {
+        
+        if (Stage == 0) {
+            Code = gifReadCode(CodeBits)
+            
+            if (Code == -1 | Code == EoiCode) {
+                S["active", number] = 0
+                return 1
+            }
+            
+            if (Code == ClearCode) {
+                gifResetLZWTable()
+                Prefix = Lzw["prefix", array]
+                Suffix = Lzw["suffix", array]
+                CodeBits = Gif["lzwCurrentSize", number]
+                NextCode = Gif["lzwNextCode", number]
+                FirstCall = 1
+                continue
+            }
+            
+            if (FirstCall == 1) {
+                OldCode = Code
+                FirstChar = Code
+
+                OutPix[PixelIdx + 1, number] = Code
+                PixelIdx = PixelIdx + 1
+                
+                FirstCall = 0
+                continue
+            }
+            
+            Stack = array()
+            StackPtr = 0
+            CurrentCode = Code
+            
+            if (Code >= NextCode) {
+                StackPtr = 1
+                Stack[1, number] = FirstChar
+                CurrentCode = OldCode
+            }
+            
+            Stage = 1
+            continue
+        }
+        
+        if (Stage == 1) {
+            if (CurrentCode > -1) {
+                StackPtr = StackPtr + 1
+                Stack[StackPtr, number] = Suffix[CurrentCode + 1, number]
+                CurrentCode = Prefix[CurrentCode + 1, number]
+                continue 
+            }
+            
+            FirstChar = Stack[StackPtr, number]
+            Stage = 2
+            continue
+        }
+        
+        if (Stage == 2) {
+            if (StackPtr > 0) {
+                OutPix[PixelIdx + 1, number] = Stack[StackPtr, number]
+                PixelIdx = PixelIdx + 1
+                StackPtr = StackPtr - 1
+                continue 
+            }
+            
+            if (NextCode < 4096) {
+                Prefix[NextCode + 1, number] = OldCode
+                Suffix[NextCode + 1, number] = FirstChar
+                NextCode = NextCode + 1
+
+                if (NextCode == (1 << CodeBits) & CodeBits < 12) {
+                    CodeBits = CodeBits + 1
+                }
+            }
+            
+            OldCode = Code
+            Stage = 0
+        }
+    }
+    
+    # Save everything back to permanent table scope before shifting tick execution
+    S["stage", number] = Stage
+    S["pixelIndex", number] = PixelIdx
+    S["firstCall", number] = FirstCall
+    S["oldCode", number] = OldCode
+    S["firstChar", number] = FirstChar
+    S["currentCode", number] = CurrentCode
+    S["code", number] = Code
+    S["stackPtr", number] = StackPtr
+    S["stack", array] = Stack
+    Gif["lzwNextCode", number] = NextCode
+    Gif["lzwCurrentSize", number] = CodeBits
+    
+    return 0
+}

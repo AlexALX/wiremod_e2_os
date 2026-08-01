@@ -1,6 +1,6 @@
 @name JPG Reader By AlexALX
-@inputs ProgressivePreview:number
-@persist PreviewMode:number
+@inputs ProgressivePreview:number JpgSizeLimit:number JpgNoKeepAR:number
+@persist PreviewMode:number SizeLimit:number NoKeepAR:number
 @strict
 
 #[
@@ -8,7 +8,7 @@
     Created by AlexALX (c) 2026
     -------------------
     JPG Parser, specifications:
-    - Max resolution is up to 512x512 (Digital Screen limitation)
+    - Max resolution is unlimited, but will be automatically resized to 512x512 (DS limit)
     - Support Baseline (8/12bits) and Progressive JPG
     - Support YUV 4:2:0 4:2:2 4:2:2v 4:4:4
     - Slow, no multithread
@@ -33,6 +33,14 @@
      preview - first AC scan preview
      fullpreview - every scan rerender (slow)
     Note: this mode works only for progressive images 
+    
+    !jpgsize - set maximum image dimensions before scaling (1 to 512)
+    !jpgkeepar - set image Aspect Ratio mode (0 or 1)
+    
+    Additional Wire Inputs:
+    JpgSizeLimit - Maximum image dimensions before scale (default and max are 512)
+     This can be used to scale down any image before drawing
+    JpgNoKeepAR - Do not keep Aspect Ratio of image
 ]#
 
 #include "alx_pc/standalone/includes/basicreader"
@@ -45,11 +53,11 @@ if (first() | duped()) {
     
     Funcs["readerAbort", function] = function() {
         print(_HUD_PRINTTALK,"JPG rendering canceled.")     
-        Jpg["state",string] = ""
+        jpgAbort()
     }
     
     Funcs["readerLoad", function] = function(Body:string, Size:number, Path:string) {
-        jpgInit(Body, PreviewMode)
+        jpgInit(Body, PreviewMode, SizeLimit, NoKeepAR)
     }
     
     Funcs["readerCheck", function] = function() {
@@ -70,6 +78,8 @@ if (first() | duped()) {
     }
     
     PreviewMode = ProgressivePreview
+    SizeLimit = JpgSizeLimit
+    NoKeepAR = JpgNoKeepAR
 }
 
 event chat(Player:entity, Said:string, Team:number) {
@@ -108,6 +118,29 @@ event chat(Player:entity, Said:string, Team:number) {
                         "This mode is fastest"
                     ) 
                 }
+            } elseif (Cmd==Command+"size") {
+                local Size = Mode:toNumber()                
+                SizeLimit = clamp(Size,1,512)
+                print(_HUD_PRINTTALK,
+                    "Jpg max size set to "+SizeLimit
+                ) 
+                if (Size>512) {
+                    print(_HUD_PRINTTALK,
+                        "Size clamped, Digital Screen support max 512x512"
+                    ) 
+                }
+            } elseif (Cmd==Command+"keepar") {
+                if (Mode=="false" | Mode=="0" | Mode=="nokeep" | Mode=="off") {
+                    NoKeepAR = 1    
+                    print(_HUD_PRINTTALK,
+                        "Aspect Ratio: DISABLED (Stretch to fit)"
+                    ) 
+                } else {
+                    NoKeepAR = 0   
+                    print(_HUD_PRINTTALK,
+                        "Aspect Ratio: ENABLED (Preserve proportions)"
+                    ) 
+                }
             }
         }
     }
@@ -115,4 +148,12 @@ event chat(Player:entity, Said:string, Team:number) {
 
 if (~ProgressivePreview) {
     PreviewMode = ProgressivePreview
+}
+
+if (~JpgSizeLimit) {
+    SizeLimit = JpgSizeLimit
+}
+
+if (~JpgNoKeepAR) {
+    NoKeepAR = JpgNoKeepAR
 }

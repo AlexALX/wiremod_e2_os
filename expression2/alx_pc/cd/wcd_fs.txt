@@ -858,6 +858,9 @@ function number cmd_wcd_readfile(CmdData:table) {
     local FS = CmdData[1,table]
     local File = CmdData[2,table]
     local Step = CmdData[5,number]
+    
+    local BytesInSector = FS["bytes_in_sector",number]
+
     if (Step==0) {
         local Start = CmdData[3,number]
         local End = CmdData[4,number]
@@ -867,32 +870,34 @@ function number cmd_wcd_readfile(CmdData:table) {
             CmdData[4,number] = End
         }
             
-        CmdData[8,number] = ceil(End/FS["bytes_in_sector",number])
+        CmdData[8,number] = ceil(End/BytesInSector)
         CurTask[1,number] = CmdData[8,number]
 
-        local StartC = floor(CmdData[3,number]/FS["bytes_in_sector",number])       
+        local StartC = floor(CmdData[3,number]/BytesInSector)       
         StartC += File["sector",number]
         
         CmdData[5,number] = 1
         CmdData[6,number] = StartC
         CmdData[7,number] = 0
+        
+        CmdData[12,array] = array()
     } elseif (Step==1) {
         local Of = CmdData[6,number]
         local I = CmdData[7,number]
         local Max = CmdData[8,number]
-        local Ret = CmdData[9,string]
+        local StringArray = CmdData[12,array]
         
         while(perf()) {
             if (I>Max) {
-                cmdClearRes()
-                #print(Ret)
-                local CalcS = CmdData[3,number]-floor(CmdData[3,number]/FS["bytes_in_sector",number])*FS["bytes_in_sector",number]
-                local CalcE = CalcS+CmdData[4,number]
-                CmdResult[1,string] = Ret:sub(CalcS+1,CalcE)
-                CurTask = table()
-                local CD = FS["hddinfo",table]
                 CmdData[5,number] = 2
-                dsSendDirect("clearDiskCommands",CD["ent",entity],table(entity(),"wcd_readfile_finish",CD,CmdData))
+                CmdData[9,number] = 1 
+                CmdData[11,string] = ""   
+                
+                local TotalElements = StringArray:count()
+                CurTask[1,number] = TotalElements > 1 ? TotalElements - 1 : 1
+                CurTask[2,number] = 0
+                
+                CmdData[15,number] = 0  
                 return 1
             }
             local Tmp = readCellCD(FS["hddinfo",table],Of)
@@ -901,19 +906,82 @@ function number cmd_wcd_readfile(CmdData:table) {
                 cmdRun("wcd_waitDiskReadIO",table(FS["hddinfo",table],Of))
                 break
             }
-            Ret += byte2strraw(Tmp,0)
+            
+            StringArray:pushString(byte2strraw(Tmp,0))
+            
             I++
             Of++
         }
         CmdData[6,number] = Of
         CurTask[2,number] = I
+        CurTask[1,number] = Max
         CmdData[7,number] = I
+        CmdData[12,array] = StringArray
+        
+    } elseif (Step==2) {
+        local StringArray = CmdData[12,array]
+        local TempArray = CmdData[13,array]
+        local Idx = CmdData[14,number]
+        local TotalProcessed = CmdData[15,number]
+        
+        if (Idx == 0) { Idx = 1 }
+        local Count = StringArray:count()
+        
+        while (Count > 1) {
+            while (Idx <= Count) {
+                if (!perf(90)) {
+                    CmdData[12,array] = StringArray
+                    CmdData[13,array] = TempArray
+                    CmdData[14,number] = Idx
+                    CmdData[15,number] = TotalProcessed
+                    
+                    CurTask[2,number] = TotalProcessed
+                    return 1
+                }
+                
+                if (Idx == Count) {
+                    TempArray:pushString(StringArray[Idx,string])
+                } else {
+                    TempArray:pushString(StringArray[Idx,string] + StringArray[Idx+1,string])
+                    TotalProcessed += 1
+                }
+                Idx += 2
+            }
+            
+            StringArray = TempArray
+            TempArray = array()
+            Count = StringArray:count()
+            Idx = 1
+        }
+        
+        local Ret = StringArray[1,string]
+        cmdClearRes()
+        
+        local CalcS = CmdData[3,number] % BytesInSector
+        local CalcE = CalcS+CmdData[4,number]
+        CmdResult[1,string] = Ret:sub(CalcS+1,CalcE)
+
+        CurTask[2,number] = CurTask[1,number]
+        CurTask = table()
+        
+        local CD = FS["hddinfo",table]
+        CmdData[5,number] = 3
+        
+        CmdData[12,array] = array()
+        CmdData[13,array] = array()
+        CmdData[14,number] = 0
+        CmdData[15,number] = 0
         CmdData[9,string] = Ret
+        
+        dsSendDirect("clearDiskCommands",CD["ent",entity],table(entity(),"wcd_readfile_finish",CD,CmdData))
+        return 1
+        
     } elseif (Step==3) {
-        return 0
+        return 0    
     }
     return 1
 }
+
 
 function wcd_readfile_finish(Name:string,Args:table) {
     #cmdRun("wcd_readfile_finish",table())

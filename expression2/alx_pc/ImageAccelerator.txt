@@ -1,6 +1,5 @@
-@name JPG Accelerator
-@inputs InA Board:wirelink JPGReader:wirelink
-@inputs CurrentState:string Progress:table ProgressText:string Processing:number Error:string
+@name Image Accelerator
+@inputs InA Board:wirelink JPGReader:wirelink GIFReader:wirelink
 @outputs EntID DS:wirelink
 @persist BIOS:entity Device_Name:string
 @persist E2_GPU:entity Init
@@ -21,38 +20,33 @@ dsSetScope(2)
 BIOS = getentity(InA)
 Board["A",number] = entity():id()
 if (!duped()) {
-    dsSendDirect("reload",BIOS,"jpgacc")
+    dsSendDirect("reload",BIOS,"imageacc")
 }
 
 Init = 0
-Device_Name = "JPG Accelerator"
+Device_Name = "Image Accelerator"
 
 function shutdown() {
     if (!Init) { return }
 
     stopAllTimers()
 
-    dsSendDirect("abortJpg",JPGReader:entity(),1)
+    dsSendDirect("abortImage",JPGReader:entity(),1)
+    dsSendDirect("abortImage",GIFReader:entity(),1)
     DsHandler = ""
     Init = 0
 
 }
 
 function pci_init() {    
-    dsSendDirect("pci",BIOS,table("jpgacc",entity(),Device_Name))
+    dsSendDirect("pci",BIOS,table("imageacc",entity(),Device_Name))
 }
 
 function usb_init() {
     Init = 1
     local Info = dsGetTable()
     local USB_Device = Info[2,entity]
-    dsSendDirect("usbcontroller",USB_Device,table("jpgacc",wirelink(),table()))
-}
-
-function sendProgress() {
-    dsSendDirect("jpgProgress", E2_GPU, table(
-        CurrentState, Progress, ProgressText, Processing, Error
-    ))
+    dsSendDirect("usbcontroller",USB_Device,table("imageacc",wirelink(),table()))
 }
 
 }
@@ -75,17 +69,27 @@ if (!BIOS:isValid()) { exit() }
 if (dsClk()) {
     local Name = dsClkName()
     
-    if (Name=="drawJpg") {
+    if (Name=="drawImage") {
         local Info = dsGetTable()
         DS = Info[1,wirelink]
         E2_GPU = Info[2,entity]
         TickQuota = Info[3,number]
+        local Type = Info[4,string]
+        local ImgInfo = Info[5,table]
         Init = 1
         
-        if (JPGReader == nowirelink()) {
-            dsSendDirect("JpgReaderError",E2_GPU,1)
-        } else {        
-            dsSendDirect("drawJpg", JPGReader:entity(), table(Info[4,string],Info[5,number]))
+        if (Type=="jpg") {
+            if (JPGReader == nowirelink()) {
+                dsSendDirect("imageReaderError",E2_GPU,1)
+            } else {        
+                dsSendDirect("drawImage", JPGReader:entity(), ImgInfo)
+            }
+        } elseif (Type=="gif") {
+            if (GIFReader == nowirelink()) {
+                dsSendDirect("imageReaderError",E2_GPU,1)
+            } else {
+                dsSendDirect("drawImage", GIFReader:entity(), ImgInfo)
+            }
         }
     } elseif (Name=="pci") {
         pci_init()
@@ -95,21 +99,11 @@ if (dsClk()) {
         shutdown()
     } elseif (DsHandler!="") {
         DsHandler(Name)
+    } elseif (Name=="initImage") {
+        dsSendDirect("initImage", E2_GPU, dsGetTable())     
     }
 }
 
 if (clk("cmd")) {
     cmdClk()
-}
-
-event input(InputName:string) {
-    if (InputName=="Processing" & Processing) {
-        sendProgress()
-    } elseif (InputName=="Error" & Error) {
-        sendProgress()    
-    } elseif (InputName == "Progress" & Processing) {
-        sendProgress()
-    } elseif (InputName == "CurrentState") {
-        sendProgress()   
-    }
 }

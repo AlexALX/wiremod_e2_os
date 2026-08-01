@@ -1,0 +1,40 @@
+@persist BitBuffer:number BitCount:number LzwPos:number
+#include "alx_pc/standalone/gif_reader/_shared_"
+ 
+function gifBitInit() {
+    BitBuffer = 0
+    BitCount = 0
+    LzwPos = 1
+}
+
+function number gifReadCode(Bits:number) {
+    local LzwData = Gif["lzwData", string]
+    local LzwSize = Gif["lzwSize", number]
+    
+    # Read bytes until bit buffer has enough bits
+    while (BitCount < Bits) {
+        if (LzwPos > LzwSize) {
+            return -1
+        }
+        
+        # Read exact single ASCII byte from data string
+        local Byte = toByte(LzwData, LzwPos)
+        LzwPos = LzwPos + 1
+        
+        BitBuffer = BitBuffer || (Byte << BitCount)
+        BitCount = BitCount + 8
+    }
+    
+    # Extract code using standard mask
+    local Code = BitBuffer && ((1 << Bits) - 1)
+    
+    # Shift out read bits
+    BitBuffer = BitBuffer >> Bits
+    BitCount = BitCount - Bits
+    
+    # Clear E2 sign extension bits after right shift
+    BitBuffer = BitBuffer && ((1 << BitCount) - 1)
+    
+    return Code
+}
+

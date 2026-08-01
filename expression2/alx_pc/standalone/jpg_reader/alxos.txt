@@ -1,16 +1,21 @@
 @name ALX OS JPG Reader
+@outputs WL:wirelink
 
 #include "alx_pc/standalone/jpg_reader/_init_"
 
+if (first() | duped()) {
+    # fix wirelink wiring reset on crash
+    WL = wirelink()
+}
+
 if (dsClk()) {
     local DSName = dsClkName()    
-    if (DSName=="drawJpg") {
+    if (DSName=="drawImage") {
         JPGNoPrint = 1
         local Info = dsGetTable()
-        jpgInit(Info[1,string],Info[2,number])    
-    } elseif (DSName=="abortJpg") {
-        Jpg["state",string] = ""
-        Processing = 0
-        jpgUpdateProgress()
+        jpgInit(Info[1,string],Info[2,number],Info[3,number],Info[4,number])
+        dsSendDirect("initImage",dsGetSender(),table(wirelink()))
+    } elseif (DSName=="abortImage") {
+        jpgAbort()
     }
 }

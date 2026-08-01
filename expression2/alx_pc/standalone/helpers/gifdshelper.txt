@@ -1,4 +1,4 @@
-@name JPG Helper for DS
+@name GIF Helper for DS
 @persist Header:string
 @inputs CurrentState:string Progress:table ProgressText:string Processing:number Error:string Warning:string
 @strict
@@ -10,34 +10,36 @@ function displayHelp() {
 
     local Text = Header+
 "
-JPG Parser, specifications:
+GIF Parser, specifications:
 - Max resolution is unlimited, but
   will be resized to 512x512 (DS limit) 
-- Support Baseline and Progressive JPG 
-- Support YUV 4:2:0 4:2:2 4:2:2v 4:4:4
-- Slow, no multithread
-- Support progressive preview mode
+- Baseline and Interlace files supported
+- Animation with multiple loop modes
+- Loop and Disposal support
+- Due to digital screen speed issues anims 
+   work properly only on very small images
+   or you can resize output by GifSizeLimit
 
 Usage via chat commands:
-!jpg http://url - open jpg file from the web
-
+!gif http://url - open gif file from the web
 Note: long url may be cut, use input LongURL 
 instead for such case (via string value) 
 
-!jpgfile filename.jpg - open jpg file from 
+!giffile filename.gif - open gif file from 
 garrysmod/data/e2files/ folder
+file extension must be renamed to .txt
 
-!jpgabort - abort rendering
-
-!jpgmode - normal, preview, fullpreview
+!gifabort - abort rendering
+!gifmode - normal, manual, animate
 
 Modes:
- normal - no preview, fastest render
- preview - first AC scan preview
- fullpreview - every scan rerender (slow)
+ normal - first frame, no animation
+ manual - play next frame via !gifnext
+ animate - automatic animation play
 
-!jpgsize - limit image scale (1-512)
-!jpgkeepar - set Aspect Ratio mode (0 or 1)
+!gifsize - limit image scale (1-512)
+!gifdelay - frame delay limit (min 0.1)
+!gifkeepar - set Aspect Ratio mode (0 or 1)
 "
 
     dsDrawTextStart(2, 0, Text)
@@ -47,14 +49,14 @@ function displayProgressStart() {
     displayInit()
     
     displayBlockDraw(0.5)
-    
+
     local Text = Header+
 "
 Step:
 0 / 0
 
 Current task:
-Loading JPEG
+Loading GIF
 
 Progress:
 
@@ -68,7 +70,7 @@ function displayError(Msg:string) {
     
     local Text = Header+
 "
-JPG Reader Error:
+GIF Reader Error:
 
 "+Msg+"
 "
@@ -101,11 +103,12 @@ function displayProgress()
     
     local FontLine = DsFontHeight + DsFontSpacing
     
-    displayBlockDraw(2)
-    
     dsDrawCachedText(2, 4 * FontLine, Step + " / "+Progress["stepTotal",number])
     dsDrawCachedText(2, 7 * FontLine, CurrentTask)
     dsDrawCachedText(2, 10 * FontLine, Current + " / " + Max + " ("+Perc+"%)")
+    
+    displayBlockDraw(2)
+    
 }
 
 function displayMode() {
@@ -115,33 +118,33 @@ function displayMode() {
         displayProgressStart()
     } else {
         displayHelp()    
-    }
+    }   
 }
 
 function displayWarning(Msg:string) {
     local FontLine = DsFontHeight + DsFontSpacing
-    
+        
     local Lines = stringWordWrap(Msg,33)
-    
+
     dsDrawCachedText(2, 13 * FontLine, "Warning:")
     
     for (I=1,Lines:count()) {
         dsDrawCachedText(2, (13+I) * FontLine, Lines[I,string])     
     }    
-    
-    displayBlockDraw(2)
+
+    displayBlockDraw(3)
 }
 
 if (first() | duped()) {
     Header = 
-"JPG Reader
+"GIF Reader
 Created by AlexALX (c) 2026
 -------------------"
     
     displayMode()
 }
 
-event input(InputName:string) {    
+event input(InputName:string) {  
     if (InputName=="DS" & DS!=nowirelink()) {
         displayMode()
     } elseif (InputName=="Processing" & Processing) {

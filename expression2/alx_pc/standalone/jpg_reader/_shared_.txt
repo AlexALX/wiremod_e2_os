@@ -1,6 +1,6 @@
 @persist Jpg:table JpgZigZag:array JPGDebug JPGNoPrint
-@outputs CurrentState:string Progress:table ProgressText:string Processing:number Error:string
-@inputs DS:wirelink JPG_NoKeepAR
+@outputs CurrentState:string Progress:table ProgressText:string Processing:number Error:string Warning:string
+@inputs DS:wirelink
 
 if (first() | duped()) {
     JpgZigZag = array(

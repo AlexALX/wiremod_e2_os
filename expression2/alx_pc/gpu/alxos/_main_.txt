@@ -376,6 +376,7 @@ function number alxos_dialog(Title:string,Width,Height,Type:string,Callback:stri
     if (DialogData[0,number]==2) { alxos_closemenu() }    
     
     alxos_menubg(Title,Width,Height,table(vec4(168,168,168,255),vec4(0,0,0,255)))
+    DialogData["title",string] = Title
     
     local Parent = DialogData[-1,number]
     
@@ -546,6 +547,49 @@ function number alxos_dialog(Title:string,Width,Height,Type:string,Callback:stri
 
 function number alxos_dialog(Title:string,Width,Height,Type:string,Callback:string) {
     return alxos_dialog(Title,Width,Height,Type,Callback,table())
+}
+
+function alxos_dialog_warning(Title:string, Width, Height, Pos:vector2, Warning:string, TextHeight:number) {
+    local Parent = LAST_I
+    
+    local PosX = Pos[1]
+    local PosY = Pos[2]
+
+    local Col = table()
+    Col[1, vector4] = vec4(200, 130, 10, 255) 
+    Col[2, vector4] = vec4(255, 255, 255, 255)  
+
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpBox(LAST_I, vec2(PosX, PosY), vec2(Width, Height))
+    EGP:egpColor(LAST_I, Col[1, vector4]) LAST_I++
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpBoxOutline(LAST_I, vec2(PosX + 8, PosY + 8), vec2(Width - 16, Height - 16))
+    EGP:egpColor(LAST_I, Col[2, vector4]) LAST_I++
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpBoxOutline(LAST_I, vec2(PosX + 11, PosY + 11), vec2(Width - 22, Height - 22))
+    EGP:egpColor(LAST_I, Col[2, vector4]) LAST_I++
+
+    DialogData[-10,table]:pushNumber(LAST_I)
+    local Sz = Title:length() * 12    
+    EGP:egpBox(LAST_I, vec2(Width / 2 - Sz / 2, 0), vec2(Sz, 22))
+    EGP:egpParent(LAST_I, Parent)
+    EGP:egpColor(LAST_I, Col[1, vector4]) LAST_I++
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I, Title, vec2(Width / 2, 0))
+    EGP:egpParent(LAST_I, Parent)
+    EGP:egpAlign(LAST_I, 1)
+    EGP:egpColor(LAST_I, Col[2, vector4]) LAST_I++
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpTextLayout(LAST_I,Warning,vec2(22,18),vec2(Width-40,TextHeight))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++
+    
+    DialogData["WarningParent", number] = Parent
 }
 
 # this is helper function to fix dialog centering due to wiremod changes

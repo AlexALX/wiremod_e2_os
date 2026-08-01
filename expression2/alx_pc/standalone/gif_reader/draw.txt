@@ -1,0 +1,274 @@
+#include "alx_pc/standalone/gif_reader/_shared_"
+
+function number gifDrawStep() {
+    local FrameProcessed = Gif["frameProcessed",number]
+    
+    local Pixels = Gif["framePixels", array]
+    local Palette = Gif["currentPalette", table]
+    
+    local Width = Gif["screenWidth", number]
+    local Height = Gif["screenHeight", number]
+    
+    local FrameW = Gif["frameWidth", number]
+    local FrameH = Gif["frameHeight", number]
+    local FrameX = Gif["frameX", number]
+    local FrameY = Gif["frameY", number]
+    
+    local TotalPixels = FrameW * FrameH
+    local State = Gif["draw", table]
+
+    local Scale = Gif["globalScale", number]
+    local InvScale = 1 / Scale 
+    
+    local NoKeepAR = Gif["NoKeepAR",number]
+
+    if (State["active", number] == 0) {    
+        if (!Gif["drawCache",table][FrameProcessed,table]:count()) {
+            Gif["drawCache",table][FrameProcessed,table] = table()    
+        }
+        
+        State["active", number] = 1
+        State["pass", number] = 1
+        State["x", number] = 0
+        State["y", number] = 0
+        
+        State["lastDisposal", number] = Gif["lastDisposal", number]
+        State["lastWidth", number]    = Gif["lastWidth", number]
+        State["lastHeight", number]   = Gif["lastHeight", number]
+        State["lastX", number]        = Gif["lastX", number]
+        State["lastY", number]        = Gif["lastY", number]
+            
+        State["clearIDX", number] = 0
+        if (Gif["lastDisposal", number] == 2) {
+            if (State["lastWidth", number] >= Width & State["lastHeight", number] >= Height) {
+                DS[1048574] = 1
+                Gif["drawCache",table][FrameProcessed,table]:pushArray(array(-1048574,1))
+                State["clearing", number] = 0
+            } else {
+                State["clearing", number] = 1
+            }
+        } else {
+            State["clearing", number] = 0
+        }
+        
+        if (!Gif["DS_Inited", number]) {
+            Gif["DS_Inited", number] = 1
+            Progress["progressDrew",number] = 1
+            
+            DS[1048569] = 2  
+            DS[1048574] = 0  
+            DS[1048575] = 1  
+            
+            local MaxWidth = Gif["maxWidth",number]
+            
+            if (!NoKeepAR) {
+                local SWH = (Width > Height ? Width : Height)
+                Gif["Xadd", number] = (Height > Width ? floor((Height - Width) / 2) : 0)
+                Gif["Yadd", number] = (Width > Height ? floor((Width - Height) / 2) : 0)
+                Gif["posMul", number] = SWH
+                DS[1048573] = SWH 
+                DS[1048572] = SWH 
+            } else {
+                Gif["Xadd", number] = 0
+                Gif["Yadd", number] = 0
+                Gif["posMul", number] = Width
+                DS[1048573] = Width
+                DS[1048572] = Height
+            }
+        }
+    }
+        
+    local DrawCache = Gif["drawCache",table][FrameProcessed,table]
+    
+    if (Gif["looping",number]) {
+        local DrawIndex = Gif["renderIndex", number]
+        local Total = DrawCache:count()
+        while(perf(90)) {
+            if (DrawIndex >= Total) {
+                State["active", number] = 0
+                return 1
+            }
+            
+            local Arr = DrawCache[DrawIndex+1,array]
+            
+            if (Arr[1,number]==-1048574) {
+                DS[1048574] = 1
+                Gif["renderIndex", number] = DrawIndex + 1
+                return -1
+            }
+            
+            DS[Arr[1,number]] = Arr[2,number]
+
+            DrawIndex++
+        }
+        Gif["renderIndex", number] = DrawIndex
+        return 0
+    }
+
+    local Xadd = Gif["Xadd", number]
+    local Yadd = Gif["Yadd", number]
+    local PosMul = Gif["posMul", number]
+    local IsInterlaced = Gif["interlace", number]
+    local TransFlag = Gif["transparentFlag", number]
+    local TransIndex = Gif["transparentIndex", number]
+    
+    # Cache indices to local variables for massive performance boost inside perf loop
+    local InterX = State["x", number]
+    local InterY = State["y", number]
+    local Pass = State["pass", number]
+
+    local IsClearing = State["clearing", number]
+    local ClearIDX = State["clearIDX", number]
+    local LW = State["lastWidth", number]
+    local LH = State["lastHeight", number]
+    local LX = State["lastX", number]
+    local LY = State["lastY", number]
+    local TotalClearPixels = LW * LH
+    local IDX = Gif["renderIndex", number]
+    
+    local LastX = -1
+    local LastY = -1
+
+    local StepX = floor(Scale)
+    if (StepX < 1) { StepX = 1 }
+
+    while (perf(90)) {
+        
+        if (IsClearing == 1) {
+            if (ClearIDX >= TotalClearPixels) {
+                IsClearing = 0
+                State["clearing", number] = 0
+                continue
+            } else {
+                local ClearX = ClearIDX % LW
+                local ClearY = floor(ClearIDX / LW)
+                local ClearIndex = 0
+                
+                if (Scale > 1) {
+                    local FinalCX = floor((LX + ClearX) * InvScale)
+                    local FinalCY = floor((LY + ClearY) * InvScale)
+                    
+                    if (!NoKeepAR) {
+                        ClearIndex = (FinalCX + Xadd) + (FinalCY + Yadd) * PosMul
+                    } else {
+                        ClearIndex = FinalCX + FinalCY * PosMul
+                    }
+                } else {
+                    if (!NoKeepAR) {
+                        ClearIndex = (LX + ClearX + Xadd) + (LY + ClearY + Yadd) * PosMul
+                    } else {
+                        ClearIndex = (LX + ClearX) + (LY + ClearY) * PosMul
+                    }
+                }
+                
+                DrawCache:pushArray(array(ClearIndex,0))
+                DS[ClearIndex, number] = 0
+                ClearIDX = ClearIDX + 1
+                continue
+            }
+        }
+        
+        if (IDX >= TotalPixels) {
+            State["active", number] = 0
+            
+            # Save cached interlace state back to table on exit
+            State["x", number] = InterX
+            State["y", number] = InterY
+            State["pass", number] = Pass
+            Gif["renderIndex", number] = IDX
+            
+            Gif["lastX", number]        = FrameX
+            Gif["lastY", number]        = FrameY
+            Gif["lastWidth", number]    = FrameW
+            Gif["lastHeight", number]   = FrameH
+            Gif["lastDisposal", number] = Gif["currentDisposal", number]
+            
+            return 1
+        }
+        
+        local ColorIndex = Pixels[IDX + 1, number]
+        local LocalX = 0
+        local LocalY = 0
+    
+        if (TransFlag == 0 | ColorIndex != TransIndex) {
+            
+            if (IsInterlaced == 0) {
+                LocalX = IDX % FrameW
+                LocalY = floor(IDX / FrameW)
+            } else {
+                LocalX = InterX
+                LocalY = InterY
+            }
+        
+            local DSIndex = 0
+        
+            if (Scale > 1) {
+                local FinalX = floor((FrameX + LocalX) * InvScale)
+                local FinalY = floor((FrameY + LocalY) * InvScale)
+                
+                if (FinalX != LastX | FinalY != LastY) {
+                    LastX = FinalX
+                    LastY = FinalY
+                    
+                    if (!NoKeepAR) {
+                        DSIndex = (FinalX + Xadd) + (FinalY + Yadd) * PosMul
+                    } else {
+                        DSIndex = FinalX + FinalY * PosMul
+                    }
+                    
+                    DrawCache:pushArray(array(DSIndex,Palette[ColorIndex, number]))
+                    DS[DSIndex] = Palette[ColorIndex, number]        
+                }                
+            } else {
+                if (!NoKeepAR) {
+                    DSIndex = (FrameX + LocalX + Xadd) + (FrameY + LocalY + Yadd) * PosMul
+                } else {
+                    DSIndex = (FrameX + LocalX) + (FrameY + LocalY) * PosMul
+                }
+                DrawCache:pushArray(array(DSIndex,Palette[ColorIndex, number]))
+                DS[DSIndex] = Palette[ColorIndex, number]
+            }
+        }
+        
+        if (Scale > 1 & IsInterlaced == 0) {
+            local SpaceInRow = FrameW - LocalX - 1
+            if (SpaceInRow >= StepX) {
+                IDX = IDX + StepX
+            } else {
+                local CurrentRow = floor(IDX / FrameW)
+                local NextRow = CurrentRow + floor(Scale)
+                IDX = NextRow * FrameW
+            }
+        } else {  
+            IDX = IDX + 1
+            
+            if (IsInterlaced == 1) {
+                InterX = InterX + 1
+                if (InterX >= FrameW) {
+                    InterX = 0
+                    
+                    # Optimized interlace pass switching instead of multi-if chains
+                    if (Pass == 1 | Pass == 2) { InterY = InterY + 8 }
+                    elseif (Pass == 3) { InterY = InterY + 4 }
+                    elseif (Pass == 4) { InterY = InterY + 2 }
+                    
+                    if (InterY >= FrameH) {
+                        Pass = Pass + 1
+                        if (Pass == 2) { InterY = 4 }
+                        elseif (Pass == 3) { InterY = 2 }
+                        elseif (Pass == 4) { InterY = 1 }
+                    }
+                }
+            }
+            
+        }
+    }
+    
+    # Save current processing iteration back to global state table
+    State["x", number] = InterX
+    State["y", number] = InterY
+    State["pass", number] = Pass
+    State["clearIDX", number] = ClearIDX
+    Gif["renderIndex", number] = IDX
+    return 0
+}

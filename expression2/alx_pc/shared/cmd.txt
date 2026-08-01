@@ -1,5 +1,5 @@
 @name Simple Command API
-@persist CMD:string CMDArg CMDA:table
+@persist CMD:string CMDArg CMDA:table CMDLast:string
 
 #[
     ALX Wiremod E2 PC
@@ -13,7 +13,8 @@ if (first()|duped()) {
 #include "alx_pc/shared/_main_"
 
 function runCmd(Cmd:string,Delay,NoDebug) {
-    CMD = Cmd
+    CMDLast = CMD
+    CMD = Cmd    
     timer("cmd",Delay)
 }
 
@@ -24,6 +25,7 @@ function runCmd(Cmd:string,Delay) {
 
 
 function runCmd(Cmd:string,Delay,Arg:table,NoDebug) {
+    CMDLast = CMD
     CMD = Cmd
     CMDArg = 1
     CMDA = Arg

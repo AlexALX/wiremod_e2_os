@@ -1,0 +1,230 @@
+#include "alx_pc/standalone/gif_reader/_shared_"
+
+function number gifU8() {
+    local Pos = Gif["pos", number]
+    local Value = toByte(Gif["data", string], Pos)
+    Gif["pos", number] = Pos + 1
+    return Value
+}
+
+function number gifU16() {
+    local Low = gifU8()
+    local High = gifU8()
+    # Correct Little-Endian calculation using fast bitwise OR
+    return (High << 8) || Low
+}
+
+function gifSkip(Bytes:number) {
+    Gif["pos", number] = Gif["pos", number] + Bytes
+}
+
+# This function works but buggy, sometimes can skip one frame
+function number gifCountTotalFramesStep() {
+    local State = Gif["countState", table]
+    local Size = Gif["size", number]
+    
+    if (State["active", number] == 0) {
+        State["active", number] = 1
+        State["frameCount", number] = 0
+        State["startPos", number] = Gif["pos", number]
+        
+        # ALWAYS start scanning strictly from the 1st byte of the file
+        State["scanPos", number] = 1
+    }
+    
+    local FrameCount = State["frameCount", number]
+    local DataStr = Gif["data", string]
+    local Pos = State["scanPos", number]
+    
+    local TargetSignature = toChar(0x21) + toChar(0xF9)
+    
+    while (perf(90)) {
+        # Blazing fast native C++ string find. Completely unfreezable.
+        local FoundPos = DataStr:find(TargetSignature, Pos)
+        
+        if (FoundPos == 0 | FoundPos >= Size - 8) {
+            if (FrameCount == 0) { FrameCount = 1 }
+            
+            Gif["frameTotal", number] = FrameCount
+            State["active", number] = 0
+            
+            Progress["frameProcessed",number] = 0
+            Progress["frameTotal",number] = FrameCount
+            return 1
+        }
+        
+        if (toByte(DataStr, FoundPos + 8) == 0x2C) {
+            FrameCount = FrameCount + 1
+        }
+        
+        Pos = FoundPos + 2
+    }
+
+    State["frameCount", number] = FrameCount
+    State["scanPos", number] = Pos
+    return 0
+}
+
+   
+function number gifReadSubBlocksStep() {
+    local State = Gif["subBlockState", table]
+    
+    if (State["active", number] == 0) {
+        State["active", number] = 1
+        State["buffer", string] = ""
+    }
+    
+    local DataStr = Gif["data", string]
+    local Pos = Gif["pos", number]
+    local Buffer = State["buffer", string]
+    
+    while (perf(90)) {
+        local BlockSize = gifU8()
+        if (BlockSize == 0) {
+            Gif["lzwData", string] = Buffer
+            Gif["lzwSize", number] = Buffer:length()
+            State["buffer", string] = Buffer
+            State["active", number] = 0
+            return 1
+        }
+ 
+        Pos = Gif["pos", number]
+        # Restored standard E2 string concatenation without non-existent append operator
+        Buffer += DataStr:sub(Pos, Pos + BlockSize - 1)
+        Pos = Pos + BlockSize
+        Gif["pos", number] = Pos
+    }
+    
+    State["buffer", string] = Buffer
+    return 0
+}
+
+function lctFinish() {
+    Gif["minCodeSize", number] = gifU8() 
+    
+    Gif["subBlockState", table] = table()
+    Gif["subBlockState", table]["active", number] = 0
+    
+    Gif["lzwState", table] = table()
+    Gif["lzwState", table]["active", number] = 0
+    Gif["lzwState", table]["stage", number] = 0
+    Gif["lzwState", table]["firstCall", number] = 0
+    
+    Gif["framePixels", array] = array()
+    Gif["renderIndex", number] = 0
+}
+
+function number gifReaderBlockStep() {
+    
+    if (Gif["lctState",number]==1) {
+        local LCTSize = Gif["lctSize",number]
+        local Index = Gif["lctIndex",number]
+        
+        local Lct = Gif["lctTable",table]
+        for (I = Index, LCTSize - 1) {
+            if (!perf(90)) {
+                Gif["lctIndex",number] = I
+                return 0        
+            }
+            Lct[I, number] = (gifU8() << 16) || (gifU8() << 8) || gifU8()
+        }
+        Gif["currentPalette", table] = Lct
+        Gif["lctState",number] = 0
+        
+        lctFinish()
+        return 2
+    }
+    
+    local BlockID = gifU8()
+    
+    if (BlockID == 0x3B) {
+        return 1
+    }
+    
+    if (BlockID == 0x21) {
+        local ExtType = gifU8()
+        
+        if (ExtType == 0xF9) {
+            local BlockSize = gifU8()
+            local Packed = gifU8()
+            
+            local Disposal = (Packed >> 2) && 7
+            Gif["currentDisposal", number] = Disposal
+            Gif["transparentFlag", number] = Packed && 1
+            Gif["delayTime", number] = gifU16()     
+            Gif["transparentIndex", number] = gifU8()
+            
+            gifU8()
+        # loop event 
+        } elseif (ExtType == 0xFF) {              
+            local BlockSize = gifU8()
+            
+            gifSkip(BlockSize) 
+            
+            local SubBlockSize = gifU8() 
+            if (SubBlockSize == 3) {
+                local SubBlockID = gifU8()
+
+                local LoopCount = gifU16()
+                Gif["loopCount", number] = LoopCount
+                Gif["loopMode", number] = 1
+                Gif["loopCounter", number] = LoopCount
+                
+                gifU8() 
+            } else {  
+                while (SubBlockSize > 0) {
+                    gifSkip(SubBlockSize)
+                    SubBlockSize = gifU8()
+                }
+            }            
+        } else {   
+            local Size = gifU8()
+            while (Size > 0) {
+                gifSkip(Size)
+                Size = gifU8()
+            }
+        }
+        return 0
+    }
+    
+    if (BlockID == 0x2C) {
+        local OrigX = gifU16()
+        local OrigY = gifU16()
+        local OrigW = gifU16()
+        local OrigH = gifU16()
+        
+        Gif["frameX", number] = OrigX
+        Gif["frameY", number] = OrigY
+        Gif["frameWidth", number] = OrigW
+        Gif["frameHeight", number] = OrigH
+        
+        local GlobalScale = Gif["globalScale",number]
+
+        Gif["dsX", number] = floor(OrigX / GlobalScale)
+        Gif["dsY", number] = floor(OrigY / GlobalScale)
+        Gif["dsWidth", number]  = floor((OrigX + OrigW) / GlobalScale) - Gif["dsX", number]
+        Gif["dsHeight", number] = floor((OrigY + OrigH) / GlobalScale) - Gif["dsY", number]
+        
+        local Packed = gifU8()
+        local HasLCT = (Packed >> 7) && 1
+        local Interlace = (Packed >> 6) && 1
+        local LCTSize = 1 << ((Packed && 7) + 1)
+        
+        Gif["interlace", number] = Interlace
+
+        if (HasLCT) {
+            Gif["lctState",number] = 1
+            Gif["lctIndex",number] = 0
+            Gif["lctSize",number] = LCTSize
+            Gif["lctTable",table] = table()
+            return 0
+        } else {
+            Gif["currentPalette", table] = Gif["gct", table]
+        }
+        
+        lctFinish()
+        return 2
+    }
+    
+    return 0
+}

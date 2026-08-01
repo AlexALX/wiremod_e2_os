@@ -1,0 +1,20 @@
+@persist Gif:table GIFDebug GIFNoPrint
+@outputs CurrentState:string Progress:table ProgressText:string Processing:number Error:string Warning:string
+@inputs DS:wirelink
+
+if (first() | duped()) {
+    GIFDebug = 0
+    GIFNoPrint = 0
+    
+    dsSetScope(2)
+}
+
+function gifError(Msg:string) {
+    Error = Msg
+    Processing = 0
+    Gif["state",string] = ""
+    
+    if (!GIFNoPrint) {
+        print(Error)
+    }
+}

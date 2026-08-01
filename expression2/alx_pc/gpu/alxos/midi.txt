@@ -23,6 +23,13 @@ function alxos_midi_init(Args:table) {
     GpuData["midiStart",number] = 0
 }
 
+function alxos_prog_midi_unplug() {
+    stopAllTimers()
+    ExplorerDsH = ""
+    "alxos_explorer_handlers"()
+    "alxos_explorer_msg"("Disk was unplugged.",200,"Information")
+}
+
 function alxos_midi_postinit() {
     local DSType = dsGetType()
     if (DSType=="table") {
@@ -37,7 +44,7 @@ function alxos_midi_postinit() {
     local FInfo = GpuData[1,table]
     local ExplorerFS = GpuData[2,table]
 
-    ExplorerCurTask = "midi"
+    ExplorerCurTask = "alxos_prog_midi"
 
     dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(
         ExplorerFS,FInfo,0,FInfo["size",number]
@@ -169,6 +176,8 @@ function alxos_midi_play(Data:string) {
         "alxos_explorer_error"("MIDI Player not connected to your Sound Card.",450)
         return
     }
+    
+    ExplorerCurTask = ""
     
     dsSendDirect("alxos_runprog",Devices["spu",entity],table(
         "alxos_midi_player",
@@ -318,47 +327,11 @@ function alxos_midi_warning(Warning:string) {
     local Width = DialogData["DialogW",number]
     local Height = 90
     local Title = "Warning"
-
-    local Parent = LAST_I
     
     local PosX = 256 - (Width / 2)
     local PosY = 440 - (Height / 2)
     
-    local Col = table()
-    Col[1, vector4] = vec4(230, 130, 10, 255) 
-    Col[2, vector4] = vec4(255, 255, 255, 255)  
-
-    DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpBox(LAST_I, vec2(PosX, PosY), vec2(Width, Height))
-    EGP:egpColor(LAST_I, Col[1, vector4]) LAST_I++
-    
-    DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpBoxOutline(LAST_I, vec2(PosX + 8, PosY + 8), vec2(Width - 16, Height - 16))
-    EGP:egpColor(LAST_I, Col[2, vector4]) LAST_I++
-    
-    DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpBoxOutline(LAST_I, vec2(PosX + 11, PosY + 11), vec2(Width - 22, Height - 22))
-    EGP:egpColor(LAST_I, Col[2, vector4]) LAST_I++
-
-    DialogData[-10,table]:pushNumber(LAST_I)
-    local Sz = Title:length() * 12    
-    EGP:egpBox(LAST_I, vec2(Width / 2 - Sz / 2, 0), vec2(Sz, 22))
-    EGP:egpParent(LAST_I, Parent)
-    EGP:egpColor(LAST_I, Col[1, vector4]) LAST_I++
-    
-    DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I, Title, vec2(Width / 2, 0))
-    EGP:egpParent(LAST_I, Parent)
-    EGP:egpAlign(LAST_I, 1)
-    EGP:egpColor(LAST_I, Col[2, vector4]) LAST_I++
-    
-    DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpTextLayout(LAST_I,Warning,vec2(22,18),vec2(Width-40,60))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpAlign(LAST_I,1)
-    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++
-    
-    DialogData["WarningParent", number] = Parent
+    alxos_dialog_warning(Title, Width, Height, vec2(PosX,PosY), Warning, 60)
 }
 
 function alxos_midi_playprogress() {

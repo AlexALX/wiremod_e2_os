@@ -144,9 +144,7 @@ function jpgDecodeBlockBegin(
 function number jpgDecodeBlockBaseline()
 {
     local S = Jpg["blockDecode",table]
-
     local Stage = S["stage",number]
-
     local Block = S["block",table]
 
     #
@@ -187,6 +185,7 @@ function number jpgDecodeBlockBaseline()
         S["block",table] = Block
         S["k",number] = 1
         S["stage",number] = 1
+        State = 1
     }
 
     #
@@ -194,6 +193,8 @@ function number jpgDecodeBlockBaseline()
     #
 
     if (S["stage",number] == 1) {
+            
+        local ACHT = S["acht",table]
 
         Block = S["block",table]
 
@@ -207,7 +208,7 @@ function number jpgDecodeBlockBaseline()
             }
 
             local Symbol =
-                jpgHuffmanRead(S["acht",table])
+                jpgHuffmanRead(ACHT)
 
             if (Symbol < 0) {
                 #print("jpgHuffmanRead acht -1")
@@ -256,9 +257,7 @@ function number jpgDecodeBlockBaseline()
                 Value = jpgExtend(Value, Size)
             }
 
-            local Index = JpgZigZag[K + 1,number]
-
-            Block[Index,number] = Value
+            Block[JpgZigZag[K + 1,number],number] = Value
 
             K++
         }
@@ -302,12 +301,7 @@ function number jpgDecodeBlockDCFirstStep()
         # Progressive block starts empty
         #
         if (Block:count() == 0) {
-
             Block = table()
-
-            for (I = 0,63) {
-                Block[I,number] = 0
-            }
         }
 
         local Size = jpgHuffmanRead(S["dcht",table])
@@ -972,8 +966,12 @@ function number jpgDequantizeBlockStep(Block:table, QT:table, State:table)
             State["dequantIndex",number] = I
             return 0
         }
-
-        Block[I,number] = Block[I,number] * QT[I,number]
+        
+        local Val = Block[I,number]
+        
+        if (Val!=0) {
+            Block[I,number] = Val * QT[I,number]
+        }
 
         I++
     }
@@ -985,7 +983,6 @@ function number jpgDequantizeBlockStep(Block:table, QT:table, State:table)
 
 function number jpgDecodeMCU()
 {
-    
     local State = Jpg["mcuDecode",table]
 
     if (State["active",number] == 0) {
@@ -993,11 +990,11 @@ function number jpgDecodeMCU()
     }
 
     local Components = Jpg["scanComponents",table]
-
     local C = State["component",number]
+    local CompCount = Components:count()  
 
-    if (C > Components:count()) {
-        State["active",number] = 0
+    if (C > CompCount) {
+        State["active", number] = 0
         return 1
     }
 
@@ -1006,49 +1003,39 @@ function number jpgDecodeMCU()
     local Component = Jpg["components",table][ID,table]
         
     local Index = -1
+    local IsSingle = Jpg["scanIsSingleComponent",number] 
     
-    if (Jpg["scanIsSingleComponent",number]) {
+    if (IsSingle) {
         local BlocksX = Component["blocksX",number]
-        local BlockX = Jpg["scanMCU",number] % BlocksX
-        local BlockY = floor(Jpg["scanMCU",number] / BlocksX)
+        local ScanMCU = Jpg["scanMCU",number]
+        local BlockX = ScanMCU % BlocksX
+        local BlockY = floor(ScanMCU / BlocksX)
         
         local H = Component["h",number]
         local V = Component["v",number]
-        local MCUGridX = Jpg["mcuX",number]
         
-        local MCUPosX = floor(BlockX / H)
-        local MCUPosY = floor(BlockY / V)
-        local TargetMCU = MCUPosY * MCUGridX + MCUPosX
-        
+        local TargetMCU = floor(BlockY / V) * Jpg["mcuX",number] + floor(BlockX / H)
         local InternalBlock = (BlockY % V) * H + (BlockX % H)
         
         Index = jpgComponentBlockIndex(Component, TargetMCU, InternalBlock)
     } else {
-        local InternalBlockOffset = (State["y",number]-1) * Component["h",number] + (State["x",number]-1)
+        local InternalBlockOffset = (State["y",number] - 1) * Component["h",number] + (State["x",number] - 1)
         Index = jpgComponentBlockIndex(Component, Jpg["scanMCU",number], InternalBlockOffset)
     }
 
     local Decode = Jpg["blockDecode",table]
+    local CurStage = State["stage",number]
 
-    #
-    # Stage 0
-    #
-
-    if (State["stage",number] == 0) {
+    if (CurStage == 0) {
         local DCHT = Jpg["dht",table][Scan["dc",number],table]
         local ACHT = Jpg["dht",table][16 + Scan["ac",number],table]
         
         jpgDecodeBlockBegin(ID, Index, DCHT, ACHT)
-
         State["stage",number] = 1
+        CurStage = 1
     }
 
-    #
-    # Stage 1 : Huffman
-    #
-
-    if (State["stage",number] == 1) {
-
+    if (CurStage == 1) {
         local Result = jpgDecodeBlockStep()
 
         if (Result <= 0) {
@@ -1056,19 +1043,16 @@ function number jpgDecodeMCU()
         }
     
         if (Jpg["progressive",number]) {
-        
             if (Index >= 0) {
                 local Blocks = Jpg["coefficients",table][ID,table]
-            
-                if (!Blocks[Index,table]:count()) {
+                local Coeff = Blocks[Index,table]
+                
+                if (!Coeff:count()) {
                     Blocks[Index,table] = table()
+                    Coeff = Blocks[Index,table]
                 }
                 
-                local Coeff = Blocks[Index,table]
                 local Block = Decode["block",table]
-    
-                local CurrentSs = Jpg["scanSs",number]
-                local CurrentSe = Jpg["scanSe",number]
                 
                 for (I = 0, 63) {
                     Coeff[I,number] = Block[I,number]
@@ -1076,50 +1060,33 @@ function number jpgDecodeMCU()
             }
         
             State["stage",number] = 0
-        
             return jpgNextMCUBlock()
         }
 
         State["stage",number] = 2
+        CurStage = 2
     }
 
-    #
-    # Stage 2 : Dequant
-    #
-
-    if (State["stage",number] == 2) {
-
+    if (CurStage == 2) {
         local QT = Jpg["dqt",table][Component["qt",number],table]
 
-        if (!jpgDequantizeBlockStep(
-            Decode["block",table],
-            QT, State
-        )) {
+        if (!jpgDequantizeBlockStep(Decode["block",table], QT, State)) {
             return 0
         }
 
         State["stage",number] = 3
+        CurStage = 3
     }
 
-    #
-    # Stage 3 : IDCT
-    #
-
-    if (State["stage",number] == 3) {
-        if (!jpgIDCTStep(
-            Decode["block",table]
-        )) {
+    if (CurStage == 3) {
+        if (!jpgIDCTStep(Decode["block",table])) {
             return 0
         }
-
         State["stage",number] = 4
+        CurStage = 4
     }
 
-    #
-    # Stage 4 : Save
-    #
-
-    if (State["stage",number] == 4) {
+    if (CurStage == 4) {
         local Storage = Jpg["blocks",table][ID,table]
         
         if (Index >= 0) {
@@ -1130,15 +1097,10 @@ function number jpgDecodeMCU()
             BlockTable["mcu",number] = Jpg["scanMCU",number]
             
             Storage[Index,table] = BlockTable
-            
             Decode["block",table] = table()
         }
 
         State["stage",number] = 0
-
-        #
-        # next block
-        #
         return jpgNextMCUBlock()
     }
 
@@ -1382,18 +1344,7 @@ function number jpgProgressiveBuildBlocksStep()
     #
 
     if (State["stage",number] == 2) {
-        local Saved = Storage[Index,table]
-
-        if (!Saved:count()) {
-            Saved = table()
-        }
-
-
-        for (I = 0,63) {
-            Saved[I,number] = Block[I,number]
-        }
-
-        Storage[Index,table] = Saved
+        Storage[Index,table] = Block
 
         #
         # next block

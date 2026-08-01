@@ -235,10 +235,47 @@ function jpgParseSOF(Type:number)
     
     local WH = Width > Height ? Width : Height
     
-    if (WH>512) {
+    #[if (WH>512) {
         jpgError("Your image are too big\nMaximum resolution is 512x512\nYour image: "+Width+"x"+Height)
         return -1
+    } ]#
+    
+    local JpgMaxWidth = 512 # DS Limit
+    local SizeLimit = Jpg["MaxSize",number]
+    
+    if (SizeLimit>0) {
+        JpgMaxWidth = min(512,SizeLimit)  
     }
+    
+    Jpg["maxWidth",number] = JpgMaxWidth
+    
+    Jpg["screenAr", number] = Width / Height
+    if (WH > JpgMaxWidth) {
+        local Scale = WH / JpgMaxWidth
+        local ResizedWidth  = floor(Width / Scale)
+        local ResizedHeight = floor(Height / Scale)
+
+        Jpg["globalScale",number] = Scale
+        Jpg["screenWidth", number] = ResizedWidth
+        Jpg["screenHeight", number] = ResizedHeight
+
+        if (WH>512 & JpgMaxWidth==512) {
+            Warning = "Your image is larger than Digital Screen supports\n"+
+            "Your image will be resized to: "+ResizedWidth+"x"+ResizedHeight
+            
+            if (!JPGNoPrint) {
+                print(Warning)    
+            }
+        }
+           
+    } else {
+        Jpg["globalScale",number] = 1
+        Jpg["screenWidth", number] = Width
+        Jpg["screenHeight", number] = Height
+    }
+    Jpg["width",number] = Width
+    Jpg["height",number] = Height   
+    Jpg["invScale", number] = 1 / Jpg["globalScale", number] 
     
     Jpg["precision",number] = Precision
     Jpg["levelShift", number] = 1 << (Precision - 1)
@@ -305,9 +342,6 @@ function jpgParseSOF(Type:number)
     
     Jpg["maxH",number] = MaxH
     Jpg["maxV",number] = MaxV
-    
-    Jpg["width",number] = Width
-    Jpg["height",number] = Height
     
     Jpg["componentCount",number] = Components
     
