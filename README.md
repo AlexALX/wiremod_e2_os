@@ -23,6 +23,7 @@ This project pushes **Expression2** to its absolute limits, implementing complex
 * **Low-Level File Systems** — Custom **WM1** and **WCD** storage architectures for virtual HDDs, and CD-ROMs.
 * **Modular Component Architecture** — Custom interconnection layer using Expression2 Data Signals to simulate motherboard slots, BIOS, and boot sequence.
 * **Network & Router Simulation** — Multi-device routing stack featuring virtual switches, laser transceivers, and a real-world **HTTP gateway**.
+* **State Machine Architecture** — Execution splitting across server ticks using finite-state machines to safely handle heavy logic without exceeding E2 Tick Quota and Ops limits.
 
 ### [Wiki](https://github.com/AlexALX/wiremod_e2_os/wiki)
 
