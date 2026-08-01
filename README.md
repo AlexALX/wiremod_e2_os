@@ -15,6 +15,15 @@ Written in in-game Expression2 Language (wiremod addon).
 This is not an real OS, it cannot work anywhere except this game.  
 However it works similar to a real PC (boot sequence etc), but still very much simplified.  
 
+### Advanced Engineering Highlights
+This project pushes **Expression2** to its absolute limits, implementing complex low-level systems entirely from scratch:
+
+* **Custom Binary Parsers** — Native E2 decoders for **Progressive JPG**, animated **GIF**, and **BMP**.
+* **Multi-Channel MIDI Synthesizer** — Advanced player with 3 playback modes.
+* **Low-Level File Systems** — Custom **WM1** and **WCD** storage architectures for virtual HDDs, and CD-ROMs.
+* **Modular Component Architecture** — Custom interconnection layer using Expression2 Data Signals to simulate motherboard slots, BIOS, and boot sequence.
+* **Network & Router Simulation** — Multi-device routing stack featuring virtual switches, laser transceivers, and a real-world **HTTP gateway**.
+
 ### [Wiki](https://github.com/AlexALX/wiremod_e2_os/wiki)
 
 Main features:  
