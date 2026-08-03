@@ -34,7 +34,7 @@ Main features:
 * Virtual BIOS, boot sequence.
 * **Low-level WM1 File System** what works with wire dupable HDDs/EEPROM. 
 * **WCD File System** what used for wiremod CD Discs. 
-* Expression2 **BMP Reader**, draw on wire Digital Screen (up to 512x512). 
+* Expression2 **BMP Reader**, draw on wire Digital Screen (up to 512x512, 1024x1024 Quad Digital Screen). 
 * Expression2 Baseline (8/12bits) and Progressive **JPG Reader** for Digital Screen.
 * Expression2 **GIF Reader** with animations support for Digital Screen.
 * Expression2 **PNG Reader** for Digital Screen.
