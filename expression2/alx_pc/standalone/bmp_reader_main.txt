@@ -452,6 +452,10 @@ event chat(Player:entity, Said:string, Team:number) {
     }
 }
 
+if (~BMP_NoKeepAR) {
+    NoKeepAR = BMP_NoKeepAR
+}
+
 if (clk("bmp")) {
     alxos_bmp_draw()
     exit()
