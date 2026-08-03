@@ -1,7 +1,7 @@
 @name Standalone BMP Reader Multithreaded Main Process
-@inputs DigitalScreen:wirelink LongURL:string
+@inputs DigitalScreen:wirelink LongURL:string BMP_NoKeepAR
 @outputs Percent Threads RenderTime RenderRealTime Error:string
-@persist BMP_NoKeepAR BmpData:table MaxThreads 
+@persist NoKeepAR BmpData:table MaxThreads 
 @strict
 
 #[
@@ -9,7 +9,7 @@
     Created by AlexALX (c) 2018
     -------------------
     BMP Parser, specifications:
-    - Max resolution is up to 512x512 (Digital Screen limitation)
+    - Max resolution is up to 512x512 (DS limitation) or 1024x1024 (Quad Digital Screen)
     - Support most common uncompressed bmp files (32/24/8/4 bits and monochrome, including RGB444/RGB555/RGB565)
     - Support "flip row order" function
     - Slow, but multithreaded
@@ -17,13 +17,15 @@
     Usage:
     - Spawn one BMP Main Process E2 (this file)
     - Connect this E2 to Digital Screen (this is not EGP screen! located in Wire -> Visuals -> Screens -> Digital Screen)
+    - Or connect "DigitalScreen" input to Quad Digital Screen E2 VirtualScreen output (this is custom device dupe)
     - Spawn one or more BMP Sub Process E2's
     
     Chat commands:
     !bmp http://url_with_bmp_file - open bmp file
-    !bmpfile filename.bmp.txt - open bmp file from a garrysmod/data/e2files/ folder, file extension must be renamed to .txt
-    !bmp abort - abort rendering
     Note: long url may be cut, use input LongURL instead for such case (via string value) 
+    !bmpfile filename.bmp.txt - open bmp file from a garrysmod/data/e2files/ folder, file extension must be renamed to .txt
+    !bmpabort - abort rendering
+    !bmpkeepar - set image Aspect Ratio mode (0 or 1) 
     
     If you have own web server with PHP, then you can place 
     img2bmp.php from https://github.com/AlexALX/wiremod_e2_os/blob/master/php/img2bmp.php
@@ -32,15 +34,7 @@
     
 ]#
 
-if (first()|duped()) {
-    
-runOnLast(1)
-
-BmpData = table()
-
-BMP_NoKeepAR = 0 # 0 - keep asset ratio, 1 - scale to screen size
-Percent = 0
-MaxThreads = 0 # maximum threads, 0 - unlimited (may crash)
+#include "alx_pc/standalone/includes/basicreader"
 
 function dsClear() {
     local Global = gTable("BMP_MULTI")
@@ -74,19 +68,6 @@ function number string:read_uint24(Offset) {
 function number string:read_uint32(Offset) {
     #return toByte(This, Offset+3)*16777216+toByte(This, Offset+2)*65536+toByte(This, Offset+1)*256+toByte(This, Offset) 
     return (toByte(This, Offset+3) << 24) + (toByte(This, Offset+2) << 16) + (toByte(This, Offset+1) << 8) + toByte(This, Offset) 
-}
-
-function number checkDS() {
-    if (!->DigitalScreen) {
-        print(_HUD_PRINTTALK,"Digital Screen is not connected.") 
-        return 0
-    }
-    if (DigitalScreen:entity():type()!="gmod_wire_digitalscreen") {
-        print(_HUD_PRINTTALK,"Entity what you did connected is not Digital Screen.\n"+
-        "It is located in Wire -> Visuals -> Screens -> Digital Screen.\nThis is NOT EGPv3 screen.") 
-        return 0    
-    }
-    return 1   
 }
 
 function alxos_bmp_draw() {
@@ -145,9 +126,12 @@ function alxos_bmp_draw() {
                 print(_HUD_PRINTTALK,Error)
                 return
             }
+            
+            local ScreenName = DigitalScreen:entity():getName()
+            local MaxSize = (ScreenName=="Quad Digital Screen" ? 1024 : 512)
 
-            if (Width>512 | Height>512) {
-                Error = "Max BMP resolution is 512x512\nYour's current is "+Width+"x"+Height+"."
+            if (Width>MaxSize | Height>MaxSize) {
+                Error = "Max BMP resolution is "+MaxSize+"x"+MaxSize+"\nYour's current is "+Width+"x"+Height+"."
                 print(_HUD_PRINTTALK,Error)
                 return
             }
@@ -203,7 +187,7 @@ function alxos_bmp_draw() {
             #BmpData[5,number] = Size
             local FSize = BmpData["size",number]
             
-            if (!BMP_NoKeepAR) {
+            if (!NoKeepAR) {
                 local SWH = (Width>Height ? Width : Height)
                 BmpData[31,number] = (Height>Width ? floor((Height-Width)/2) : 0 )
                 BmpData[32,number] = (Width>Height ? floor((Width-Height)/2) : 0 )
@@ -395,104 +379,78 @@ function bmpInit(Body:string, Size) {
     timer("bmp",1)
 }
 
-}
-
-event chat(Player:entity, Message:string, Team:number) {
-    if (owner() == Player) {
-        local Said = Message:trim()
-        local Find = Said:find(" ")
-        local Cmd = Said:left(Find-1)
-        local Url = Said:sub(Find+1) 
-        if (Cmd=="!bmp" & Said!="!bmp abort") {
-            if (!checkDS()) { exit() }
-            #ifndef httpCanRequest()
-                print(_HUD_PRINTTALK,"HTTP extension is not enabled. Please enable via wire_expression2_extension_enable http")   
-                exit()
-            #else
-                if (!httpCanRequest()) {
-                    print(_HUD_PRINTTALK,"HTTP Request Canceled - Please wait a bit...")   
-                    exit()
-                }
-                httpRequest(Url)   
-            #endif
-        } elseif (Cmd=="!bmpfile" & Said!="!bmp abort") {
-            if (!checkDS()) { exit() }
-            #ifndef fileCanLoad()
-                print(_HUD_PRINTTALK,"FILE extension is not enabled. Please enable via wire_expression2_extension_enable file")   
-                exit()
-            #else
-                if (!fileCanLoad()) {
-                    print(_HUD_PRINTTALK,"FILE Request Canceled - Please wait a bit...")   
-                    exit()
-                }
-                try {
-                    fileLoad(Url) 
-                } catch(E:string) {
-                    print(E)   
-                }
-            #endif
-        } elseif (Cmd=="!bmpabort" | Cmd=="!bmpstop" | Said=="!bmp abort") {
-            print(_HUD_PRINTTALK,"BMP rendering canceled.")     
-            stopAllTimers()
-            #dsSend("BMP_MULTI_STOP","BMP_SUB",entity())
-            local Global = gTable("BMP_MULTI")
-            Global["BMP_STOP",number] = 1
-        }
-        exit() 
-    }    
-}
-
-if (~LongURL & LongURL!="") {
-    if (!checkDS()) { 
-        print(_HUD_PRINTTALK,"Digital Screen is not connected")   
-        exit() 
+if (first()|duped()) {
+    
+    Command = "!bmp"
+    
+    Funcs = table()
+    
+    Funcs["readerAbort", function] = function() {
+        print(_HUD_PRINTTALK,"BMP rendering canceled.")     
+        stopAllTimers()
+        #dsSend("BMP_MULTI_STOP","BMP_SUB",entity())
+        local Global = gTable("BMP_MULTI")
+        Global["BMP_STOP",number] = 1
     }
-
-    #ifndef httpCanRequest()
-        print(_HUD_PRINTTALK,"HTTP extension is not enabled. Please enable via wire_expression2_extension_enable http")   
-        exit()
-    #else
-        if (!httpCanRequest()) {
-            print(_HUD_PRINTTALK,"HTTP Request Canceled - Please wait a bit...")   
-            exit()
+    
+    Funcs["readerLoad", function] = function(Body:string, Size:number, Path:string) {
+        bmpInit(Body, Size)
+    }
+    
+    Funcs["readerCheck", function] = function() {
+        if (!->DigitalScreen) {
+            print(_HUD_PRINTTALK,"Digital Screen is not connected.") 
+            return 0
         }
-        httpRequest(LongURL) 
-    #endif
+        
+        local ScreenName = DigitalScreen:entity():getName()
+        if (DigitalScreen:entity():type()!="gmod_wire_digitalscreen" & ScreenName!="Quad Digital Screen") {
+            print(_HUD_PRINTTALK,"Entity what you did connected is not Digital Screen.\n"+
+            "It is located in Wire -> Visuals -> Screens -> Digital Screen.\nThis is NOT EGPv3 screen.") 
+            return 0    
+        }
+        return 1  
+    } 
+    
+    Funcs["readerError", function] = function(Error:string, Path:string) {
+        print(_HUD_PRINTTALK, Error)
+    }
+    
+    BmpData = table()
+    
+    NoKeepAR = BMP_NoKeepAR # 0 - keep asset ratio, 1 - scale to screen size
+    Percent = 0
+    MaxThreads = 0 # maximum threads, 0 - unlimited (may crash)
+
 }
 
-#ifdef httpCanRequest()
-event httpLoaded(Body:string, Size, Url:string) {
-    bmpInit(Body, Size)
-}
+event chat(Player:entity, Said:string, Team:number) {
+    if (!Command) { exit() }
+    
+    if (Player==owner()) { 
+        
+        local Find = Said:lower():find(" ")
+        
+        if (Find) {
+            local Cmd = Said:left(Find-1)
+            local Mode = Said:sub(Find+1):lower()
 
-event httpErrored(Error:string, Url:string) {
-    print(_HUD_PRINTTALK,"HTTP Request Failed - Error: "+Error)   
-    exit()
-}
-#endif
-
-#ifdef fileLoad(string)
-event fileLoaded(FilePath:string, Data:string) {
-    bmpInit(Data, Data:length())    
-}
-
-event fileErrored(FilePath:string, Status:number) {
-    switch(Status) {
-        case _FILE_404,
-            print("File Error: Not Found")   
-            break     
-        case _FILE_TIMEOUT,
-            print("File Error: Timeout")   
-            break 
-        case _FILE_TRANSFER_ERROR,
-            print("File Error: Transfer Error")   
-            break 
-        default,
-            print("File Error: Unknown Error ("+Status+")")   
-            break 
+            if (Cmd==Command+"keepar") {
+                if (Mode=="false" | Mode=="0" | Mode=="nokeep" | Mode=="off") {
+                    NoKeepAR = 1    
+                    print(_HUD_PRINTTALK,
+                        "Aspect Ratio: DISABLED (Stretch to fit)"
+                    ) 
+                } else {
+                    NoKeepAR = 0   
+                    print(_HUD_PRINTTALK,
+                        "Aspect Ratio: ENABLED (Preserve proportions)"
+                    ) 
+                }
+            }
+        }
     }
 }
-#endif
 
 if (clk("bmp")) {
     alxos_bmp_draw()
@@ -526,9 +484,10 @@ if (dsClk("BMP_MULTI_FINISH")) {
     if (BmpData["MULTI_DONE",number] == BmpData["MULTI_E2",table]:count()) {
         RenderTime = curtime() - BmpData["time",number]
         RenderRealTime = realtime() - BmpData["real_time",number]
-        print(_HUD_PRINTTALK,"BMP successfully parsed.")
+        print(_HUD_PRINTTALK,"BMP successfully parsed. Render time: "+round(RenderTime,2)+"s")
         Percent = 100
-        stopAllTimers()   
+        stopAllTimers()
+        BmpData = table()
     }
     exit()
 }

@@ -1,64 +1,56 @@
-@name JPG Reader By AlexALX
-@inputs ProgressivePreview:number JpgSizeLimit:number JpgNoKeepAR:number
-@persist PreviewMode:number SizeLimit:number NoKeepAR:number
+@name PNG Reader By AlexALX
+@inputs PngSizeLimit:number PngNoKeepAR:number
+@persist SizeLimit:number NoKeepAR:number
 @strict
 
 #[
-    JPG Reader
+    PNG Reader
     Created by AlexALX (c) 2026
     -------------------
-    JPG Parser, specifications:
+    PNG Parser, specifications:
     - Max resolution is unlimited, but will be automatically resized to 512x512 (DS limit) or 1024x1024 (Quad DS)
-    - Support Baseline (8/12bits) and Progressive JPG
-    - Support YUV 4:2:0 4:2:2 4:2:2v 4:4:4
+    - Support Baseline and 7-pass Adam7 Interlace
+    - Color Depth: Full range (1 to 32 bits)
+    - Types: RGB, RGBA, Grayscale & Palette
     - Slow, no multithread
-    - Support progressive preview mode
     
     Usage:
-    - Spawn one JPG Reader (this file)
+    - Spawn one PNG Reader (this file)
     - Connect this E2 to Digital Screen (this is not EGP screen! located in Wire -> Visuals -> Screens -> Digital Screen)
     - Or connect "DS" input to Quad Digital Screen E2 VirtualScreen output (this is custom device dupe)
     
     Chat commands:
-    !jpg http://url_with_jpg_file - open jpg file from the web
+    !png http://url_with_png_file - open png file from the web
     Note: long url may be cut, use input LongURL instead for such case (via string value) 
     
-    !jpgfile filename.jpg - open jpg file from a garrysmod/data/e2files/ folder
+    !pngfile filename.png - open png file from a garrysmod/data/e2files/ folder
     
-    !jpgabort - abort rendering
+    !pngabort - abort rendering
     
-    !jpgmode - normal, preview, fullpreview
+    !pngsize - set maximum image dimensions before scaling (1 to 512 for DS, 1024 for Quad DS)
+    !pngkeepar - set image Aspect Ratio mode (0 or 1)
 
-    Modes:
-     normal - no preview, fastest render
-     preview - first AC scan preview
-     fullpreview - every scan rerender (slow)
-    Note: this mode works only for progressive images 
-    
-    !jpgsize - set maximum image dimensions before scaling (1 to 512 for DS, 1024 for Quad DS)
-    !jpgkeepar - set image Aspect Ratio mode (0 or 1)
-    
     Additional Wire Inputs:
-    JpgSizeLimit - Maximum image dimensions before scale
+    PngSizeLimit - Maximum image dimensions before scale
      This can be used to scale down any image before drawing
-    JpgNoKeepAR - Do not keep Aspect Ratio of image
+    PngNoKeepAR - Do not keep Aspect Ratio of image
 ]#
 
 #include "alx_pc/standalone/includes/basicreader"
-#include "alx_pc/standalone/jpg_reader/_init_"
+#include "alx_pc/standalone/png_reader/_init_"
 
 if (first() | duped()) {
-    Command = "!jpg"
+    Command = "!png"
     
     Funcs = table()
     
     Funcs["readerAbort", function] = function() {
-        print(_HUD_PRINTTALK,"JPG rendering canceled.")     
-        jpgAbort()
+        print(_HUD_PRINTTALK,"PNG rendering canceled.")     
+        pngAbort()
     }
     
     Funcs["readerLoad", function] = function(Body:string, Size:number, Path:string) {
-        jpgInit(Body, PreviewMode, SizeLimit, NoKeepAR)
+        pngInit(Body, SizeLimit, NoKeepAR)
     }
     
     Funcs["readerCheck", function] = function() {
@@ -80,9 +72,8 @@ if (first() | duped()) {
         print(_HUD_PRINTTALK, Error)
     }
     
-    PreviewMode = ProgressivePreview
-    SizeLimit = JpgSizeLimit
-    NoKeepAR = JpgNoKeepAR
+    SizeLimit = PngSizeLimit
+    NoKeepAR = PngNoKeepAR
 }
 
 event chat(Player:entity, Said:string, Team:number) {
@@ -96,40 +87,15 @@ event chat(Player:entity, Said:string, Team:number) {
             local Cmd = Said:left(Find-1)
             local Mode = Said:sub(Find+1):lower()
 
-            if (Cmd==Command+"mode") { 
-                if (Mode == "fullpreview") {
-                    PreviewMode = 2
-                    print(_HUD_PRINTTALK,
-                        "Jpg mode set to fullpreview\n"+
-                        "Every scan read will rerender image\n"+
-                        "This mode is very slow\n"+
-                        "Note: this mode works only for progressive images"
-                    ) 
-                } elseif (Mode == "preview") {
-                    PreviewMode = 1    
-                    print(_HUD_PRINTTALK,
-                        "Jpg mode set to preview\n"+
-                        "Image preview will display once after the 2nd scan\n"+
-                        "This mode balances speed and visualization\n"+
-                        "Note: this mode works only for progressive images"
-                    ) 
-                } else {
-                    PreviewMode = 0 
-                    print(_HUD_PRINTTALK,
-                        "Jpg mode set to normal\n"+
-                        "No preview will be displayed, rendering only the final image\n"+
-                        "This mode is fastest"
-                    ) 
-                }
-            } elseif (Cmd==Command+"size") {
+            if (Cmd==Command+"size") {
                 local IsQuadScreen = DS:entity():getName()=="Quad Digital Screen"
                 local MaxSize = IsQuadScreen ? 1024 : 512
                 
                 local Size = Mode:toNumber()                
                 SizeLimit = clamp(Size,1,MaxSize)
                 print(_HUD_PRINTTALK,
-                    "Jpg max size set to "+SizeLimit
-                )
+                    "Png max size set to "+SizeLimit
+                ) 
                 if (Size>MaxSize) {
                     if (IsQuadScreen) {
                         print(_HUD_PRINTTALK,
@@ -158,14 +124,10 @@ event chat(Player:entity, Said:string, Team:number) {
     }
 }
 
-if (~ProgressivePreview) {
-    PreviewMode = ProgressivePreview
+if (~PngSizeLimit) {
+    SizeLimit = PngSizeLimit
 }
 
-if (~JpgSizeLimit) {
-    SizeLimit = JpgSizeLimit
-}
-
-if (~JpgNoKeepAR) {
-    NoKeepAR = JpgNoKeepAR
+if (~PngNoKeepAR) {
+    NoKeepAR = PngNoKeepAR
 }

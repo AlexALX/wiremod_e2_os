@@ -12,7 +12,8 @@ function displayHelp() {
 "
 JPG Parser, specifications:
 - Max resolution is unlimited, but
-  will be resized to 512x512 (DS limit) 
+  will be resized to 512x512 (DS limit)
+  or 1024x1024 (Quad DS Limit) 
 - Support Baseline and Progressive JPG 
 - Support YUV 4:2:0 4:2:2 4:2:2v 4:4:4
 - Slow, no multithread

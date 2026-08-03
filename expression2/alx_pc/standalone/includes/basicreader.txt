@@ -1,5 +1,5 @@
 @name Basic Reader
-@inputs LongURL:string
+@inputs LongURL:string FileName:string
 @persist Funcs:table Command:string
 @strict
 
@@ -29,7 +29,7 @@ event chat(Player:entity, Said:string, Team:number) {
                     print(_HUD_PRINTTALK,"HTTP extension is not enabled. Please enable via wire_expression2_extension_enable http") 
                 #else
                     if (!httpCanRequest()) {
-                        print("HTTP Busy. Please wait...")
+                        print(_HUD_PRINTTALK, "HTTP Busy. Please wait...")
                         exit()
                     }
                         
@@ -44,15 +44,15 @@ event chat(Player:entity, Said:string, Team:number) {
                     print(_HUD_PRINTTALK,"FILE extension is not enabled. Please enable via wire_expression2_extension_enable file") 
                 #else
                     if (!fileCanLoad()) {
-                        print("File Busy. Please wait...")
+                        print(_HUD_PRINTTALK, "File Busy. Please wait...")
                         exit()
                     }
-                        
+                    
                     timer(0.01, function() {
                         try {
                             fileLoad(Url) 
                         } catch(E:string) {
-                            print(E)  
+                            Funcs["readerError", function](E, FileName)  
                         }
                     })
                 #endif
@@ -78,6 +78,26 @@ if (~LongURL & LongURL!="") {
     #endif
 }
 
+if (~FileName & FileName!="") {
+    if (!Funcs["readerCheck",function]()[number]) { exit() }
+
+    #ifndef fileCanLoad()
+        print(_HUD_PRINTTALK,"FILE extension is not enabled. Please enable via wire_expression2_extension_enable file")   
+        exit()
+    #else
+        if (!fileCanLoad()) {
+            print(_HUD_PRINTTALK, "File Busy. Please wait...") 
+            exit()
+        }
+
+        try {
+            fileLoad(FileName) 
+        } catch(E:string) {
+            Funcs["readerError", function](E, FileName) 
+        }
+    #endif
+}
+
 #ifdef httpCanRequest()
 event httpLoaded(Body:string, Size:number, Url:string)
 {
@@ -99,7 +119,8 @@ event fileErrored(FilePath:string, Status:number) {
     local Error = ""
     switch(Status) {
         case _FILE_404,
-            Error = "File Error: Not Found"
+            Error = "File Error: Not Found (too big? max "+fileMaxSize()+"kb)\n"+
+            "You can change size via wire_expression2_file_max_size convar"
             break     
         case _FILE_TIMEOUT,
             Error = "File Error: Timeout"

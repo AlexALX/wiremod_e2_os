@@ -1,0 +1,63 @@
+@persist Png_BitBuffer Png_BitCount
+
+
+#include "alx_pc/standalone/png_reader/_shared_"
+#include "alx_pc/standalone/png_reader/reader"
+
+function pngBitInit()
+{
+    Png_BitBuffer = 0
+    Png_BitCount = 0
+}
+
+function number pngReadCompressedByte()
+{
+    if (Png_CompressedPos > Png_CompressedData:length()) {
+        return -1 
+    }
+    
+    local Byte = toByte(Png_CompressedData, Png_CompressedPos)
+    Png_CompressedPos++
+    return Byte
+}
+
+function number pngBits(Bits:number)
+{
+    if (Bits == 0) { return 0 }
+
+    # Core bit refill loop using blazing fast persist registers
+    while (Png_BitCount < Bits) {
+        local Byte = pngReadCompressedByte()
+        if (Byte < 0) {
+            return -1 
+        }
+        Png_BitBuffer = Png_BitBuffer || (Byte << Png_BitCount)
+        Png_BitCount += 8
+    }
+
+    local Value = Png_BitBuffer && ((1 << Bits) - 1)
+    
+    Png_BitBuffer = Png_BitBuffer >> Bits
+    Png_BitCount = Png_BitCount - Bits
+
+    return Value
+}
+
+function number pngBit()
+{
+    if (Png_BitCount == 0) {
+        local Byte = pngReadCompressedByte()
+        if (Byte < 0) { return -1 } # EOF safe guard
+        
+        Png_BitBuffer = Byte
+        Png_BitCount = 8
+    }
+
+    local Value = Png_BitBuffer && 1
+    
+    # Smooth step to the next bit
+    Png_BitBuffer = Png_BitBuffer >> 1
+    Png_BitCount--
+
+    return Value
+}

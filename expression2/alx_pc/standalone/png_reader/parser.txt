@@ -1,0 +1,139 @@
+#include "alx_pc/standalone/png_reader/_shared_"
+#include "alx_pc/standalone/png_reader/reader"
+
+function number pngParseChunksStep()
+{
+    if (Png["pos",number] > Png["size",number]) {
+        Png["state",string] = "error"
+        Error = "Unexpected EOF"
+        return 1
+    }
+
+    local Length = pngU32()
+    local Type   = pngReadType()
+    local DataStart = Png["pos",number]
+
+    if (Type == "IHDR") {
+        local Width  = pngU32()
+        local Height = pngU32()
+        
+        local WH = Width > Height ? Width : Height
+        
+        local IsQuadScreen = DS:entity():getName()=="Quad Digital Screen"
+        
+        local DsMaxLimit = (IsQuadScreen ? 1024 : 512) # DS Limit 
+        local PngMaxWidth = DsMaxLimit # Default Limit
+        local SizeLimit = Png["MaxSize",number]
+    
+        if (SizeLimit>0) {
+            PngMaxWidth = min(DsMaxLimit,SizeLimit) 
+        }
+        
+        Png["maxWidth",number] = PngMaxWidth
+        
+        Png["screenAr", number] = Width / Height
+        if (WH > PngMaxWidth) {
+            local Scale = WH / PngMaxWidth
+            local ResizedWidth  = floor(Width / Scale)
+            local ResizedHeight = floor(Height / Scale)
+    
+            Png["globalScale",number] = Scale
+            Png["screenWidth", number] = ResizedWidth
+            Png["screenHeight", number] = ResizedHeight
+    
+            if (WH>DsMaxLimit & PngMaxWidth==DsMaxLimit) {
+                Warning = "Your image is larger than "+(IsQuadScreen ? "Quad " : "")+"Digital Screen supports\n"+
+                "Your image will be resized to: "+ResizedWidth+"x"+ResizedHeight    
+                
+                if (!PNGNoPrint) {
+                    print(Warning)
+                }
+            }
+        } else {
+            Png["globalScale",number] = 1
+            Png["screenWidth", number] = Width
+            Png["screenHeight", number] = Height
+        }
+        Png["width", number] = Width
+        Png["height", number] = Height
+        Png["invScale", number] = 1 / Png["globalScale", number] 
+        
+        local CurrentPos = Png["pos", number]
+        
+        Png["bitDepth", number]          = toByte(Png["data", string], CurrentPos)
+        Png["colorType", number]         = toByte(Png["data", string], CurrentPos + 1)
+        Png["compressionMethod", number] = toByte(Png["data", string], CurrentPos + 2)
+        Png["filterMethod", number]      = toByte(Png["data", string], CurrentPos + 3)
+        Png["interlaceMethod", number]   = toByte(Png["data", string], CurrentPos + 4)
+        
+        local CT = Png["colorType", number]
+        local BD = Png["bitDepth", number]
+        local Channels = 3 # RGB (Type 2)
+        
+        if (CT == 6) { Channels = 4 } # RGBA (Type 6)
+        elseif (CT == 0) { Channels = 1 } # Grayscale (Type 0)
+        elseif (CT == 4) { Channels = 2 } # Grayscale + Alpha (Type 4)
+        elseif (CT == 3) { Channels = 1 } # Palette (Type 3)
+        
+        local BytesPerChannel = (BD == 16) ? 2 : 1
+        local CalculatedBPP = Channels * BytesPerChannel
+        
+        Png["bpp", number] = CalculatedBPP
+        
+        if (BD < 8) {
+            Png["stride", number] = 1 + floor((Png["width", number] * CalculatedBPP * BD + 7) / 8)
+        } else {
+            Png["stride", number] = 1 + (Png["width", number] * CalculatedBPP)
+        }
+        
+        Png["pos",number] = DataStart + Length 
+        
+        if (PNGDebug) {
+            print("PNG Size: " + Png["width", number] + "x" + Png["height", number])
+            print("Color Type: " + CT)
+            print("Bit Depth: " + BD)
+            print("Calculated BPP: " + CalculatedBPP)
+            print("Calculated Stride: " + Png["stride", number])
+            print("Interlace Method: " + Png["interlaceMethod", number])
+        }
+        
+    } elseif (Type == "IDAT") {
+        local ChunkData = Png["data",string]:sub(DataStart, DataStart + Length - 1)
+        Png_CompressedData += ChunkData
+        Png["pos",number] = DataStart + Length
+    } elseif (Type == "PLTE") {
+        local PaletteTable = table()
+        local PalPos = Png["pos", number]
+        local ColorsCount = floor(Length / 3)
+        
+        for (I = 0, ColorsCount - 1) {
+            # Read 3 consecutive bytes for R, G, B
+            local R = toByte(Png["data", string], PalPos + I * 3)
+            local G = toByte(Png["data", string], PalPos + I * 3 + 1)
+            local B = toByte(Png["data", string], PalPos + I * 3 + 2)
+            
+            # Store packed RGB color inside the palette table using the index as a key
+            PaletteTable[I, number] = (R << 16) || (G << 8) || B
+        }
+        
+        Png["palette", table] = PaletteTable
+        
+        if (PNGDebug) {
+            print("PNG Palette chunk parsed. Total colors: " + ColorsCount)
+        }
+        
+        # Rewind pointer to the end of the chunk
+        Png["pos", number] = DataStart + Length
+    } elseif (Type == "IEND") {
+        Png["state",string] = "decompress"
+        return 1
+        
+    } else { 
+        Png["pos",number] = DataStart + Length
+    }
+
+    # CRC32    
+    pngU32() 
+
+    return 0
+}

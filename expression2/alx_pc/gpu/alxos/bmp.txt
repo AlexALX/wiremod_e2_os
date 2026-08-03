@@ -7,7 +7,7 @@
     Created by AlexALX
     -------------------
     BMP Parser, specifications:
-    - Max resolution is up to 512x512 (Digital Screen limitation)
+    - Max resolution is up to 512x512 (Digital Screen limitation) or 1024x1024 (Quad Digital Screen)
     - Support most common uncompressed bmp files (32/24/8/4 bits and monochrome, including RGB444/RGB555/RGB565)
     - Support "flip row order" function
     - Very slow... :(
@@ -99,9 +99,12 @@ function alxos_bmp_draw(Data:string) {
                 "alxos_explorer_error"("Unsupported BMP file.")
                 return
             }
+            
+            local ScreenName = DS:entity():getName()
+            local MaxSize = (ScreenName=="Quad Digital Screen" ? 1024 : 512)
 
-            if (Width>512 | Height>512) {
-                "alxos_explorer_error"("Max BMP resolution is 512x512 (current is "+Width+"x"+Height+").")
+            if (Width>MaxSize | Height>MaxSize) {
+                "alxos_explorer_error"("Max BMP resolution is "+MaxSize+"x"+MaxSize+" (current is "+Width+"x"+Height+").")
                 return
             }
 

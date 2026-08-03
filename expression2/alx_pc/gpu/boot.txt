@@ -120,6 +120,12 @@ function initbios() {
     if (!DS:entity():isValid()) {
         Status = "Not connected"
     } else { Status = "Connected" }
+    
+    local ScreenName = DS:entity():getName()
+    if (ScreenName=="Quad Digital Screen") {
+        Status += " (Quad)"    
+    }
+    
     EGP:egpText(I,"Digital Screen - "+Status,vec2(X,Y))
     EGP:egpSize(I,Sz) I++ Y+=Sz
     

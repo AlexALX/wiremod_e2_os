@@ -1,0 +1,169 @@
+@name Quad Digital Screen
+@inputs LinkTopLeft:wirelink LinkTopRight:wirelink LinkBottomLeft:wirelink LinkBottomRight:wirelink
+@outputs VirtualScreen:wirelink
+@persist ScrW ScrH VirtW VirtH
+@persist DsBuffer:array DirtyRows:array UpdateQueue:array QueueCount BlockDraw
+@persist ClearRowsQueue:array ClearRowsCount ClearColsQueue:array ClearColsCount
+@trigger none 
+@strict
+
+function dsClear() {
+    DsBuffer = array()
+    DirtyRows = array()
+    UpdateQueue = array()
+    QueueCount = 0
+    
+    ClearRowsQueue = array()
+    ClearRowsCount = 0
+    ClearColsQueue = array()
+    ClearColsCount = 0
+    BlockDraw = 0
+}
+
+if (first() | duped()) {
+    ScrW = 512
+    ScrH = 512
+    
+    VirtW = ScrW * 2
+    VirtH = ScrH * 2
+        
+    VirtualScreen = wirelink()
+    
+    dsClear()
+}
+
+event writeCell(Address:number, Value:number) {
+    
+    if (Address < 1048500) {
+        # block draw for buffer
+        # this fixes huge fps drop
+        BlockDraw = 2 
+        
+        DsBuffer[Address, number] = Value
+        
+        local GlobalY = floor(Address / VirtW)
+      
+        if (DirtyRows[GlobalY, number] == 0) {
+            DirtyRows[GlobalY, number] = 1
+              
+            QueueCount++
+            UpdateQueue[QueueCount, number] = GlobalY
+        }
+    } else {
+        if (Address == 1048573) {
+            VirtW = Value
+            
+            ScrW = floor(Value / 2)
+            
+            LinkTopLeft[1048573, number] = ScrW
+            LinkTopRight[1048573, number] = ScrW
+            LinkBottomLeft[1048573, number] = ScrW
+            LinkBottomRight[1048573, number] = ScrW
+            
+            dsClear()
+        } elseif (Address == 1048572) {
+            VirtH = Value
+            
+            ScrH = floor(Value / 2)
+            
+            LinkTopLeft[1048572, number] = ScrH
+            LinkTopRight[1048572, number] = ScrH
+            LinkBottomLeft[1048572, number] = ScrH
+            LinkBottomRight[1048572, number] = ScrH
+            
+            dsClear()
+        } elseif (Address == 1048570) {
+            ClearRowsCount++
+            ClearRowsQueue[ClearRowsCount, number] = Value
+            
+            local RowStart = Value * VirtW
+            for (X = 0, VirtW - 1) {
+                DsBuffer[RowStart + X, number] = 0
+            }
+        } elseif (Address == 1048571) {
+            ClearColsCount++
+            ClearColsQueue[ClearColsCount, number] = Value
+            
+            for (Y = 0, VirtH - 1) {
+                DsBuffer[Value + (Y * VirtW), number] = 0
+            }
+        } else {  
+            LinkTopLeft[Address, number] = Value
+            LinkTopRight[Address, number] = Value
+            LinkBottomLeft[Address, number] = Value
+            LinkBottomRight[Address, number] = Value
+        }
+    }
+}
+
+event tick() {
+    if (QueueCount == 0 & ClearRowsCount == 0 & ClearColsCount == 0) { exit() }
+    
+    # move to next tick
+    if (BlockDraw>0) {
+        BlockDraw--
+        exit()    
+    }
+    
+    while (ClearRowsCount > 0 & perf(95)) {
+        local RowY = ClearRowsQueue[ClearRowsCount, number]
+        ClearRowsCount--
+        
+        if (RowY < ScrH) {
+            LinkTopLeft[1048570, number] = RowY
+            LinkTopRight[1048570, number] = RowY
+        } else {
+            local LocalY = RowY - ScrH
+            LinkBottomLeft[1048570, number] = LocalY
+            LinkBottomRight[1048570, number] = LocalY
+        }
+    }
+    
+    while (ClearColsCount > 0 & perf(95)) {
+        local ColX = ClearColsQueue[ClearColsCount, number]
+        ClearColsCount--
+        
+        if (ColX < ScrW) {
+            LinkTopLeft[1048571, number] = ColX
+            LinkBottomLeft[1048571, number] = ColX
+        } else {
+            local LocalX = ColX - ScrW
+            LinkTopRight[1048571, number] = LocalX
+            LinkBottomRight[1048571, number] = LocalX
+        }
+    }
+       
+    while (QueueCount > 0 & perf(90)) {
+          
+        local TargetY = UpdateQueue[QueueCount, number]
+        QueueCount--
+        
+        DirtyRows[TargetY, number] = 0
+        
+        local RowBaseAddress = TargetY * VirtW
+        
+        if (TargetY < ScrH) {
+            # ---    ---
+            local LocalY = TargetY
+            local LocalRowOffset = LocalY * ScrW
+            
+            for (LocalX = 0, ScrW - 1) {
+                LinkTopLeft[LocalX + LocalRowOffset, number] = DsBuffer[LocalX + RowBaseAddress, number]
+            }
+            for (LocalX = 0, ScrW - 1) {
+                LinkTopRight[LocalX + LocalRowOffset, number] = DsBuffer[(LocalX + ScrW) + RowBaseAddress, number]
+            }
+        } else {
+            # ---    ---
+            local LocalY = TargetY - ScrH
+            local LocalRowOffset = LocalY * ScrW
+            
+            for (LocalX = 0, ScrW - 1) {
+                LinkBottomLeft[LocalX + LocalRowOffset, number] = DsBuffer[LocalX + RowBaseAddress, number]
+            }
+            for (LocalX = 0, ScrW - 1) {
+                LinkBottomRight[LocalX + LocalRowOffset, number] = DsBuffer[(LocalX + ScrW) + RowBaseAddress, number]
+            }
+        }
+    }
+}

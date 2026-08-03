@@ -6,15 +6,16 @@
 #include "alx_pc/standalone/helpers/_shared_"
 
 function displayHelp() {
-    displayInit()
+    displayInit(1)
 
     local Text = Header+
 "
 BMP Parser, specifications:
 - Max resolution is up to 512x512 (DS limit)
+  or 1024x1024 (Quad DS Limit)
 - Support most common uncompressed bmp files: 
- - 32/24/8/4 bits and monochrome
- - including RGB444/RGB555/RGB565
+- 32/24/8/4 bits and monochrome
+- including RGB444/RGB555/RGB565
 - Support \"flip row order\" function
 - Slow, but multithreaded
 
@@ -25,22 +26,20 @@ Usage:
 
 Chat commands:
 !bmp http://url - open bmp file
-
-!bmpfile filename.bmp.txt - open bmp file from 
-garrysmod/data/e2files/ folder
-file extension must be renamed to .txt
-
-!bmp abort - abort rendering
-
 Note: long url may be cut, use input LongURL 
 instead for such case (via string value) 
+!bmpfile filename.bmp.txt - open bmp file 
+from garrysmod/data/e2files/ folder
+file extension must be renamed to .txt
+!bmpabort - abort rendering
+!bmpkeepar - set Aspect Ratio mode (0 or 1)
 
 If you have own web server with PHP, 
-then you can place img2bmp.php from php dir in
+then you can place img2bmp.php from php dir
 https://github.com/AlexALX/wiremod_e2_os/
 and then use it to convert any image to BMP
 with auto resize in url:
-http://yourserv/img2bmp.php?http://url/img.jpg
+http://yoursv/img2bmp.php?http://url/img.jpg
 "
 
     dsDrawTextStart(2, 0, Text)

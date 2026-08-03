@@ -235,16 +235,14 @@ function jpgParseSOF(Type:number)
     
     local WH = Width > Height ? Width : Height
     
-    #[if (WH>512) {
-        jpgError("Your image are too big\nMaximum resolution is 512x512\nYour image: "+Width+"x"+Height)
-        return -1
-    } ]#
+    local IsQuadScreen = DS:entity():getName()=="Quad Digital Screen"
     
-    local JpgMaxWidth = 512 # DS Limit
+    local DsMaxLimit = (IsQuadScreen ? 1024 : 512) # DS Limit 
+    local JpgMaxWidth = DsMaxLimit # Default Limit
     local SizeLimit = Jpg["MaxSize",number]
-    
+
     if (SizeLimit>0) {
-        JpgMaxWidth = min(512,SizeLimit)  
+        JpgMaxWidth = min(DsMaxLimit,SizeLimit) 
     }
     
     Jpg["maxWidth",number] = JpgMaxWidth
@@ -259,15 +257,14 @@ function jpgParseSOF(Type:number)
         Jpg["screenWidth", number] = ResizedWidth
         Jpg["screenHeight", number] = ResizedHeight
 
-        if (WH>512 & JpgMaxWidth==512) {
-            Warning = "Your image is larger than Digital Screen supports\n"+
-            "Your image will be resized to: "+ResizedWidth+"x"+ResizedHeight
+        if (WH>DsMaxLimit & JpgMaxWidth==DsMaxLimit) {
+            Warning = "Your image is larger than "+(IsQuadScreen ? "Quad " : "")+"Digital Screen supports\n"+
+            "Your image will be resized to: "+ResizedWidth+"x"+ResizedHeight    
             
             if (!JPGNoPrint) {
                 print(Warning)    
             }
-        }
-           
+        }                  
     } else {
         Jpg["globalScale",number] = 1
         Jpg["screenWidth", number] = Width

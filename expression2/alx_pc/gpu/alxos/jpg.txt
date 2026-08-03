@@ -138,20 +138,23 @@ function alxos_jpg_init(Args:table) {
     DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"512 is maximum for DS",vec2(240,LAST_Y))
+    EGP:egpText(LAST_I,"512 max DS, 1024 Quad DS",vec2(220,LAST_Y))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) 
     DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpBox(LAST_I,vec2(150,LAST_Y),vec2(80,20))
+    EGP:egpBox(LAST_I,vec2(150,LAST_Y),vec2(60,20))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,168,168,255) 
     DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
     
+    local ScreenName = DS:entity():getName()
+    local MaxSize = (ScreenName=="Quad Digital Screen" ? "1024" : "512")
+    
     DialogData[-10,table]:pushNumber(LAST_I)
-    local DefaultMaxSize = GpuPersistData["jpgMaxSize",number] != 0 ? GpuPersistData["jpgMaxSize",number]:toString() : "512"
-    Entries[4,table] = table(LAST_I,DefaultMaxSize,"^[0-9]$",3)
+    local DefaultMaxSize = GpuPersistData["jpgMaxSize",number] != 0 ? GpuPersistData["jpgMaxSize",number]:toString() : MaxSize
+    Entries[4,table] = table(LAST_I,DefaultMaxSize,"^[0-9]$",4)
     EGP:egpText(LAST_I,DefaultMaxSize,vec2(152,LAST_Y))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) 
@@ -654,10 +657,13 @@ function number alxos_jpg_key(Key:string,Pressed) {
             local InpMaxSize = DialogData[-4,table][4,table][2,string]:toNumber()
             local InpKeepAR = DialogData[-4,table][5,table][2,string]
             
-            if (InpMaxSize==0) { InpMaxSize = 512 }
+            local ScreenName = DS:entity():getName()
+            local MaxSize = (ScreenName=="Quad Digital Screen" ? 1024 : 512)
+            
+            if (InpMaxSize==0) { InpMaxSize = MaxSize }
             if (InpKeepAR=="") { InpKeepAR = "1" }
             
-            GpuPersistData["jpgMaxSize",number] = clamp(InpMaxSize,1,512)
+            GpuPersistData["jpgMaxSize",number] = clamp(InpMaxSize,1,MaxSize)
             GpuPersistData["jpgNoKeepAR",number] = (InpKeepAR=="1" ? 0 : 1)
             
             "alxos_explorer_closedialog"()

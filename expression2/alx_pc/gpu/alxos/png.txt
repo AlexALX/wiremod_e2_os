@@ -1,4 +1,4 @@
-@name GIF Reader (GPU)
+@name PNG Reader (GPU)
 
 #[
     ALX Wiremod E2 OS
@@ -7,7 +7,7 @@
 
 #include "alx_pc/gpu/alxos/_main_"
 
-function array alxos_gif_findAccelerator() {
+function array alxos_png_findAccelerator() {
     
     local PCI_Devices = Devices["pci_bus",table]
             
@@ -20,20 +20,20 @@ function array alxos_gif_findAccelerator() {
     return array()
 }
 
-function alxos_gif_init(Args:table) {
+function alxos_png_init(Args:table) {
     if (!DS:entity():isValid()) {
         "alxos_explorer_error"("Digital screen not connected! Rendering canceled.",420)
         return
     }
     
-    local IMGAccelerator = alxos_gif_findAccelerator()
+    local IMGAccelerator = alxos_png_findAccelerator()
     if (!IMGAccelerator:count()) {
         "alxos_explorer_error"("Image Accelerator not found, please insert PCI card and reboot.",490)
         return
     }
     
-    GpuData["GIFInit",number] = 0
-    KeyHandler = "alxos_gif_key"
+    GpuData["PNGInit",number] = 0
+    KeyHandler = "alxos_png_key"
     
     local FInfo = Args[1,table]
     local ExplorerFS = Args[2,table]
@@ -43,96 +43,18 @@ function alxos_gif_init(Args:table) {
     GpuData[5,number] = 0
     
     local Width = 450
-    local Height = 290
+    local Height = 110
 
-    local Parent = "alxos_explorer_dialog"("GIF Settings",Width,Height,"","alxos_gif_close")[number]
+    local Parent = "alxos_explorer_dialog"("PNG Settings",Width,Height,"","alxos_png_close")[number]
     
     DialogData[7,number] = LAST_I
-    DialogData[-10,table]:pushNumber(LAST_I)
     
-    local LAST_Y = 18
-    
-    Txt = "Please choose GIF Animation Mode:\n\n"+
-    "Normal - no animation, just first frame\n"+
-    "Manual - play animation manually\n"+
-    "Animate - replay animation, but it's slow,\n"+
-    "work properly only on very small images"
-      
-    EGP:egpTextLayout(LAST_I,Txt,vec2(22,LAST_Y),vec2(Width-40,115))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpColor(LAST_I,0,0,0,255) 
-    DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
-    
-    LAST_Y += 122
+    local LAST_Y = 22
     
     local Entries = table()
     local EntID = DialogData[-10,table]
-    
-    local GifMode = GpuPersistData["gifMode",number]
-    
-    # 1. Normal Mode Button
-    Entries[1,number] = LAST_I
-    EntID:pushNumber(LAST_I)   
-    local Sz = 65
-    local Txt = "Normal"
-    local CenterX = (Width / 3) * 0.8
-    local Col = vec4(168,168,168,255)
-    if (GifMode==0) { Col = vec4(0,168,168,255) }
-    EGP:egpBox(LAST_I,vec2(CenterX - Sz/2,LAST_Y),vec2(Sz,20))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpAlign(LAST_I,1)
-    EGP:egpColor(LAST_I,Col) 
-    DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
-    
-    EntID:pushNumber(LAST_I)        
-    EGP:egpText(LAST_I,Txt,EGP:egpPos(LAST_I-1)+vec2(5,0))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpColor(LAST_I,0,0,0,255) 
-    DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
-    
-    # 2. Manual Mode Button
-    Entries[2,number] = LAST_I
-    EntID:pushNumber(LAST_I)  
-    local Sz = 65
-    local Txt = "Manual"
-    local CenterX = (Width / 3) * 1.5
-    local Col = vec4(168,168,168,255)
-    if (GifMode==1) { Col = vec4(0,168,168,255) }
-    EGP:egpBox(LAST_I,vec2(CenterX - Sz/2,LAST_Y),vec2(Sz,20))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpAlign(LAST_I,1)
-    EGP:egpColor(LAST_I,Col) 
-    DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
-    
-    EntID:pushNumber(LAST_I)        
-    EGP:egpText(LAST_I,Txt,EGP:egpPos(LAST_I-1)+vec2(5,0))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpColor(LAST_I,0,0,0,255) 
-    DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
-    
-    # 3. Animate Mode Button
-    Entries[3,number] = LAST_I
-    EntID:pushNumber(LAST_I)  
-    local Sz = 70
-    local Txt = "Animate"
-    local CenterX = (Width / 3) * 2.3
-    local Col = vec4(168,168,168,255)
-    if (GifMode==2) { Col = vec4(0,168,168,255) }
-    EGP:egpBox(LAST_I,vec2(CenterX - Sz/2,LAST_Y),vec2(Sz,20))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpAlign(LAST_I,1)
-    EGP:egpColor(LAST_I,Col) 
-    DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
-    
-    EntID:pushNumber(LAST_I)        
-    EGP:egpText(LAST_I,Txt,EGP:egpPos(LAST_I-1)+vec2(5,0))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpColor(LAST_I,0,0,0,255) 
-    DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
-
-    LAST_Y += 35
-
-    # 4. Max Size Input
+ 
+    # 1. Max Size Input
     DialogData[-10,table]:pushNumber(LAST_I)
     EGP:egpText(LAST_I,"Size Limit (px):",vec2(22,LAST_Y))
     EGP:egpParent(LAST_I,Parent)
@@ -155,8 +77,8 @@ function alxos_gif_init(Args:table) {
     local MaxSize = (ScreenName=="Quad Digital Screen" ? "1024" : "512")
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    local DefaultMaxSize = GpuPersistData["gifMaxSize",number] != 0 ? GpuPersistData["gifMaxSize",number]:toString() : MaxSize
-    Entries[4,table] = table(LAST_I,DefaultMaxSize,"^[0-9]$",4)
+    local DefaultMaxSize = GpuPersistData["pngMaxSize",number] != 0 ? GpuPersistData["pngMaxSize",number]:toString() : MaxSize
+    Entries[1,table] = table(LAST_I,DefaultMaxSize,"^[0-9]$",4)
     EGP:egpText(LAST_I,DefaultMaxSize,vec2(152,LAST_Y))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) 
@@ -164,7 +86,7 @@ function alxos_gif_init(Args:table) {
 
     LAST_Y += 35
 
-    # 5. Keep AR Input
+    # 2. Keep AR Input
     DialogData[-10,table]:pushNumber(LAST_I)
     EGP:egpText(LAST_I,"Keep Aspect Ratio (1/0):",vec2(22,LAST_Y))
     EGP:egpParent(LAST_I,Parent)
@@ -178,51 +100,21 @@ function alxos_gif_init(Args:table) {
     DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    local DefaultNoKeepAR = GpuPersistData["gifNoKeepAR",number] == 1 ? "0" : "1"
-    Entries[5,table] = table(LAST_I,DefaultNoKeepAR,"^[0-1]$",1)
+    local DefaultNoKeepAR = GpuPersistData["pngNoKeepAR",number] == 1 ? "0" : "1"
+    Entries[2,table] = table(LAST_I,DefaultNoKeepAR,"^[0-1]$",1)
     EGP:egpText(LAST_I,DefaultNoKeepAR,vec2(222,LAST_Y))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpColor(LAST_I,0,0,0,255) 
-    DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
-    
-    LAST_Y += 35
-
-    # 5. Min Delay
-    DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Minumum Frame Delay:",vec2(22,LAST_Y))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpColor(LAST_I,0,0,0,255) 
-    DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
-    
-    DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"can be float (eg 0.5)",vec2(270,LAST_Y))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpColor(LAST_I,0,0,0,255) 
-    DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
-    
-    DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpBox(LAST_I,vec2(205,LAST_Y),vec2(55,20))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpColor(LAST_I,0,168,168,255) 
-    DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
-    
-    DialogData[-10,table]:pushNumber(LAST_I)
-    local GifMinDelay = GpuPersistData["gifMinDelay",number]
-    if (!GifMinDelay) { GifMinDelay = 2 }
-    Entries[6,table] = table(LAST_I,GifMinDelay:toString(),"^[0-9.]$",4)
-    EGP:egpText(LAST_I,GifMinDelay:toString(),vec2(207,LAST_Y))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) 
     DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
 
     LAST_Y = Height - 25
 
-    # 6. OK Button (In focus by default)
+    # 3. OK Button (In focus by default)
     local SzOK = 30
     local AddOK = -100
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    Entries[7,number] = LAST_I
+    Entries[3,number] = LAST_I
     EGP:egpBox(LAST_I,vec2((SzOK/2)+AddOK+Width/2,Height-22),vec2(SzOK,20))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,168,0,255)
@@ -233,12 +125,12 @@ function alxos_gif_init(Args:table) {
     EGP:egpColor(LAST_I,0,0,0,255)
     DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
 
-    # 7. Cancel Button
+    # 4. Cancel Button
     local SzCan = 60
     local AddCan = 20
     
     DialogData[-10,table]:pushNumber(LAST_I)
-    Entries[8,number] = LAST_I
+    Entries[4,number] = LAST_I
     EGP:egpBox(LAST_I,vec2((SzCan/2)+AddCan+Width/2,Height-22),vec2(SzCan,20))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,168,168,168,255)
@@ -249,26 +141,27 @@ function alxos_gif_init(Args:table) {
     EGP:egpColor(LAST_I,0,0,0,255)
     DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
 
-    DialogData[-5,number] = 7
+    DialogData[-5,number] = 3
     DialogData[-4,table] = Entries
     DialogData[10,table] = Entries
-    DialogData[11,number] = 7
-    DialogData[12,number] = 8
+    DialogData[11,number] = 3
+    DialogData[12,number] = 4
     DialogData[-2,string] = "text"
 }
 
-function alxos_prog_gif_unplug() {
+
+function alxos_prog_png_unplug() {
     stopAllTimers()
     ExplorerDsH = ""
     "alxos_explorer_handlers"()
     "alxos_explorer_msg"("Disk was unplugged.",200,"Information")
 }
 
-function alxos_gif_postinit() {
+function alxos_png_postinit() {
 
-    DsHandler = "alxos_gif_ds"
+    DsHandler = "alxos_png_ds"
 
-    ExplorerCurTask = "alxos_prog_gif"
+    ExplorerCurTask = "alxos_prog_png"
     
     local ExplorerFS = GpuData[1,table]
     local FInfo = GpuData[2,table]
@@ -277,7 +170,7 @@ function alxos_gif_postinit() {
         ExplorerFS,FInfo,0,FInfo["size",number]
     )))     
 
-    local Parent = "alxos_explorer_dialog"("Opening file",400,80,"progress","alxos_gif_clear")[number]
+    local Parent = "alxos_explorer_dialog"("Opening file",400,80,"progress","alxos_png_clear")[number]
 
     DialogData[-10,table]:pushNumber(LAST_I)
     EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
@@ -292,10 +185,10 @@ function alxos_gif_postinit() {
     DialogData[1,number] = 1
     DialogData[3,number] = 1
     DialogData[4,number] = 1
-    runCmd("alxos_gifread_progress",1)
+    runCmd("alxos_pngread_progress",1)
 }
 
-function alxos_gifread_progress() {
+function alxos_pngread_progress() {
     local ExplorerFS = GpuData[1,table]
     
     local FS = ExplorerFS["hdd_io",wirelink]
@@ -319,24 +212,24 @@ function alxos_gifread_progress() {
         EGP:egpSetText(PercID,CalcP+"%")
     }
     
-    runCmd("alxos_gifread_progress",1) 
+    runCmd("alxos_pngread_progress",1) 
 }
 
-function number alxos_gif_cmd() {
+function number alxos_png_cmd() {
     #alxos_bmp_draw(GpuData[11,string])
     return 0
 }
 
-function number alxos_gif_clear() {
+function number alxos_png_clear() {
     if (!checkPerf(7000)) {
-        runCmd("alxos_gif_clear",1)
+        runCmd("alxos_png_clear",1)
         return 0
     }
     
     local ExplorerFS = GpuData[1,table]
     dsSendDirect("clear",ExplorerFS["hdd_io",wirelink]:entity(),1)
     
-    local IMGAccelerator = alxos_gif_findAccelerator()
+    local IMGAccelerator = alxos_png_findAccelerator()
     dsSendDirect("SHUTDOWN",IMGAccelerator[3,entity],0)
 
     "alxos_explorer_handlers"()
@@ -344,13 +237,13 @@ function number alxos_gif_clear() {
     return 0
 }
 
-function number alxos_gif_close() {
+function number alxos_png_close() {
     "alxos_explorer_handlers"()
     "alxos_explorer_listcurdir"()
     return 0
 }
 
-function number alxos_gif_finish(Err:string) {
+function number alxos_png_finish(Err:string) {
     local Height = 60
     local Pos = vec2(225,18)
     local NewLines = Err:explode("\n") 
@@ -363,7 +256,7 @@ function number alxos_gif_finish(Err:string) {
         Pos = vec2(20,18)    
     }
         
-    local Parent = "alxos_explorer_dialog"("GIF Reader"+(Err!="" ? " Error" : ""),450,Height,"ok","alxos_gif_clear")[number]
+    local Parent = "alxos_explorer_dialog"("PNG Reader"+(Err!="" ? " Error" : ""),450,Height,"ok","alxos_png_clear")[number]
 
     if (Err) {
         for(I=1,NewLines:count()) {
@@ -375,12 +268,12 @@ function number alxos_gif_finish(Err:string) {
             Pos[2] = Pos[2] + 20
         }
     } else {
-        local GIFAccelerator = GpuData["GIFAcceleratorWirelink",wirelink]
-        local Progress = GIFAccelerator["Progress",table]
+        local PNGAccelerator = GpuData["PNGAcceleratorWirelink",wirelink]
+        local Progress = PNGAccelerator["Progress",table]
         local RenderTime = Progress["renderTime",number]
         
         DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"Opening GIF file success finished, render time: "+RenderTime+"s.",Pos)
+        EGP:egpText(LAST_I,"Opening PNG file success finished, render time: "+RenderTime+"s.",Pos)
         EGP:egpParent(LAST_I,Parent)
         if (!Err) {
             EGP:egpAlign(LAST_I,1)
@@ -392,18 +285,18 @@ function number alxos_gif_finish(Err:string) {
     return 0
 }
 
-function number alxos_gif_finish() {
+function number alxos_png_finish() {
     if (!checkPerf(7000)) {
-        runCmd("alxos_gif_finish",1)
+        runCmd("alxos_png_finish",1)
         return 0
     }
-    return alxos_gif_finish("")
+    return alxos_png_finish("")
 }
 
-function alxos_gif_draw(Data:string) {
+function alxos_png_draw(Data:string) {
     DialogData[4,number] = 0
     
-    local IMGAccelerator = alxos_gif_findAccelerator()
+    local IMGAccelerator = alxos_png_findAccelerator()
     
     if (!IMGAccelerator:count()) {
         "alxos_explorer_error"("Image Accelerator not found, please insert PCI card and reboot.",490)
@@ -414,15 +307,11 @@ function alxos_gif_draw(Data:string) {
 
     GpuData["imgAccelerator",array] = IMGAccelerator
     
-    local GifMode = GpuPersistData["gifMode",number]
-    
     dsSendDirect("drawImage",IMGAccelerator[3,entity],table(
-        DS, entity(), TickQuota, "gif", table(
+        DS, entity(), TickQuota, "png", table(
             Data, 
-            GifMode, 
-            GpuPersistData["gifMaxSize",number],
-            GpuPersistData["gifNoKeepAR",number],
-            GpuPersistData["gifMinDelay",number]
+            GpuPersistData["pngMaxSize",number],
+            GpuPersistData["pngNoKeepAR",number]
         )
     ))
 
@@ -432,38 +321,18 @@ function alxos_gif_draw(Data:string) {
     local LAST_Y = -22
     local LeftPos = 20-Width/2
     
-    if (GifMode>0) {
-        Height += 20    
-    }
-    
-    local Parent = "alxos_explorer_dialog"("Reading GIF",Width,Height,"progress","alxos_gif_clear")[number]
-    
+    local Parent = "alxos_explorer_dialog"("Reading PNG",Width,Height,"progress","alxos_png_clear")[number]
+
     DialogData["DialogW",number] = Width
     DialogData["DialogH",number] = Height
 
-    if (GifMode==1) {
-        LAST_Y = -32
-        
-        DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"Manual Mode - press Enter for next frame.",vec2(22,Height-35))
-        EGP:egpParent(LAST_I,Parent)
-        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
-    } elseif (GifMode==2) {
-        LAST_Y = -32
-        
-        DialogData[-10,table]:pushNumber(LAST_I)
-        EGP:egpText(LAST_I,"Animated Mode - press enter to abort looping.",vec2(22,Height-35))
-        EGP:egpParent(LAST_I,Parent)
-        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
-    }
-
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Current Step: 0 / 0",alxos_dlgPos(-180,LAST_Y-20))
+    EGP:egpText(LAST_I,"Current Step: 0 / 0",alxos_dlgPos(-180,-42))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
 
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Current Task: Opening GIF",alxos_dlgPos(-180,LAST_Y+22))
+    EGP:egpText(LAST_I,"Current Task: Opening PNG",alxos_dlgPos(-180,0))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     
@@ -499,7 +368,7 @@ function alxos_gif_draw(Data:string) {
     EGP:egpPos(PercID,alxos_dlgPos(0, LAST_Y+45))
 }
 
-function alxos_gif_warning(Warning:string) {
+function alxos_png_warning(Warning:string) {
     DialogData["WarningShown",number] = 1
 
     local Lines = Warning:explode("\n"):count()*2
@@ -514,36 +383,36 @@ function alxos_gif_warning(Warning:string) {
     alxos_dialog_warning(Title, Width, Height, vec2(PosX,PosY), Warning, Lines*20)
 }
 
-function alxos_gif_progress() {    
+function alxos_png_progress() {    
     if (DS==nowirelink()) {
-        local IMGAccelerator = alxos_gif_findAccelerator()
+        local IMGAccelerator = alxos_png_findAccelerator()
         dsSendDirect("SHUTDOWN",IMGAccelerator[3,entity],0)   
         
         "alxos_explorer_error"("Digital screen not connected! Rendering canceled.",420) 
         return
     }
     
-    if (CMDLast!="alxos_gif_progress") {
-        runCmd("alxos_gif_progress",100,1)
+    if (CMDLast!="alxos_png_progress") {
+        runCmd("alxos_png_progress",100,1)
         return 
     }
 
-    local GIFAccelerator = GpuData["GIFAcceleratorWirelink",wirelink]
+    local PNGAccelerator = GpuData["PNGAcceleratorWirelink",wirelink]
     
-    local CurrentState = GIFAccelerator["CurrentState",string]
-    local Progress = GIFAccelerator["Progress",table]
-    local ProgressText = GIFAccelerator["ProgressText",string]
-    local Processing = GIFAccelerator["Processing",number]
-    local Error = GIFAccelerator["Error",string]
+    local CurrentState = PNGAccelerator["CurrentState",string]
+    local Progress = PNGAccelerator["Progress",table]
+    local ProgressText = PNGAccelerator["ProgressText",string]
+    local Processing = PNGAccelerator["Processing",number]
+    local Error = PNGAccelerator["Error",string]
     
-    if (GpuData["GIFInit",number] & Processing==0 | Error) {
-        alxos_gif_finish(Error)
+    if (GpuData["PNGInit",number] & Processing==0 | Error) {
+        alxos_png_finish(Error)
         return
     }
     
-    local Warning = GIFAccelerator["Warning",string]
+    local Warning = PNGAccelerator["Warning",string]
     if (Warning & !DialogData["WarningShown",number]) {
-        alxos_gif_warning(GIFAccelerator["Warning",string])
+        alxos_png_warning(PNGAccelerator["Warning",string])
     }
     
     local TW = DialogData[3,number]
@@ -572,61 +441,53 @@ function alxos_gif_progress() {
     EGP:egpSize(BoxID,vec2(BoxW,20))
     EGP:egpSetText(PercID,Progress["progressCurrent",number] + " / " + Progress["progressMax",number] + " (" + CalcP+"%)")
     
-    runCmd("alxos_gif_progress",100)    
+    runCmd("alxos_png_progress",100)    
 }
 
-function alxos_gif_ds(Name:string) {
+function alxos_png_ds(Name:string) {
     if (Name=="fs_readfile") {
-        alxos_gif_draw(dsGetString())
+        alxos_png_draw(dsGetString())
     } elseif (Name=="clear") {
         if (!checkPerf(7000)) {
-            runCmd("alxos_gif_clear",1)
+            runCmd("alxos_png_clear",1)
             return
         }
-        alxos_gif_clear()
+        alxos_png_clear()
     } elseif (Name=="imageReaderError") {
-        "alxos_explorer_error"("GIF Reader Chip not connected (crashed?)",420)     
+        "alxos_explorer_error"("PNG Reader Chip not connected (crashed?)",420)     
     } elseif (Name=="initImage") {
         local Info = dsGetTable()        
-        GpuData["GIFAcceleratorWirelink",wirelink] = Info[1,wirelink]
-        GpuData["GIFInit",number] = 1
-        runCmd("alxos_gif_progress",100,1)
+        GpuData["PNGAcceleratorWirelink",wirelink] = Info[1,wirelink]
+        GpuData["PNGInit",number] = 1
+        runCmd("alxos_png_progress",100,1)
     }
 }
 
-function alxos_gif_stop() {
-    stoptimer("cmd")
-    dsSendDirect("clear",GpuData[1,table]["hdd_io",wirelink]:entity(),entity())
-
-    local IMGAccelerator = alxos_gif_findAccelerator()
-    dsSendDirect("SHUTDOWN",IMGAccelerator[3,entity],0)  
-}
-
-function number alxos_gif_key(Key:string,Pressed) {
+function number alxos_png_key(Key:string,Pressed) {
     if (!Pressed) { return 0 }
     
     local Index = DialogData[-5,number]
     local Type = DialogData[-2,string]
-    local GifMode = GpuPersistData["gifMode",number]
+    local PngMode = GpuPersistData["pngMode",number]
     
     local Title = DialogData["title",string]   
     
     if (Key=="f8") {
         stoptimer("cmd")
         dsSendDirect("clear",GpuData[1,table]["hdd_io",wirelink]:entity(),entity())
-        local IMGAccelerator = alxos_gif_findAccelerator()
+        local IMGAccelerator = alxos_png_findAccelerator()
         dsSendDirect("SHUTDOWN",IMGAccelerator[3,entity],0)  
-        alxos_gif_close()
+        alxos_png_close()
         return 1
-    } elseif (Key=="enter" & Title!="Opening file" & Title!="GIF Settings") {
-        alxos_gif_key("f8",1)
+    } elseif (Key=="enter" & Title!="Opening file" & Title!="PNG Settings") {
+        alxos_png_key("f8",1)
         return 1
     }
     
-    if (Title!="GIF Settings") { return 0 }
+    if (Title!="PNG Settings") { return 0 }
     
     if (Key=="left" | Key=="right" | Key=="tab") {
-        local Max = 8
+        local Max = 4
         local Ind = Index
         if (Key=="right" | Key=="tab") {
             Index = (Index==Max ? 1 : Index+1)
@@ -639,21 +500,18 @@ function number alxos_gif_key(Key:string,Pressed) {
         local CurID = DialogData[-4,table][Index,number]     
         local PrevID = DialogData[-4,table][Ind,number]  
         
-        if (Ind <= 3) {
-            local OldCol = (GifMode == (Ind-1) ? vec4(0,168,168,255) : vec4(168,168,168,255))
-            EGP:egpColor(PrevID, OldCol)
-        } elseif (Ind >= 7) {
+        if (Ind >= 3) {
             EGP:egpColor(PrevID, vec4(168,168,168,255))
         }
         
-        if (Index <= 3 | Index >= 7) { EGP:egpColor(CurID, vec4(0,168,0,255)) }
+        if (Index >= 3) { EGP:egpColor(CurID, vec4(0,168,0,255)) }
         
         # "_"
-        if (Index >= 4 & Index <= 6) {
+        if (Index == 1 | Index == 2) {
             local TxtTbl = DialogData[-4,table][Index,table]
             EGP:egpText(TxtTbl[1,number],TxtTbl[2,string]+"_",EGP:egpPos(TxtTbl[1,number]))
         }
-        if (Ind >= 4 & Ind <= 6) {
+        if (Ind == 1 | Ind == 2) {
             local TxtTbl = DialogData[-4,table][Ind,table]
             EGP:egpText(TxtTbl[1,number],TxtTbl[2,string],EGP:egpPos(TxtTbl[1,number]))
         }
@@ -662,17 +520,11 @@ function number alxos_gif_key(Key:string,Pressed) {
     } elseif (Key=="up" | Key=="down") {
         local Ind = Index
         if (Key=="down") {
-            if (Index >= 1 & Index <= 3) { Index = 4 }      #      Max Size
-            elseif (Index == 4) { Index = 5 }               #  Max Size   Keep AR
-            elseif (Index == 5) { Index = 6 }               #  Keep AR    Min Delay
-            elseif (Index == 6) { Index = 7 }               #  Min Delay    OK
-            elseif (Index >= 7 & Index <= 8) { Index = 1 }  #      Normal
+            if (Index < 4) { Index++ } 
+            elseif (Index >= 4) { Index = 1 }
         } else { # Key == "up"
-            if (Index >= 1 & Index <= 3) { Index = 7 }      #     OK
-            elseif (Index == 4) { Index = 1 }               #  Max Size   Normal
-            elseif (Index == 5) { Index = 4 }               #  Keep AR   Max Size
-            elseif (Index == 6) { Index = 5 }               #  Keep AR   Min Delay
-            elseif (Index >= 7 & Index <= 8) { Index = 6 }  #      Min Delay
+            if (Index <= 1) { Index = 4 } 
+            elseif (Index > 1) { Index-- }
         }
         DialogData[-5,number] = Index
         DialogData[11,number] = Index
@@ -680,69 +532,50 @@ function number alxos_gif_key(Key:string,Pressed) {
         local CurID = DialogData[-4,table][Index,number]     
         local PrevID = DialogData[-4,table][Ind,number]  
         
-        if (Ind <= 3) {
-            local OldCol = (GifMode == (Ind-1) ? vec4(0,168,168,255) : vec4(168,168,168,255))
-            EGP:egpColor(PrevID, OldCol)
-        } elseif (Ind >= 7) {
+        if (Ind >= 3) {
             EGP:egpColor(PrevID, vec4(168,168,168,255))
         }
         
-        if (Index <= 3 | Index >= 7) { EGP:egpColor(CurID, vec4(0,168,0,255)) }
+        if (Index >= 3) { EGP:egpColor(CurID, vec4(0,168,0,255)) }
         
-        if (Index >= 4 & Index <= 6) {
+        if (Index == 1 | Index == 2) {
             local TxtTbl = DialogData[-4,table][Index,table]
             EGP:egpText(TxtTbl[1,number],TxtTbl[2,string]+"_",EGP:egpPos(TxtTbl[1,number]))
         }
-        if (Ind >= 4 & Ind <= 6) {
+        if (Ind == 1 | Ind == 2) {
             local TxtTbl = DialogData[-4,table][Ind,table]
             EGP:egpText(TxtTbl[1,number],TxtTbl[2,string],EGP:egpPos(TxtTbl[1,number]))
         }
         return 1        
     } elseif (Key=="enter") {     
         
-        if (Index >= 1 & Index <= 3) {
-            local PrevActiveModeID = DialogData[-4,table][GifMode+1,number]
-            EGP:egpColor(PrevActiveModeID, vec4(168,168,168,255))   
-            
-            GifMode = Index - 1
-            GpuPersistData["gifMode",number] = GifMode
-            
-            local NewActiveModeID = DialogData[-4,table][Index,number]
-            EGP:egpColor(NewActiveModeID, vec4(0,168,0,255))
+        if (Index == 4) {
+            alxos_png_key("f8",1)
             return 1
         }
         
-        if (Index == 8) {
-            alxos_gif_key("f8",1)
-            return 1
-        }
-        
-        if (Index == 7) {
-            local InpMaxSize = DialogData[-4,table][4,table][2,string]:toNumber()
-            local InpKeepAR = DialogData[-4,table][5,table][2,string]
-            local InpMinDelay = DialogData[-4,table][6,table][2,string]:toNumber()
+        if (Index == 3) {
+            local InpMaxSize = DialogData[-4,table][1,table][2,string]:toNumber()
+            local InpKeepAR = DialogData[-4,table][2,table][2,string]
             
             local ScreenName = DS:entity():getName()
             local MaxSize = (ScreenName=="Quad Digital Screen" ? 1024 : 512)
             
-            # default
             if (InpMaxSize==0) { InpMaxSize = MaxSize }
             if (InpKeepAR=="") { InpKeepAR = "1" }
-            if (InpMinDelay==0) { InpMinDelay = 2 }
             
-            GpuPersistData["gifMaxSize",number] = clamp(InpMaxSize,1,MaxSize)
-            GpuPersistData["gifNoKeepAR",number] = (InpKeepAR=="1" ? 0 : 1)
-            GpuPersistData["gifMinDelay",number] = max(0.1,InpMinDelay)
+            GpuPersistData["pngMaxSize",number] = clamp(InpMaxSize,1,MaxSize)
+            GpuPersistData["pngNoKeepAR",number] = (InpKeepAR=="1" ? 0 : 1)
             
             "alxos_explorer_closedialog"()
-            alxos_gif_postinit()
+            alxos_png_postinit()
             return 1
         }
         
         return 0
         
     } else {
-        if (Index >= 4 & Index <= 6) {
+        if (Index == 1 | Index == 2) {
             local ITbl = DialogData[-4,table]
             local D_I = ITbl[Index,table][1,number]
             local D_V = ITbl[Index,table][2,string]

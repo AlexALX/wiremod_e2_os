@@ -18,7 +18,7 @@ However it works similar to a real PC (boot sequence etc), but still very much s
 ### Advanced Engineering Highlights
 This project pushes **Expression2** to its absolute limits, implementing complex low-level systems entirely from scratch:
 
-* **Custom Binary Parsers** — Native E2 decoders for **Progressive JPG**, animated **GIF**, **BMP**, and standard **MIDI** files.
+* **Custom Binary Parsers** — Native E2 decoders for **Progressive JPG**, animated **GIF**, **PNG**, **BMP**, and standard **MIDI** files.
 * **Multi-Channel MIDI Synthesizer** — Advanced player with 3 playback modes.
 * **Low-Level File Systems** — Custom **WM1** and **WCD** storage architectures for virtual HDDs, and CD-ROMs.
 * **Modular Component Architecture** — Custom interconnection layer using Expression2 Data Signals to simulate motherboard slots, BIOS, and boot sequence.
@@ -37,6 +37,7 @@ Main features:
 * Expression2 **BMP Reader**, draw on wire Digital Screen (up to 512x512). 
 * Expression2 Baseline (8/12bits) and Progressive **JPG Reader** for Digital Screen.
 * Expression2 **GIF Reader** with animations support for Digital Screen.
+* Expression2 **PNG Reader** for Digital Screen.
 * **Midi player** with 3 play modes (synth, instrumental, addon).
 * Few programs: Console, Burning software, file manager, network chat, partitions manager. 
 * Simple directory listing/file managing interface (DOS style).
@@ -45,7 +46,7 @@ Main features:
 * Satellite internet device, what provides access to real internet (http e2 extension) for files downloading.
 * Switch/router network system, also with laser transferer and two-way radio devices.
 * Basic **GFX lib** for draw text on Digital Screen.
-* Standalone BMP, JPG, GIF Readers and Midi Player.
+* Standalone BMP, JPG, GIF, PNG Readers and Midi Player.
 * And some other features and devices!
 
 Also includes PHP version of WM1 File System.

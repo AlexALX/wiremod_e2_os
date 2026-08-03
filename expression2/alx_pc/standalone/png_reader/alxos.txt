@@ -1,0 +1,21 @@
+@name ALX OS PNG Reader
+@outputs WL:wirelink
+
+#include "alx_pc/standalone/png_reader/_init_"
+
+if (first() | duped()) {
+    # fix wirelink wiring reset on crash
+    WL = wirelink()
+}
+
+if (dsClk()) {
+    local DSName = dsClkName()    
+    if (DSName=="drawImage") {
+        PNGNoPrint = 1
+        local Info = dsGetTable()
+        pngInit(Info[1,string],Info[2,number],Info[3,number])  
+        dsSendDirect("initImage",dsGetSender(),table(wirelink()))  
+    } elseif (DSName=="abortImage") {
+        pngAbort()
+    }
+}

@@ -35,6 +35,11 @@ function alxos_gif_reader(FInfo:table) {
     dsSendDirect("alxos_runprog",E2_GPU,table("alxos_gif_reader",FInfo))
 }
 
+ALXOS_PROGS["alxos_png_reader",number] = 1
+function alxos_png_reader(FInfo:table) {
+    dsSendDirect("alxos_runprog",E2_GPU,table("alxos_png_reader",FInfo))
+}
+
 ALXOS_PROGS["alxos_soundplay",number] = 1
 function alxos_soundplay(FInfo:table) {
     dsSendDirect("alxos_runprog",E2_GPU,table("alxos_explorer_soundplay",FInfo))
@@ -70,6 +75,7 @@ function alxos_midi_player(FInfo:table) {
 ALXOS_PROG_ASOC["bmp",string] = "alxos_bmp_reader"
 ALXOS_PROG_ASOC["jpg",string] = "alxos_jpg_reader"
 ALXOS_PROG_ASOC["gif",string] = "alxos_gif_reader"
+ALXOS_PROG_ASOC["png",string] = "alxos_png_reader"
 ALXOS_PROG_ASOC["txt",string] = "alxos_txt_reader"
 ALXOS_PROG_ASOC["ini",string] = "alxos_txt_reader"
 ALXOS_PROG_ASOC["e2e",string] = "alxos_txt_reader"

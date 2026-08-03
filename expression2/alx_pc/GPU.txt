@@ -111,16 +111,19 @@ function screen_connect() {
     local ID = Info[1,number]
     local WL = Info[2,wirelink]    
     local WLI = WL:entity():id()
-    if (WL) {
+    if (WL) {        
         if (!EGP:entity():isValid() & WL:entity():type()=="gmod_wire_egp") {
             EGP = WL
             Screens[WLI,number] = findscreen(ID)
             if (GpuData["BSOD",array]:count()) {
                 alxos_bsod(GpuData["BSOD",array])    
             }
-        } elseif (!DS:entity():isValid() & WL:entity():type()=="gmod_wire_digitalscreen") {
-            DS = WL
-            Screens[WLI,number] = findscreen(ID)
+        } elseif (!DS:entity():isValid()) {
+            local ScreenName = WL:entity():getName()
+            if (WL:entity():type()=="gmod_wire_digitalscreen" | ScreenName=="Quad Digital Screen") {
+                DS = WL
+                Screens[WLI,number] = findscreen(ID)
+            }
         }
     }    
 }

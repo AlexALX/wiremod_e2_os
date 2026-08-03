@@ -1,0 +1,417 @@
+@persist PngPixels:array
+#include "alx_pc/standalone/png_reader/_shared_"
+
+function pngStartFilter()
+{
+    Png["state", string] = "filter"
+    Png["filterLine", number] = 0
+    PngPixels = array()
+    Png["filterWritePos", number] = 0
+    Png["filterByteIdx", number] = 0
+    Png["filterReadPos", number] = 1      #    
+    Png["currentFilterType", number] = 0  #    
+    Png["currentPass", number] = 1        #   
+    
+    Png["a7_startX", array] = array(0, 4, 0, 2, 0, 1, 0)
+    Png["a7_startY", array] = array(0, 0, 4, 0, 2, 0, 1)
+    Png["a7_stepX",  array] = array(8, 8, 4, 4, 2, 2, 1)
+    Png["a7_stepY",  array] = array(8, 8, 8, 4, 4, 2, 2)
+}
+
+
+function number pngFilterStep()
+{
+    local Pass = Png["currentPass", number]
+    if (Pass == 0) { Pass = 1 }
+    
+    local MainWidth = Png["width", number]
+    local MainHeight = Png["height", number]
+    local BPP = Png["bpp", number]
+    
+    local OutData = Png["outputData", table]
+    local Pixels = PngPixels
+    
+    local StartXArr = Png["a7_startX", array]
+    local StartYArr = Png["a7_startY", array]
+    local StepXArr  = Png["a7_stepX", array]
+    local StepYArr  = Png["a7_stepY", array]
+    
+    local Interlaced = Png["interlaceMethod", number]
+    
+    # 1
+    while (Pass <= 7 & perf(90)) {
+        
+        local SX = StartXArr[Pass, number]
+        local SY = StartYArr[Pass, number]
+        local TX = StepXArr[Pass, number]
+        local TY = StepYArr[Pass, number]
+        
+        local PassW = (Interlaced == 1) ? ((MainWidth > SX) ? floor((MainWidth - SX + TX - 1) / TX) : 0) : MainWidth
+        local PassH = (Interlaced == 1) ? ((MainHeight > SY) ? floor((MainHeight - SY + TY - 1) / TY) : 0) : MainHeight
+        
+        if (Interlaced == 1 & (PassW <= 0 | PassH <= 0)) {
+            Pass++
+            Png["currentPass", number] = Pass
+            Png["filterLine", number] = 0
+            Png["filterByteIdx", number] = 0
+            continue
+        }
+        
+        local PassStride = 1 + (PassW * BPP)
+        local PassRowBytes = PassStride - 1
+        
+        local CurrentLine = Png["filterLine", number]
+        local TargetWritePos = Png["filterWritePos", number]
+        local CurrentByteIdx = Png["filterByteIdx", number]
+        
+        local LineStartInRaw = Png["filterLineStart", number]
+        if (LineStartInRaw == 0) { LineStartInRaw = 1 }
+        
+        local FilterType = OutData[LineStartInRaw, number]
+        
+        # 2      
+        while (CurrentLine < PassH & perf(90)) {
+            local I = CurrentByteIdx
+            local RawPos = LineStartInRaw + 1 + I
+            local CurrentByte = OutData[RawPos, number]
+            
+            local RawA = 0 
+            local RawB = 0 
+            local RawC = 0 
+            
+            local CurrentIdx = TargetWritePos + 1
+            
+            if (I >= BPP) {
+                RawA = Pixels[CurrentIdx - BPP, number]
+
+                if (CurrentLine > 0) {
+                    RawB = Pixels[CurrentIdx - PassRowBytes, number]
+                    RawC = Pixels[CurrentIdx - PassRowBytes - BPP, number]
+                }
+            } elseif (CurrentLine > 0) {
+                RawB = Pixels[CurrentIdx - PassRowBytes, number]
+            }
+            
+            local ReconByte = 0
+            if (FilterType == 0) { ReconByte = CurrentByte }
+            elseif (FilterType == 1) { ReconByte = (CurrentByte + RawA) && 255 }
+            elseif (FilterType == 2) { ReconByte = (CurrentByte + RawB) && 255 }
+            elseif (FilterType == 3) { ReconByte = (CurrentByte + floor((RawA + RawB) / 2)) && 255 }
+            elseif (FilterType == 4) {
+                local P = RawA + RawB - RawC
+                local PA = abs(P - RawA)
+                local PB = abs(P - RawB)
+                local PC = abs(P - RawC)
+                local PaethPredictor = (PA <= PB & PA <= PC) ? RawA : ((PB <= PC) ? RawB : RawC)
+                ReconByte = (CurrentByte + PaethPredictor) && 255
+            }
+            
+            Pixels[CurrentIdx, number] = ReconByte
+            
+            TargetWritePos++
+            CurrentByteIdx++
+            
+            if (CurrentByteIdx >= PassRowBytes) {
+                CurrentByteIdx = 0
+                CurrentLine++
+                LineStartInRaw = LineStartInRaw + PassStride
+                if (CurrentLine < PassH) {
+                    FilterType = OutData[LineStartInRaw, number]
+                }
+            }
+        }
+        
+        Png["filterLine", number] = CurrentLine
+        Png["filterByteIdx", number] = CurrentByteIdx
+        Png["filterWritePos", number] = TargetWritePos
+        Png["filterLineStart", number] = LineStartInRaw
+        PngPixels = Pixels
+         
+        if (CurrentLine < PassH) {
+            return 0 #     
+        }
+        
+        Pass++
+        Png["currentPass", number] = Pass
+        Png["filterLine", number] = 0
+        Png["filterByteIdx", number] = 0
+        
+        # Baseline
+        if (Interlaced == 0) { break }
+    }
+    
+    # 3
+    if (Pass > 7 | (Interlaced == 0 & Png["filterWritePos", number] >= MainWidth * MainHeight * BPP)) {
+        Png["currentPass", number] = 1
+        Png["filterLineStart", number] = 1
+        return 1
+    }
+    
+    return 0
+}
+
+
+function pngStartDraw()
+{
+    Png["state", string] = "draw"
+    Png["drawIdx", number] = 0 
+    
+    Png["drawPass", number] = 1
+    Png["drawPassLine", number] = 0
+    Png["drawPassCol", number] = 0
+    Png["drawReadIdx", number] = 0
+    
+    if (!Png["DS_Inited", number]) {
+        Png["DS_Inited", number] = 1
+        
+        DS[1048569] = 2
+        DS[1048574] = 0
+        DS[1048575] = 1
+        
+        local ScreenWidth = Png["screenWidth", number]
+        local ScreenHeight = Png["screenHeight", number]
+        local NoKeepAR = Png["NoKeepAR", number]
+        
+        if (!NoKeepAR) {
+            local SWH = (ScreenWidth > ScreenHeight ? ScreenWidth : ScreenHeight)
+            Png["Xadd", number] = (ScreenHeight > ScreenWidth ? floor((SWH - ScreenWidth) / 2) : 0)
+            Png["Yadd", number] = (ScreenWidth > ScreenHeight ? floor((SWH - ScreenHeight) / 2) : 0)
+            
+            Png["rowWidth", number] = SWH  
+                
+            DS[1048573] = SWH
+            DS[1048572] = SWH          
+        } else {
+            Png["Xadd", number] = 0
+            Png["Yadd", number] = 0
+            Png["rowWidth", number] = ScreenWidth
+            
+            DS[1048573] = ScreenWidth
+            DS[1048572] = ScreenHeight
+        }
+    }
+}
+
+
+function number pngDrawStep()
+{
+    local MainWidth = Png["width", number]
+    local MainHeight = Png["height", number]
+    local Pixels = PngPixels
+    
+    local TargetWidth = Png["screenWidth", number]
+    local TargetHeight = Png["screenHeight", number]
+    local Scale = Png["globalScale", number]
+    local InvScale = Png["invScale", number]
+    
+    local Xadd = Png["Xadd", number]
+    local Yadd = Png["Yadd", number]
+    local RowWidth = Png["rowWidth", number]
+
+    local BPP = Png["bpp", number]
+    local BitDepth = Png["bitDepth", number]
+    local ColorType = Png["colorType", number]
+    local Palette = Png["palette", table]
+    
+    local Interlaced = Png["interlaceMethod", number]
+    local BytesPerChannel = (BitDepth == 16) ? 2 : 1
+    
+    local PixelsPerByte = floor(8 / BitDepth)
+    if (PixelsPerByte == 0) { PixelsPerByte = 1 }
+
+    # Recover the precise flat step states
+    local Pass = Png["drawPass", number]
+    if (Pass == 0) { Pass = 1 }
+    
+    local PassProgressIdx = Png["drawPassProgressIdx", number]
+    local ReadIdx = Png["drawReadIdx", number] 
+    local BaselineIdx = Png["drawIdx", number] # Your original linear Index fallback
+    
+    local StartXArr = Png["a7_startX", array]
+    local StartYArr = Png["a7_startY", array]
+    local StepXArr  = Png["a7_stepX", array]
+    local StepYArr  = Png["a7_stepY", array]
+
+    local PassW = 0
+    local PassH = 0
+    local PassMaxPixels = 0
+
+    if (Interlaced == 1) {
+        # 1. Skip empty Adam7 passes sequentially on a single tick
+        local SearchingPass = 1
+        while (SearchingPass & Pass <= 7) {
+            local SX = StartXArr[Pass, number]
+            local SY = StartYArr[Pass, number]
+            local TX = StepXArr[Pass, number]
+            local TY = StepYArr[Pass, number]
+            
+            PassW = (Interlaced == 1) ? ((MainWidth > SX) ? floor((MainWidth - SX + TX - 1) / TX) : 0) : MainWidth
+            PassH = (Interlaced == 1) ? ((MainHeight > SY) ? floor((MainHeight - SY + TY - 1) / TY) : 0) : MainHeight
+            PassMaxPixels = PassW * PassH
+            
+            if (Interlaced == 1 & (PassW <= 0 | PassH <= 0)) {
+                Pass++
+                PassProgressIdx = 0
+            } else {
+                SearchingPass = 0
+            }
+        }
+    } else {
+        PassMaxPixels = TargetWidth * TargetHeight
+    }
+
+    # Verify overall finish conditions
+    if (Pass > 7 | (Interlaced == 0 & BaselineIdx >= PassMaxPixels)) {
+        Png["drawPass", number] = 1
+        Png["drawPassProgressIdx", number] = 0
+        Png["drawReadIdx", number] = 0
+        Png["drawIdx", number] = 0
+        return 1
+    }
+
+    local SourceX = 0
+    local SourceY = 0
+    local PixelPosInTable = 0
+    
+    local LastDrawX = -1
+    local LastDrawY = -1
+
+    # 2. Main processing block (Restored with your canonical unpacked/packed pipeline)
+    while (PassProgressIdx < PassMaxPixels & perf(90)) {
+                
+        if (Interlaced == 1) {
+            local PassLine = floor(PassProgressIdx / PassW)
+            local PassCol  = PassProgressIdx % PassW
+            
+            SourceX = StartXArr[Pass, number] + PassCol * StepXArr[Pass, number]
+            SourceY = StartYArr[Pass, number] + PassLine * StepYArr[Pass, number]
+            
+            PixelX = floor(SourceX / Scale)
+            PixelY = floor(SourceY / Scale)
+  
+            PixelPosInTable = (ReadIdx + PassProgressIdx) * BPP + 1
+            
+            if (PixelX == LastDrawX & PixelY == LastDrawY) {
+                PassProgressIdx++
+                continue
+            }
+            LastDrawX = PixelX
+            LastDrawY = PixelY
+            
+        } else {
+            PixelX = BaselineIdx % TargetWidth
+            PixelY = floor(BaselineIdx / TargetWidth)
+               
+            SourceX = floor(PixelX * Scale)
+            SourceY = floor(PixelY * Scale)
+            
+            if (SourceX >= MainWidth)  { SourceX = MainWidth - 1 }
+            if (SourceY >= MainHeight) { SourceY = MainHeight - 1 }
+
+            PixelPosInTable = (SourceX + (SourceY * MainWidth)) * BPP + 1
+        }
+        
+        LastDrawX = PixelX
+        LastDrawY = PixelY
+        
+        local R = 0
+        local G = 0
+        local B = 0
+        
+        if (BitDepth < 8) {    
+            local PixelDataIdx = floor(SourceX / PixelsPerByte)
+            local RowBytesWidth = floor((MainWidth * BPP * BitDepth + 7) / 8)
+            local BytePosInTable = (SourceY * RowBytesWidth) + PixelDataIdx + 1
+            
+            local RawByte = Pixels[BytePosInTable, number]
+            local BitShift = 8 - BitDepth - ((SourceX % PixelsPerByte) * BitDepth)
+            
+            local BitMask = (1 << BitDepth) - 1
+            local FinalVal = (RawByte >> BitShift) && BitMask
+            
+            if (ColorType == 3) {
+                local PackedColor = Palette[FinalVal, number]
+                R = (PackedColor >> 16) && 255
+                G = (PackedColor >> 8) && 255
+                B = PackedColor && 255
+            } else {
+                local MaxVal = (1 << BitDepth) - 1
+                local Gray = floor((FinalVal / MaxVal) * 255)
+                R = Gray
+                G = Gray
+                B = Gray
+            }
+        } else {
+            if (ColorType == 3) {
+                local ColorIndex = Pixels[PixelPosInTable, number]
+                local PackedColor = Palette[ColorIndex, number]
+                R = (PackedColor >> 16) && 255
+                G = (PackedColor >> 8) && 255
+                B = PackedColor && 255
+            } else { 
+                if (ColorType == 0 | ColorType == 4) {
+                    local Gray = Pixels[PixelPosInTable, number]
+                    R = Gray
+                    G = Gray
+                    B = Gray
+                } else {
+                    R = Pixels[PixelPosInTable, number]
+                    G = Pixels[PixelPosInTable + BytesPerChannel, number]
+                    B = Pixels[PixelPosInTable + BytesPerChannel * 2, number]
+                }
+                    
+                if (ColorType == 4 | ColorType == 6) {
+                    local AlphaOffset = (ColorType == 4) ? BytesPerChannel : (BytesPerChannel * 3)
+                    local A = Pixels[PixelPosInTable + AlphaOffset, number]
+                    local AlphaFactor = A / 255
+                    local BgColor = 255
+                    
+                    R = floor(R * AlphaFactor + BgColor * (1 - AlphaFactor))
+                    G = floor(G * AlphaFactor + BgColor * (1 - AlphaFactor))
+                    B = floor(B * AlphaFactor + BgColor * (1 - AlphaFactor))
+                }
+            }
+        }
+        
+        # Output directly to your High-Res Digital Screen layout
+        local FinalX = PixelX + Xadd
+        local FinalY = PixelY + Yadd
+        local DSIndex = FinalX + (FinalY * RowWidth)
+        
+        DS[DSIndex] = (floor(R) << 16) || (floor(G) << 8) || floor(B)
+        
+        PassProgressIdx++
+        BaselineIdx++
+    }
+    
+    # 3. Synchronize cross-pass steps safely outside hot loops
+    if (PassProgressIdx >= PassMaxPixels) {
+        PassProgressIdx = 0
+        
+        if (Interlaced == 1) {
+            ReadIdx = ReadIdx + PassMaxPixels
+        }
+        
+        Pass++
+        
+        if (Interlaced == 0) {
+            Pass = 8 # Force kill loops on Baseline completion
+        }
+    }
+    
+    # Commit variables safely back to Png
+    Png["drawPass", number] = Pass
+    Png["drawPassProgressIdx", number] = PassProgressIdx
+    Png["drawReadIdx", number] = ReadIdx
+    Png["drawIdx", number] = BaselineIdx
+    
+    if (Pass > 7 | (Interlaced == 0 & BaselineIdx >= PassMaxPixels)) {
+        Png["drawPass", number] = 1
+        Png["drawPassProgressIdx", number] = 0
+        Png["drawReadIdx", number] = 0
+        Png["drawIdx", number] = 0
+        return 1
+    }
+    
+    return 0
+}

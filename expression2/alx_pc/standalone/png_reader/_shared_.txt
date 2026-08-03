@@ -1,0 +1,31 @@
+@persist Png:table PNGDebug PNGNoPrint
+@outputs CurrentState:string Progress:table ProgressText:string Processing:number Error:string Warning:string
+@inputs DS:wirelink
+
+@persist PngFixedLiteralTable:table PngFixedDistanceTable:table
+@persist InitState:string InitIndex:number 
+@persist Png_CompressedData:string Png_CompressedPos
+
+if (first() | duped()) {
+
+    PNGDebug = 0
+    PNGNoPrint = 0
+    
+    dsSetScope(2)
+    
+    PngFixedLiteralTable = table()
+    PngFixedDistanceTable = table()
+    
+    InitState = "lit_7"
+    InitIndex = 0
+}
+
+function pngError(Msg:string) {
+    Error = Msg
+    Processing = 0
+    Png["state",string] = ""
+    
+    if (!PNGNoPrint) {
+        print(Error)
+    }
+}

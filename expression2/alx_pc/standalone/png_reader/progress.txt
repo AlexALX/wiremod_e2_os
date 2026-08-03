@@ -1,0 +1,73 @@
+#include "alx_pc/standalone/png_reader/_shared_"
+
+function pngProgress(Task:string, Current:number, Max:number)
+{
+    Progress["progressTask",string] = Task
+    Progress["progressCurrent",number] = Current
+    Progress["progressMax",number] = Max
+    
+    local Percent = 0
+    ProgressText = Progress["progressTask",string]
+    
+    if (Max > 0) {
+        Percent = floor(Current * 100 / Max)
+        ProgressText = ProgressText + " - " + Progress["progressCurrent",number] + "/" + Progress["progressMax",number] + " (" + Percent + "%)"
+    }
+    
+    Progress["progressPercent",number] = Percent
+}
+
+function pngUpdateProgress()
+{
+    CurrentState = Png["state", string]
+
+    switch (CurrentState) {
+
+        case "parse_chunks",
+            Progress["step",number] = 1
+            pngProgress("Parsing PNG Chunks", Png["pos",number], Png["size",number])
+            break
+
+        case "decompress",
+            Progress["step",number] = 2
+
+            local CompPos = Png_CompressedPos
+            local CompMax = Png_CompressedData:length()
+            if (CompMax == 0) { CompMax = 1 }
+        
+            pngProgress("Decompressing Image", CompPos, CompMax)
+            break
+
+        case "filter",
+            Progress["step",number] = 3
+
+            local Interlaced = Png["interlaceMethod", number]
+            if (Interlaced) {
+                local TotalBytes = Png["width", number] * Png["height", number] * Png["bpp", number]
+                if (TotalBytes == 0) { TotalBytes = 1 }
+                
+                local CurrentBytePos = Png["filterWritePos", number]
+                
+                local Pass = Png["currentPass", number]
+                pngProgress("Filtering Adam7 Pass " + Pass + "/7", CurrentBytePos, TotalBytes)
+            } else {
+                pngProgress("De-filtering Rows", Png["filterLine", number], Png["height", number])
+            }
+            break
+
+        case "draw",
+            Progress["step",number] = 4
+
+            local TotalPixels = Png["width", number] * Png["height", number]
+            pngProgress("Drawing PNG to Matrix", Png["drawIdx", number], TotalPixels)
+            break
+
+        case "done",
+            Progress["step",number] = 5
+            pngProgress("Done", 0, 0)
+            break
+
+        default,
+            pngProgress("", 0, 0)
+    }
+}

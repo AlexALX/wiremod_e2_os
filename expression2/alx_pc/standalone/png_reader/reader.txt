@@ -1,0 +1,70 @@
+#include "alx_pc/standalone/png_reader/_shared_"
+
+function string pngReadType()
+{
+    local Pos = Png["pos",number]
+    local Data = Png["data",string]
+    
+    local Type = Data:sub(Pos, Pos + 3)
+    Png["pos",number] = Pos + 4
+    return Type
+}
+
+function number pngU8()
+{
+    local Pos = Png["pos",number]
+
+    local Value = toByte(Png["data",string], Pos)
+
+    Png["pos",number] = Pos + 1
+
+    return Value
+}
+
+function number pngU16()
+{
+    local Pos = Png["pos",number]
+    local Data = Png["data",string]
+
+    local High = toByte(Data, Pos)
+    local Low  = toByte(Data, Pos + 1)
+
+    Png["pos",number] = Pos + 2
+
+    return High * 256 + Low
+}
+
+function number pngU32()
+{
+    local Pos = Png["pos",number]
+    local Data = Png["data",string]
+
+    local B1 = toByte(Data, Pos)
+    local B2 = toByte(Data, Pos + 1)
+    local B3 = toByte(Data, Pos + 2)
+    local B4 = toByte(Data, Pos + 3)
+
+    Png["pos",number] = Pos + 4
+
+    return (B1 << 24) || (B2 << 16) || (B3 << 8) || B4
+}
+
+function number pngTell()
+{
+    return Png["pos",number]
+}
+
+function pngSeek(Pos:number)
+{
+    Png["pos",number] = Pos
+}
+
+function pngSkip(Bytes:number)
+{
+    Png["pos",number] = Png["pos",number] + Bytes
+}
+
+function number pngEOF()
+{
+    return Png["pos",number] > Png["size",number]
+}

@@ -1,4 +1,4 @@
-@name GIF Helper for DS
+@name PNG Helper for DS
 @persist Header:string
 @inputs CurrentState:string Progress:table ProgressText:string Processing:number Error:string Warning:string
 @strict
@@ -10,36 +10,27 @@ function displayHelp() {
 
     local Text = Header+
 "
-GIF Parser, specifications:
+PNG Parser, specifications:
 - Max resolution is unlimited, but
   will be resized to 512x512 (DS limit) 
   or 1024x1024 (Quad DS Limit) 
-- Baseline and Interlace files supported
-- Animation with multiple loop modes
-- Loop and Disposal support
-- Due to digital screen speed issues anims 
-   work properly only on very small images
-   or you can resize output by GifSizeLimit
+- Support Baseline & 7-pass Adam7 Interlace
+- Color Depth: Full range (1 to 32 bits)
+- Types: RGB, RGBA, Grayscale & Palette
 
 Usage via chat commands:
-!gif http://url - open gif file from the web
+!png http://url - open png file from the web
+
 Note: long url may be cut, use input LongURL 
 instead for such case (via string value) 
 
-!giffile filename.gif - open gif file from 
+!pngfile filename.png - open png file from 
 garrysmod/data/e2files/ folder
-file extension must be renamed to .txt
 
-!gifabort - abort rendering
-!gifmode - normal, manual, animate
-Modes:
- normal - first frame, no animation
- manual - play next frame via !gifnext
- animate - automatic animation play
+!pngabort - abort rendering
 
-!gifsize - limit image scale (1-512)
-!gifdelay - frame delay limit (min 0.1)
-!gifkeepar - set Aspect Ratio mode (0 or 1)
+!pngsize - limit image scale (1-512)
+!pngkeepar - set Aspect Ratio mode (0 or 1)
 "
 
     dsDrawTextStart(2, 0, Text)
@@ -49,14 +40,14 @@ function displayProgressStart() {
     displayInit()
     
     displayBlockDraw(0.5)
-
+    
     local Text = Header+
 "
 Step:
 0 / 0
 
 Current task:
-Loading GIF
+Loading PNG
 
 Progress:
 
@@ -70,7 +61,7 @@ function displayError(Msg:string) {
     
     local Text = Header+
 "
-GIF Reader Error:
+PNG Reader Error:
 
 "+Msg+"
 "
@@ -103,12 +94,11 @@ function displayProgress()
     
     local FontLine = DsFontHeight + DsFontSpacing
     
+    displayBlockDraw(2)
+    
     dsDrawCachedText(2, 4 * FontLine, Step + " / "+Progress["stepTotal",number])
     dsDrawCachedText(2, 7 * FontLine, CurrentTask)
     dsDrawCachedText(2, 10 * FontLine, Current + " / " + Max + " ("+Perc+"%)")
-    
-    displayBlockDraw(2)
-    
 }
 
 function displayMode() {
@@ -118,33 +108,33 @@ function displayMode() {
         displayProgressStart()
     } else {
         displayHelp()    
-    }   
+    }
 }
 
 function displayWarning(Msg:string) {
     local FontLine = DsFontHeight + DsFontSpacing
-        
+    
     local Lines = stringWordWrap(Msg,33)
-
+    
     dsDrawCachedText(2, 13 * FontLine, "Warning:")
     
     for (I=1,Lines:count()) {
         dsDrawCachedText(2, (13+I) * FontLine, Lines[I,string])     
     }    
-
-    displayBlockDraw(3)
+    
+    displayBlockDraw(2)
 }
 
 if (first() | duped()) {
     Header = 
-"GIF Reader
+"PNG Reader
 Created by AlexALX (c) 2026
 -------------------"
     
     displayMode()
 }
 
-event input(InputName:string) {  
+event input(InputName:string) {    
     if (InputName=="DS" & DS!=nowirelink()) {
         displayMode()
     } elseif (InputName=="Processing" & Processing) {

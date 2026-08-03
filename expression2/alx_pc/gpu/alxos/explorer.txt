@@ -2362,6 +2362,12 @@ function alxos_explorer_sysinfo(Info:table) {
     EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ Y+=20
     
     if (!DS:entity():isValid()) { Status = "Not connected" } else { Status = "Connected" }
+    
+    local ScreenName = DS:entity():getName()
+    if (ScreenName=="Quad Digital Screen") {
+        Status += " (Quad Digital Screen)"    
+    }
+    
     EGP:egpText(LAST_I,"Digital Screen - "+Status,vec2(30,Y))
     EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ Y+=20
     

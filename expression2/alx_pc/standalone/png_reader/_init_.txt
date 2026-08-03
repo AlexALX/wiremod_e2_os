@@ -1,0 +1,273 @@
+@name PNG Reader Main Chip
+
+#include "alx_pc/standalone/png_reader/_shared_"
+#include "alx_pc/standalone/png_reader/parser"
+#include "alx_pc/standalone/png_reader/decompress"
+#include "alx_pc/standalone/png_reader/draw"
+#include "alx_pc/standalone/png_reader/progress"
+
+function pngInit(Data:string,MaxSize:number,NoKeepAR:number)
+{
+    Png = table()
+    Png["start",number] = curtime()
+    
+    Error = ""
+    Progress = table()
+    Processing = 0
+    Warning = ""
+    
+    Png["MaxSize", number] = MaxSize
+    Png["NoKeepAR", number] = NoKeepAR
+    
+    Png["data",string] = Data
+    Png["size",number] = Data:length()
+    Png["pos",number] = 1
+    Png["state",string] = ""
+    
+    Png_OutputLength = 0
+    Png_HuffBitsRead = 0
+    Png_HuffCurrentCode = 0
+    
+    Png_CompressedData = ""
+    
+    local SigValid = 1
+    local ValidSig = array(137, 80, 78, 71, 13, 10, 26, 10)
+    for(I = 1, 8) {
+        if(toByte(Data, I) != ValidSig[I, number]) {
+            SigValid = 0
+            break
+        }
+    }
+    
+    if (!SigValid) {
+        timer(0.001, function() {
+            Error = "Not a valid PNG file"
+            if (!PNGNoPrint) {
+                print(Error)
+            }
+        })
+        return
+    }
+    
+    Progress["stepTotal",number] = 5
+    Png["pos",number] = 9
+    
+    # LZ77 
+    PngLengthBase = array(3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258)
+    PngLengthExtra = array(0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0)
+    PngDistBase = array(1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577)
+    PngDistExtra = array(0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13)
+    PngCodeOrder = array(16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15)
+    
+    timer(0.001, function() {
+        Processing = 1
+        Png["state",string] = "parse_chunks"    
+    })
+    print("PNG detected")
+}
+
+# clear e2 memory
+function pngClear() {
+    Png = table()    
+    Png_CompressedData = ""
+}
+
+function pngAbort() {
+    Png["state",string] = ""
+    CurrentState = ""
+    Progress = table()
+    ProgressText = ""
+    Error = ""
+    Processing = 0
+    pngClear()
+}
+
+function pngDone() {
+    Png["state", string] = "done"
+    
+    pngUpdateProgress()
+    Processing = 0
+    
+    local RenderTime = round(curtime() - Png["start", number],2)
+    
+    Progress["renderTime",number] = RenderTime
+    
+    if (!PNGNoPrint) {
+        print("PNG Finished, render time: "+RenderTime+"s")
+    }
+    
+    # clear memory
+    pngClear()
+}
+
+function number pngInitTablesStep()
+{
+    while (perf(95)) {
+        
+        if (InitState == "lit_7") {
+            local I = InitIndex
+            
+            local Rev = 0
+            local Tmp = I
+            for (B = 0, 6) {
+                Rev = (Rev << 1) || (Tmp && 1)
+                Tmp = Tmp >> 1
+            }
+            
+            local NumericKey = (7 << 16) || Rev
+            PngFixedLiteralTable[NumericKey, number] = (256 + I) + 1
+            
+            InitIndex++
+            if (InitIndex > 23) {
+                InitState = "lit_8_first"
+                InitIndex = 48 
+            }
+        }
+        
+        elseif (InitState == "lit_8_first") {
+            local I = InitIndex
+            
+            local Rev = 0
+            local Tmp = I
+            for (B = 0, 7) {
+                Rev = (Rev << 1) || (Tmp && 1)
+                Tmp = Tmp >> 1
+            }
+            local Literal = I - 48
+            
+            local NumericKey = (8 << 16) || Rev
+            PngFixedLiteralTable[NumericKey, number] = Literal + 1
+            
+            InitIndex++
+            if (InitIndex > 191) {
+                InitState = "lit_8_second"
+                InitIndex = 192 
+            }
+        }
+        
+        elseif (InitState == "lit_8_second") {
+            local I = InitIndex
+            
+            local Rev = 0
+            local Tmp = I
+            for (B = 0, 7) {
+                Rev = (Rev << 1) || (Tmp && 1)
+                Tmp = Tmp >> 1
+            }
+            local Literal = 280 + (I - 192)
+            
+            local NumericKey = (8 << 16) || Rev
+            PngFixedLiteralTable[NumericKey, number] = Literal + 1
+            
+            InitIndex++
+            if (InitIndex > 199) {
+                InitState = "lit_9"
+                InitIndex = 400 
+            }
+        }
+        
+        elseif (InitState == "lit_9") {
+            local I = InitIndex
+            
+            local Rev = 0
+            local Tmp = I
+            for (B = 0, 8) {
+                Rev = (Rev << 1) || (Tmp && 1)
+                Tmp = Tmp >> 1
+            }
+            local Literal = 144 + (I - 400)
+            
+            local NumericKey = (9 << 16) || Rev
+            PngFixedLiteralTable[NumericKey, number] = Literal + 1
+            
+            InitIndex++
+            if (InitIndex > 511) {
+                InitState = "dist_5"
+                InitIndex = 0 
+            }
+        }
+        
+        elseif (InitState == "dist_5") {
+            local I = InitIndex
+            
+            local Rev = 0
+            local Tmp = I
+            for (B = 0, 4) {
+                Rev = (Rev << 1) || (Tmp && 1)
+                Tmp = Tmp >> 1
+            }
+            
+            local NumericKey = (5 << 16) || Rev
+            PngFixedDistanceTable[NumericKey, number] = I
+            
+            InitIndex++
+            if (InitIndex > 31) {
+                InitState = "ready"
+                return 1  
+            }
+        }
+    }
+    
+    return 0 
+}
+
+event tick()
+{
+    if (InitState != "ready") {
+        pngInitTablesStep()
+        exit() 
+    }
+    
+    if (Png["state",string] == "" | Png["state",string] == "done" | Error) {
+        exit()
+    }
+    
+    #print(Png["state",string], Png["decSubState", string])
+    
+    while(perf(95)) {
+        
+        if (Png["state",string] == "parse_chunks") {
+            
+            if (pngParseChunksStep()) {                
+                if (PNGDebug) {
+                    print("PNG Parsing Finished!")
+                    print("Total compressed IDAT bytes: " + Png_CompressedData:length())
+                }
+                
+                pngStartDecompress()
+            }
+            
+        } elseif (Png["state",string] == "decompress") {
+            local Res = pngDecompressStep()            
+            if (Res == 1) {
+                
+                if (PNGDebug) {
+                    print("Deflate finished! Uncompressed bytes: " + Png["outputLength", number])
+                }
+                
+                Png["state",string] = "filter" 
+                pngStartFilter()
+            } elseif (Res == -1) {
+                Png["state",string] = ""
+                print("Error: " + Error)
+            }
+        } elseif (Png["state",string] == "filter") {
+            #    
+            if (pngFilterStep()) {
+                if (PNGDebug) {
+                    print("PNG De-filtering Finished! Ready to draw.")
+                }
+                
+                Png["state",string] = "draw"
+                pngStartDraw()
+            }
+        } elseif (Png["state",string] == "draw") {
+            #     
+            if (pngDrawStep()) {     
+                pngDone() 
+            }
+        }
+    }
+    
+    pngUpdateProgress()
+}

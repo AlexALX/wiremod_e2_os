@@ -58,10 +58,14 @@ function number gifInit(Data:string,AnimateMode:number,SizeLimit:number,NoKeepAR
     
     local WH = Width > Height ? Width : Height
 
-    local GifMaxWidth = 512 # DS Limit
+    local IsQuadScreen = DS:entity():getName()=="Quad Digital Screen"
+    
+    local DsMaxLimit = (IsQuadScreen ? 1024 : 512) # DS Limit 
+
+    local GifMaxWidth = DsMaxLimit # DS Limit
     
     if (SizeLimit>0) {
-        GifMaxWidth = min(512,SizeLimit)  
+        GifMaxWidth = min(DsMaxLimit,SizeLimit)  
     }
     
     Gif["maxWidth",number] = GifMaxWidth
@@ -84,9 +88,9 @@ function number gifInit(Data:string,AnimateMode:number,SizeLimit:number,NoKeepAR
         Gif["screenWidth", number] = ResizedWidth
         Gif["screenHeight", number] = ResizedHeight
 
-        if (WH>512 & GifMaxWidth==512) {
+        if (WH>DsMaxLimit & GifMaxWidth==DsMaxLimit) {
             timer(0.001,function() {
-                Warning = "Your image is larger than Digital Screen supports\n"+
+                Warning = "Your image is larger than "+(IsQuadScreen ? "Quad " : "")+"Digital Screen supports\n"+
                 "Your image will be resized to: "+ResizedWidth+"x"+ResizedHeight
                 
                 if (!GIFNoPrint) {

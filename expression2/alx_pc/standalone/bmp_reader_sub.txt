@@ -249,4 +249,5 @@ if (dsClk("BMP_MULTI_START")) {
 
 if (last() & BMP_MAIN!=noentity()) {
     dsSendDirect("BMP_MULTI_FINISH",BMP_MAIN,entity())   
+    BmpData = table()
 }

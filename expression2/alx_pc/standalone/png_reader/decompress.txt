@@ -1,0 +1,568 @@
+@persist PngLengthBase:array PngLengthExtra:array
+@persist PngDistBase:array PngDistExtra:array  PngCodeOrder:array
+@persist Png_HuffBitsRead Png_HuffCurrentCode 
+
+#include "alx_pc/standalone/png_reader/_shared_"
+#include "alx_pc/standalone/png_reader/bitreader"
+
+function pngStartDecompress()
+{
+    Png["state", string] = "decompress"
+    Png["decSubState", string] = "read_block_header"
+    
+    # Bit Reader PNG (LSB-first)
+    pngBitInit()
+    Png_CompressedPos = 3
+    
+    Png["outputData", table] = table()
+    Png["outputLength", number] = 0
+    
+    Png["DynLiteralTable", table] = table()
+    Png["DynDistanceTable", table] = table()
+    
+    Png["CL_Table", table] = table()
+}
+
+function number pngDecompressStep()
+{
+    local SubState = Png["decSubState", string]
+    
+    # 1.   Deflate
+    if (SubState == "read_block_header") {
+        local BFinal = pngBit()
+        local BType  = pngBits(2)
+        if (BFinal < 0 | BType < 0) { Error = "Deflate: EOF in header" return -1 }
+        
+        Png["blockFinal", number] = BFinal
+        Png["blockType", number] = BType
+        
+        if (BType == 0) { Png["decSubState", string] = "raw_block_init" }
+        elseif (BType == 1) { 
+            Png["decSubState", string] = "decode_huffman"
+            Png_HuffBitsRead = 0
+            Png_HuffCurrentCode = 0
+        } elseif (BType == 2) { 
+            Png["decSubState", string] = "dyn_read_counts" 
+        } else {
+            Error = "Deflate: BTYPE " + BType + " not supported yet" return -1 
+        }
+        return 0
+    }
+    
+    # 2.    (RAW)
+    if (SubState == "raw_block_init") {
+        pngBitInit()
+
+        local Len  = pngBits(8) || (pngBits(8) << 8)
+        local NLen = pngBits(8) || (pngBits(8) << 8)
+        if ((Len || NLen) != 65535) { Error = "Deflate: Raw LEN mismatch" return -1 }
+        Png["rawLen", number] = Len
+        Png["decSubState", string] = "raw_block_copy"
+        return 0
+    }
+    if (SubState == "raw_block_copy") {
+        local Len = Png["rawLen", number]
+        while (Len > 0 & perf(90)) {
+            local Byte = pngReadCompressedByte()
+            if (Byte < 0) { Error = "Deflate: EOF in RAW copy" return -1 }
+            local OutLen = Png["outputLength", number] + 1
+            Png["outputData", table][OutLen, number] = Byte
+            Png["outputLength", number] = OutLen
+            Len--
+        }
+        Png["rawLen", number] = Len
+        if (Len == 0) {
+            if (Png["blockFinal", number] == 1) { return 1 } 
+            else { Png["decSubState", string] = "read_block_header" }
+        }
+        return 0
+    }
+    
+    # 3 
+    if (SubState == "dyn_read_counts") {
+        local HLit  = pngBits(5) 
+        local HDist = pngBits(5) 
+        local HCLen = pngBits(4) 
+        
+        if (HLit < 0 | HDist < 0 | HCLen < 0) { Error = "Deflate: EOF in dynamic tree counts" return -1 }
+        
+        Png["dynHLit", number]  = HLit + 257
+        Png["dynHDist", number] = HDist + 1
+        Png["dynHCLen", number] = HCLen + 4
+        
+        Png["CL_Table", table] = table()
+        Png["dynIdx", number] = 1 
+        
+        if (PNGDebug) {
+            print("------")
+            print("HLit:", Png["dynHLit", number])
+            print("HDist:", Png["dynHDist", number])
+            print("HCLen:", Png["dynHCLen", number])
+        }
+        
+        Png["decSubState", string] = "dyn_read_code_lengths"
+        return 0
+    }
+    
+    # 4
+    if (SubState == "dyn_read_code_lengths") {
+        local HCLen = Png["dynHCLen", number]
+        local Idx = Png["dynIdx", number]
+        local CL_Table = Png["CL_Table", table]
+        
+        while (Idx <= HCLen & perf(95)) {
+            local Bits = pngBits(3)
+            if (Bits < 0) { Error = "Deflate: EOF in code lengths" return -1 }
+            
+            local TargetPos = PngCodeOrder[Idx, number]
+            CL_Table[TargetPos, number] = Bits
+            Idx++
+        }
+        
+        Png["dynIdx", number] = Idx
+        Png["CL_Table", table] = CL_Table
+        
+        if (Idx > HCLen) {
+            for (I = HCLen + 1, 19) {
+                local TargetPos = PngCodeOrder[I, number]
+                if (CL_Table[TargetPos, number] == 0) {
+                    CL_Table[TargetPos, number] = 0
+                }
+            }
+            Png["CL_Table", table] = CL_Table
+            Png["decSubState", string] = "dyn_build_code_tree"
+        }
+        return 0
+    }
+    
+    # 5    
+    if (SubState == "dyn_build_code_tree") {
+        local CL_Table = Png["CL_Table", table]
+        
+        local BlCount = table()
+        for (I = 0, 18) {
+            local Len = CL_Table[I, number]
+            if (Len > 0) { BlCount[Len, number] = BlCount[Len, number] + 1 }
+        }
+        
+        local Code = 0
+        local NextCode = table()
+        for (Bits = 1, 7) {
+            Code = (Code + BlCount[Bits - 1, number]) << 1
+            NextCode[Bits, number] = Code
+        }
+        
+        local CodeTree = table()
+        for (I = 0, 18) {
+            local Len = CL_Table[I, number]
+            if (Len > 0) {
+                local CurCode = NextCode[Len, number]
+                NextCode[Len, number] = NextCode[Len, number] + 1
+                
+                local Rev = 0
+                local Tmp = CurCode
+                for (B = 0, Len - 1) {
+                    Rev = (Rev << 1) || (Tmp && 1)
+                    Tmp = Tmp >> 1
+                }
+                CodeTree[Len + "_" + Rev, number] = I
+            }
+        }
+        
+        Png["CodeTree", table] = CodeTree
+        Png["treeTotalExpected", number] = Png["dynHLit", number] + Png["dynHDist", number]
+        Png["treeLengthsRead", number] = 0
+        Png["FullLengthsTable", table] = table()
+        Png["treeBitsRead", number] = 0
+        Png["treeCurrentCode", number] = 0
+        
+        Png["decSubState", string] = "dyn_decode_tables"
+        return 0
+    }
+    
+    # 6 
+    if (SubState == "dyn_decode_tables") {
+        local TotalExpected = Png["treeTotalExpected", number]
+        local ReadCount = Png["treeLengthsRead", number]
+        local FullTable = Png["FullLengthsTable", table]
+        local CodeTree = Png["CodeTree", table]
+        
+        local BitsRead = Png["treeBitsRead", number]
+        local CurrentCode = Png["treeCurrentCode", number]
+        
+        while (ReadCount < TotalExpected & perf(90)) {
+            local Bit = pngBit()
+            if (Bit < 0) { Error = "Deflate: EOF in dynamic table stream" return -1 }
+            
+            CurrentCode = CurrentCode || (Bit << BitsRead)
+            BitsRead++
+            
+            local Key = BitsRead + "_" + CurrentCode
+            
+            if (CodeTree:exists(Key)) {
+                local Value = CodeTree[Key, number]
+                
+                BitsRead = 0
+                CurrentCode = 0
+                
+                if (Value <= 15) {
+                    FullTable[ReadCount, number] = Value
+                    ReadCount++
+                }
+                elseif (Value == 16) {
+                    if (ReadCount == 0) { Error = "Deflate: Repeat code 16 at index 0" return -1 }
+                    local Extra = pngBits(2)
+                    if (Extra < 0) { Error = "Deflate: EOF in repeat 16 extra bits" return -1 }
+                    local RepeatTimes = 3 + Extra
+                    local PrevValue = FullTable[ReadCount - 1, number]
+                    
+                    for (I = 1, RepeatTimes) {
+                        FullTable[ReadCount, number] = PrevValue
+                        ReadCount++
+                    }
+                }
+                elseif (Value == 17) {
+                    local Extra = pngBits(3)
+                    if (Extra < 0) { Error = "Deflate: EOF in repeat 17 extra bits" return -1 }
+                    local RepeatTimes = 3 + Extra
+                    
+                    for (I = 1, RepeatTimes) {
+                        FullTable[ReadCount, number] = 0
+                        ReadCount++
+                    }
+                }
+                elseif (Value == 18) {
+                    local Extra = pngBits(7)
+                    if (Extra < 0) { Error = "Deflate: EOF in repeat 18 extra bits" return -1 }
+                    local RepeatTimes = 11 + Extra
+                    
+                    for (I = 1, RepeatTimes) {
+                        FullTable[ReadCount, number] = 0
+                        ReadCount++
+                    }
+                }
+            }
+        }
+        
+        Png["treeBitsRead", number] = BitsRead
+        Png["treeCurrentCode", number] = CurrentCode
+        Png["treeLengthsRead", number] = ReadCount
+        Png["FullLengthsTable", table] = FullTable
+        
+        if (ReadCount >= TotalExpected) {
+            Png["decSubState", string] = "dyn_compile_final_trees"
+            Png["dynCompileState", string] = "lit"
+        }
+        return 0
+    }
+    
+    # 7    
+    if (SubState == "dyn_compile_final_trees") {
+        local FullTable = Png["FullLengthsTable", table]
+        local HLit = Png["dynHLit", number]
+        local HDist = Png["dynHDist", number]
+        local CState = Png["dynCompileState", string]
+        
+        if (CState == "lit") {   
+            if (!Png["litCompiledTable", number]) {
+                local BlCount = table()
+                for (I = 0, HLit - 1) {
+                    local Len = FullTable[I, number]
+                    if (Len > 0) { BlCount[Len, number] = BlCount[Len, number] + 1 }
+                }
+                local Code = 0
+                local NextCode = table()
+                for (Bits = 1, 15) {
+                    Code = (Code + BlCount[Bits - 1, number]) << 1
+                    NextCode[Bits, number] = Code
+                }
+                
+                Png["litNextCode", table] = NextCode
+                Png["litDynLiteralTable", table] = table()
+                Png["litCompileIdx", number] = 0 
+                Png["litCompiledTable", number] = 1 
+            }
+            
+            local NextCode = Png["litNextCode", table]
+            local DynLiteralTable = Png["litDynLiteralTable", table]
+            local StartI = Png["litCompileIdx", number]
+            
+            local I = StartI
+            while (I <= HLit - 1 & perf(90)) {
+                local Len = FullTable[I, number]
+                if (Len > 0) {
+                    local CurCode = NextCode[Len, number]
+                    NextCode[Len, number] = NextCode[Len, number] + 1
+                    
+                    local Rev = 0
+                    local Tmp = CurCode
+                    for (B = 0, Len - 1) { 
+                        Rev = (Rev << 1) || (Tmp && 1)
+                        Tmp = Tmp >> 1 
+                    }
+                    local NumericKey = (Len << 16) || Rev
+                    DynLiteralTable[NumericKey, number] = I + 1
+                }
+                I++
+            }
+            
+            Png["litCompileIdx", number] = I
+            Png["litNextCode", table] = NextCode
+            Png["litDynLiteralTable", table] = DynLiteralTable
+                 
+            if (I <= HLit - 1) { return 0 }
+            
+            Png["DynLiteralTable", table] = DynLiteralTable
+            Png["litCompiledTable", number] = 0
+            
+            Png["dynCompileState", string] = "dist"
+            return 0
+        }
+        
+        if (CState == "dist") {
+            if (!Png["distCompiledTable", number]) {
+                local BlCount = table()
+                for (I = 0, HDist - 1) {
+                    local Len = FullTable[HLit + I, number]
+                    if (Len > 0) { BlCount[Len, number] = BlCount[Len, number] + 1 }
+                }
+                local Code = 0
+                local NextCode = table()
+                for (Bits = 1, 15) {
+                    Code = (Code + BlCount[Bits - 1, number]) << 1
+                    NextCode[Bits, number] = Code
+                }
+                
+                Png["distNextCode", table] = NextCode
+                Png["distDynDistanceTable", table] = table()
+                Png["distCompileIdx", number] = 0
+                Png["distCompiledTable", number] = 1
+            }
+            
+            local NextCode = Png["distNextCode", table]
+            local DynDistanceTable = Png["distDynDistanceTable", table]
+            local StartI = Png["distCompileIdx", number]
+            
+            local I = StartI
+            while (I <= HDist - 1 & perf(90)) {
+                local Len = FullTable[HLit + I, number]
+                if (Len > 0) {
+                    local CurCode = NextCode[Len, number]
+                    NextCode[Len, number] = NextCode[Len, number] + 1
+                    
+                    local Rev = 0
+                    local Tmp = CurCode
+                    for (B = 0, Len - 1) { 
+                        Rev = (Rev << 1) || (Tmp && 1)
+                        Tmp = Tmp >> 1 
+                    }
+                    DynDistanceTable[Len + "_" + Rev, number] = I
+                }
+                I++
+            }
+            
+            Png["distCompileIdx", number] = I
+            Png["distNextCode", table] = NextCode
+            Png["distDynDistanceTable", table] = DynDistanceTable
+            
+            if (I <= HDist - 1) { return 0 }
+            
+            Png["DynDistanceTable", table] = DynDistanceTable
+            Png["distCompiledTable", number] = 0
+            
+            Png["dynCompileState", string] = ""
+            Png_HuffBitsRead = 0
+            Png_HuffCurrentCode = 0
+            Png["decSubState", string] = "decode_huffman"
+        }
+        return 0
+    }
+    
+    # 8  
+    if (SubState == "decode_huffman") {
+        local BitsRead = Png_HuffBitsRead
+        local CurrentCode = Png_HuffCurrentCode
+        
+        local OutData = Png["outputData", table]
+        local LocalOutLen = Png["outputLength", number]
+        
+        local TargetTable = PngFixedLiteralTable
+        if (Png["blockType", number] == 2) { 
+            TargetTable = Png["DynLiteralTable", table] 
+        }
+                 
+        while (perf(90)) {
+            
+            local Bit = pngBit()
+            if (Bit < 0) { 
+                Png["outputLength", number] = LocalOutLen
+                Error = "Deflate: EOF in Huffman" 
+                return -1 
+            }
+            
+            CurrentCode = CurrentCode || (Bit << BitsRead)
+            BitsRead++
+            
+            local Key = (BitsRead << 16) || CurrentCode
+            
+            if (TargetTable[Key,number]>0) {
+                local Value = TargetTable[Key, number]-1
+                
+                BitsRead = 0
+                CurrentCode = 0
+                
+                if (Value < 256) {
+                    LocalOutLen++
+                    OutData[LocalOutLen, number] = Value
+                }
+                elseif (Value == 256) {
+                    Png_HuffBitsRead = 0
+                    Png_HuffCurrentCode = 0
+                    
+                    Png["outputLength", number] = LocalOutLen
+
+                    if (Png["blockFinal", number] == 1) { 
+                        return 1
+                    } else { 
+                        Png["decSubState", string] = "read_block_header" 
+                        Png["DynLiteralTable", table] = table()
+                        Png["DynDistanceTable", table] = table()
+                        Png["CodeTree", table] = table()
+                        Png["distBitsRead", number] = 0
+                        Png["distCurrentCode", number] = 0
+                        return 0
+                    }
+                } else {
+                    local LIdx = Value - 257
+                    Png["lzLenBase", number] = PngLengthBase[LIdx + 1, number]
+                    Png["lzLenExtraBits", number] = PngLengthExtra[LIdx + 1, number]
+                    Png["decSubState", string] = "lz_read_length_extra"
+                    
+                    Png_HuffBitsRead = 0
+                    Png_HuffCurrentCode = 0   
+                    
+                    Png["outputLength", number] = LocalOutLen
+                    return 0
+                }
+            }
+        }
+
+        Png_HuffBitsRead = BitsRead
+        Png_HuffCurrentCode = CurrentCode
+        Png["outputLength", number] = LocalOutLen
+        return 0
+    }
+    
+    # 9 LZ77
+    if (SubState == "lz_read_length_extra") {
+        local ExtraBits = Png["lzLenExtraBits", number]
+        local ExtraVal = 0
+        if (ExtraBits > 0) {
+            ExtraVal = pngBits(ExtraBits)
+            if (ExtraVal < 0) { Error = "Deflate: EOF in Length Extra" return -1 }
+        }
+        
+        Png["lzTotalLen", number] = Png["lzLenBase", number] + ExtraVal
+        Png["decSubState", string] = "lz_decode_dist"
+        
+        Png["distBitsRead", number] = 0
+        Png["distCurrentCode", number] = 0
+        return 0
+    }
+    
+    # 10 LZ77
+    if (SubState == "lz_decode_dist") {
+        if (Png["blockType", number] == 1) {
+            local DistCode = pngBits(5)
+            if (DistCode < 0) { Error = "Deflate: EOF in Dist Code" return -1 }
+            
+            local Rev = 0
+            local Tmp = DistCode
+            for(B = 0, 4) { Rev = (Rev << 1) || (Tmp && 1) Tmp = Tmp >> 1 }
+            
+            local DIdx = PngFixedDistanceTable["5_" + Rev, number]
+            Png["lzDistBase", number] = PngDistBase[DIdx + 1, number]
+            Png["lzDistExtraBits", number] = PngDistExtra[DIdx + 1, number]
+            Png["decSubState", string] = "lz_read_dist_extra"
+            return 0
+        } 
+        else {
+            if (Png["dynHDist", number] == 1) {
+                Png["lzDistBase", number] = PngDistBase[1, number]
+                Png["lzDistExtraBits", number] = PngDistExtra[1, number]
+                Png["decSubState", string] = "lz_read_dist_extra"
+                return 0
+            }
+
+            local BitsRead = Png["distBitsRead", number]
+            local CurrentCode = Png["distCurrentCode", number]
+            
+            local Bit = pngBit()
+            if (Bit < 0) { Error = "Deflate: EOF in Huffman Dist" return -1 }
+            
+            CurrentCode = CurrentCode || (Bit << BitsRead)
+            BitsRead++
+            
+            local Key = BitsRead + "_" + CurrentCode
+            local DistTable = Png["DynDistanceTable", table]
+            
+            if (DistTable:exists(Key)) {
+                local DIdx = DistTable[Key, number]
+                
+                Png["lzDistBase", number] = PngDistBase[DIdx + 1, number]
+                Png["lzDistExtraBits", number] = PngDistExtra[DIdx + 1, number]
+                Png["decSubState", string] = "lz_read_dist_extra"
+                  
+                Png["distBitsRead", number] = 0
+                Png["distCurrentCode", number] = 0
+                return 0
+            }
+             
+            Png["distBitsRead", number] = BitsRead
+            Png["distCurrentCode", number] = CurrentCode
+        }
+        return 0
+    }
+    
+    # 11 LZ77
+    if (SubState == "lz_read_dist_extra") {
+        
+        if (!Png["lzInCopyActive", number]) {
+            local ExtraBits = Png["lzDistExtraBits", number]
+            local ExtraVal = 0
+            if (ExtraBits > 0) {
+                ExtraVal = pngBits(ExtraBits)
+                if (ExtraVal < 0) { Error = "Deflate: EOF in Dist Extra" return -1 }
+            }
+                 
+            Png["lzCalculatedDist", number] = Png["lzDistBase", number] + ExtraVal
+            Png["lzCopyRemains", number] = Png["lzTotalLen", number]
+            Png["lzInCopyActive", number] = 1
+        }
+        
+        local TotalDist = Png["lzCalculatedDist", number]
+        local Remains   = Png["lzCopyRemains", number]
+        local OutLen    = Png["outputLength", number]
+        local OutData   = Png["outputData", table]
+        
+        while (Remains > 0 & perf(90)) {
+            local Byte = OutData[OutLen - TotalDist + 1, number]
+            OutLen++
+            OutData[OutLen, number] = Byte
+            Remains--
+        }
+        
+        Png["outputLength", number] = OutLen
+        Png["outputData", table] = OutData
+        Png["lzCopyRemains", number] = Remains
+        
+        if (Remains == 0) {
+            Png["lzInCopyActive", number] = 0 
+            Png["decSubState", string] = "decode_huffman" 
+        }
+        
+        return 0
+    }        
+    
+    return 0
+}

@@ -1,5 +1,5 @@
 @name Image Accelerator
-@inputs InA Board:wirelink JPGReader:wirelink GIFReader:wirelink
+@inputs InA Board:wirelink JPGReader:wirelink GIFReader:wirelink PNGReader:wirelink
 @outputs EntID DS:wirelink
 @persist BIOS:entity Device_Name:string
 @persist E2_GPU:entity Init
@@ -33,6 +33,7 @@ function shutdown() {
 
     dsSendDirect("abortImage",JPGReader:entity(),1)
     dsSendDirect("abortImage",GIFReader:entity(),1)
+    dsSendDirect("abortImage",PNGReader:entity(),1)
     DsHandler = ""
     Init = 0
 
@@ -89,6 +90,12 @@ if (dsClk()) {
                 dsSendDirect("imageReaderError",E2_GPU,1)
             } else {
                 dsSendDirect("drawImage", GIFReader:entity(), ImgInfo)
+            }
+        } elseif (Type=="png") {
+            if (PNGReader == nowirelink()) {
+                dsSendDirect("imageReaderError",E2_GPU,1)
+            } else {
+                dsSendDirect("drawImage", PNGReader:entity(), ImgInfo)
             }
         }
     } elseif (Name=="pci") {
