@@ -74,6 +74,8 @@ if (first() | duped()) {
     
     SizeLimit = PngSizeLimit
     NoKeepAR = PngNoKeepAR
+    
+    DS_Out = DS
 }
 
 event chat(Player:entity, Said:string, Team:number) {
@@ -130,4 +132,8 @@ if (~PngSizeLimit) {
 
 if (~PngNoKeepAR) {
     NoKeepAR = PngNoKeepAR
+}
+
+if (~DS) {
+    DS_Out = DS    
 }

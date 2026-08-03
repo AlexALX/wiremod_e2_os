@@ -1,5 +1,6 @@
 @name Basic Reader
 @inputs LongURL:string FileName:string
+@outputs DS_Out:wirelink ImageProcessor:wirelink
 @persist Funcs:table Command:string
 @strict
 
@@ -7,6 +8,10 @@
     Basic Reader
     Created by AlexALX (c) 2026
 ]#
+
+if (first() | duped()) {
+    ImageProcessor = wirelink()    
+}
 
 event chat(Player:entity, Said:string, Team:number) {
     if (!Command) { exit() }

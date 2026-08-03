@@ -83,6 +83,8 @@ if (first() | duped()) {
     PreviewMode = ProgressivePreview
     SizeLimit = JpgSizeLimit
     NoKeepAR = JpgNoKeepAR
+    
+    DS_Out = DS
 }
 
 event chat(Player:entity, Said:string, Team:number) {
@@ -168,4 +170,8 @@ if (~JpgSizeLimit) {
 
 if (~JpgNoKeepAR) {
     NoKeepAR = JpgNoKeepAR
+}
+
+if (~DS) {
+    DS_Out = DS    
 }

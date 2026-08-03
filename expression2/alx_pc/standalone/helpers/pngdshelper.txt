@@ -71,12 +71,17 @@ PNG Reader Error:
 
 function displayProgress()
 {
-    if (CurrentState=="draw" | CurrentState=="done") {
+    local ProcessorDS = ImageProcessor["DS_Out",wirelink]
+    local IsSameScreen = ProcessorDS==DS
+    
+    if (IsSameScreen & (CurrentState=="draw" | CurrentState=="done")) {
         dsStopQueues()
         return
     }
+    
+    local IsLastUpdate = (!Processing & CurrentState=="done")
      
-    if (BlockDraw) {
+    if (BlockDraw & !IsLastUpdate) {
         return
     }
     
@@ -88,7 +93,7 @@ function displayProgress()
     local Drew = Progress["progressDrew",number]
     
     # if DS drew preview
-    if (Drew) {
+    if (IsSameScreen & Drew) {
         return    
     }
     
@@ -98,7 +103,12 @@ function displayProgress()
     
     dsDrawCachedText(2, 4 * FontLine, Step + " / "+Progress["stepTotal",number])
     dsDrawCachedText(2, 7 * FontLine, CurrentTask)
-    dsDrawCachedText(2, 10 * FontLine, Current + " / " + Max + " ("+Perc+"%)")
+    
+    local Txt = Current + " / " + Max + " ("+Perc+"%)"
+    if (IsLastUpdate) {
+        Txt = "100%"
+    }
+    dsDrawCachedText(2, 10 * FontLine, Txt)
 }
 
 function displayMode() {
@@ -141,7 +151,7 @@ event input(InputName:string) {
         displayProgressStart()
     } elseif (InputName=="Error" & Error) {
         displayError(Error)    
-    } elseif (InputName == "Progress" & Processing) {
+    } elseif (InputName == "Progress") {
         displayProgress()
     } elseif (InputName == "Warning" & Warning) {
         displayWarning(Warning)           

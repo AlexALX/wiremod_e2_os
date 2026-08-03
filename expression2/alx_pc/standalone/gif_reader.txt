@@ -100,6 +100,8 @@ if (first() | duped()) {
     MinDelay = GifMinDelay
     SizeLimit = GifSizeLimit
     NoKeepAR = GifNoKeepAR
+    
+    DS_Out = DS
 }
 
 function gifNextCommand() {
@@ -229,4 +231,8 @@ if (~GifNoKeepAR) {
 
 if (~NextFrame & NextFrame) {
     gifNextCommand()
+}
+
+if (~DS) {
+    DS_Out = DS    
 }

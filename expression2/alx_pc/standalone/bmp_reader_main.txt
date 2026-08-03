@@ -312,7 +312,8 @@ function alxos_bmp_draw() {
                 BmpData["MULTI_INIT",number] = 2
             }
             if (!ChildE2s) {
-                print(_HUD_PRINTTALK,"FATAL ERROR: no child e2 spawned.") 
+                Error = "FATAL ERROR: no child e2 spawned."
+                print(_HUD_PRINTTALK,Error) 
             } else {
                 #local Lines = (Width > Height ? Width : Height)
                 local SubLines = ceil(Height / ChildE2s)
@@ -421,6 +422,8 @@ if (first()|duped()) {
     NoKeepAR = BMP_NoKeepAR # 0 - keep asset ratio, 1 - scale to screen size
     Percent = 0
     MaxThreads = 0 # maximum threads, 0 - unlimited (may crash)
+    
+    DS_Out = DigitalScreen
 
 }
 
@@ -454,6 +457,10 @@ event chat(Player:entity, Said:string, Team:number) {
 
 if (~BMP_NoKeepAR) {
     NoKeepAR = BMP_NoKeepAR
+}
+
+if (~DigitalScreen) {
+    DS_Out = DigitalScreen    
 }
 
 if (clk("bmp")) {

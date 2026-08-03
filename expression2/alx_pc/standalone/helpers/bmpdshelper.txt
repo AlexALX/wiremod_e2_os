@@ -1,6 +1,6 @@
 @name BMP Helper for DS
-@persist Header:string 
-@inputs Error:string
+@persist Header:string Inited:number
+@inputs Error:string Percent:number
 @strict
 
 #include "alx_pc/standalone/helpers/_shared_"
@@ -43,6 +43,8 @@ http://yoursv/img2bmp.php?http://url/img.jpg
 "
 
     dsDrawTextStart(2, 0, Text)
+    
+    Inited = 0
 }
 
 function displayError(Msg:string) {
@@ -56,6 +58,61 @@ BMP Reader Error:
 "
 
     dsDrawTextStart(2, 0, Text)
+    
+    Inited = 0
+}
+
+function displayProgressStart() {
+    local ProcessorDS = ImageProcessor["DS_Out",wirelink]
+    local IsSameScreen = ProcessorDS==DS
+    
+    if (IsSameScreen) {
+        return
+    }
+    
+    local Threads = ImageProcessor["Threads",number]
+    
+    displayInit()
+    
+    displayBlockDraw(0.5)
+    
+    local Text = Header+
+"
+Step:
+1 / 1
+
+Current task:
+Drawing Image ("+Threads+" Thread"+(Threads>1 ? "s" : "")+")
+
+Progress:
+
+"
+    
+    dsDrawTextStart(2, 0, Text)
+    
+    Inited = 1
+}
+
+function displayProgress()
+{ 
+    if (!Inited & Percent>0) { 
+        displayProgressStart()
+        return
+    }
+    
+    if (Percent>=100) {
+        Inited = 0
+    }
+    
+    if (BlockDraw & Percent<100) {
+        return
+    }
+    
+    local FontLine = DsFontHeight + DsFontSpacing
+    
+    displayBlockDraw(0.5)
+
+    dsDrawCachedText(2, 10 * FontLine, Percent+"%")
 }
 
 function displayMode() {
@@ -81,5 +138,7 @@ event input(InputName:string) {
         displayMode()
     } elseif (InputName=="Error" & Error) {
         displayError(Error)    
+    } elseif (InputName=="Percent") {
+        displayProgress()    
     }
 }

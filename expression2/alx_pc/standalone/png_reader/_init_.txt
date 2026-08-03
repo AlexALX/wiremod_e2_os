@@ -97,7 +97,9 @@ function pngDone() {
     }
     
     # clear memory
-    pngClear()
+    timer(0.001, function() {
+        pngClear()
+    })
 }
 
 function number pngInitTablesStep()

@@ -159,7 +159,9 @@ function gifDone() {
     }
     
     # clear memory
-    gifClear()
+    timer(0.001, function() {
+        gifClear()
+    })
 }
 
 function gifDoneLoop() {
