@@ -47,6 +47,7 @@ Main features:
 * Switch/router network system, also with laser transferer and two-way radio devices.
 * Basic **GFX lib** for draw text on Digital Screen.
 * Standalone BMP, JPG, GIF, PNG Readers and Midi Player.
+* Standalone [Starfall](https://steamcommunity.com/sharedfiles/filedetails/?id=3412004213) BMP Reader.
 * And some other features and devices!
 
 Also includes PHP version of WM1 File System.
