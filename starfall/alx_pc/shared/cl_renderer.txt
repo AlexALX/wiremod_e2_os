@@ -1,0 +1,213 @@
+--@name Renderer
+--@author AlexALX
+--@client
+
+local Renderer = {}
+
+Renderer.RT_NAME = "alx_pc_image"
+
+function Renderer.Init(w,h,isMaterialRender)
+    Renderer.queue = {}
+    
+    Renderer.Dirty = false
+    Renderer.MaterialRender = materialRender
+    
+    if not materialRender then
+        local scale = math.min(
+            1024 / w,
+            1024 / h,
+            1
+        )
+    
+        Renderer.scale = scale
+    
+        Renderer.w = w
+        Renderer.h = h
+        
+        Renderer.u = Renderer.w / 1024
+        Renderer.v = Renderer.h / 1024
+        
+        if not render.renderTargetExists(Renderer.RT_NAME) then
+            render.createRenderTarget(Renderer.RT_NAME)
+        end
+        
+        Renderer.Mat = material.create("UnlitGeneric")
+        Renderer.Mat:setTextureRenderTarget("$basetexture", Renderer.RT_NAME)
+    else
+        Renderer.w = w
+        Renderer.h = h
+    end
+    
+    if not materialRender then
+        Renderer.clear = true
+        hook.add("renderoffscreen", "cl_renderer", Renderer.Update)
+    end
+    hook.add("render", "cl_renderer", Renderer.Think)
+    
+    hook.remove("render", "cl_renderer_helper") 
+    
+    Renderer.CalculateDrawSize()
+end
+
+function Renderer.materialRender(Body)
+    Renderer.Mat:setTextureURL(
+        "$basetexture", 
+        Body,
+        function(mat,url,w,h,layout)
+    
+            Renderer.Mat = mat
+    
+            Renderer.w = w
+            Renderer.h = h
+    
+            Renderer.u = w / 1024
+            Renderer.v = h / 1024
+    
+            Renderer.CalculateDrawSize()
+    
+            layout(
+                0,
+                0,
+                w,
+                h,
+                true
+            )
+    
+        end
+    )
+end
+
+function Renderer.CalculateDrawSize()
+
+    local ScreenSize = 512
+
+    if Renderer.NoKeepAR then
+
+        Renderer.drawX = 0
+        Renderer.drawY = 0
+        Renderer.drawW = ScreenSize
+        Renderer.drawH = ScreenSize
+
+    else
+
+        local Scale = math.min(
+            ScreenSize / Renderer.w,
+            ScreenSize / Renderer.h
+        )
+
+        Renderer.drawW = Renderer.w * Scale
+        Renderer.drawH = Renderer.h * Scale
+
+        Renderer.drawX = (ScreenSize - Renderer.drawW) / 2
+        Renderer.drawY = (ScreenSize - Renderer.drawH) / 2
+    end
+end
+
+function Renderer.SetARMode(NoKeepAR)
+    Renderer.NoKeepAR = NoKeepAR    
+end
+
+function Renderer.Flush()
+    Renderer.Dirty = true    
+end
+
+function Renderer.Finish()
+    Renderer.Dirty = true
+    Renderer.isFinish = true
+end
+
+function Renderer.Abort()
+    Renderer.queue = {}
+    Renderer.Dirty = false
+    Renderer.isFinish = false
+    hook.remove("renderoffscreen", "cl_renderer")
+end
+
+function Renderer.FinishRender()
+    Renderer.queue = {}
+    hook.remove("renderoffscreen", "cl_renderer")
+    Renderer.isFinish = false
+    Renderer.Dirty = false
+end
+
+function Renderer.setPixel(x,y,r,g,b,a)    
+    Renderer.queue[#Renderer.queue + 1] = {
+        x = x,
+        y = y,
+        r = r,
+        g = g,
+        b = b,
+        a = a or 255
+    }
+end
+
+function Renderer.Update()
+    if not Renderer.Dirty then return end
+
+    render.selectRenderTarget(Renderer.RT_NAME)
+    
+    if Renderer.clear then
+        Renderer.clear = false
+        
+        render.setViewPort(
+            0,
+            0,
+            1024,
+            1024
+        )
+    
+        render.clear()
+        
+        render.selectRenderTarget(nil)
+        return    
+    end
+    
+    if #Renderer.queue==0 and Renderer.isFinish then
+        Renderer.FinishRender()
+        return  
+    end
+
+    while #Renderer.queue > 0 and quotaUsed()<quotaMax()*0.9 do
+    
+        local p = table.remove(Renderer.queue, 1)
+    
+        render.setViewPort(
+            p.x,
+            p.y,
+            1,
+            1
+        )
+    
+        render.clear(Color(
+            p.r,
+            p.g,
+            p.b,
+            p.a
+        ))
+    
+    end
+
+    render.selectRenderTarget(nil)
+end
+
+function Renderer.Think()    
+    if not Renderer.Mat then return end
+    
+    render.setMaterial(Renderer.Mat)
+
+    render.drawTexturedRectUV(
+        Renderer.drawX,
+        Renderer.drawY,
+        Renderer.drawW,
+        Renderer.drawH,
+        0,
+        0,
+        Renderer.u,
+        Renderer.v
+    )
+    
+    render.selectRenderTarget()
+
+end
+
+return Renderer

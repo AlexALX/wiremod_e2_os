@@ -1,0 +1,192 @@
+--@name BMP Parser
+--@author AlexALX
+--@client
+--@owneronly
+
+function BMP.bmpParseFileHeader()
+    local File = BMP.file
+
+    local Signature1 = File:readByte()
+    local Signature2 = File:readByte()
+
+    if Signature1 ~= 0x42 or Signature2 ~= 0x4D then
+        BMP.error = "Invalid BMP signature"
+        BMP.finished = true
+        return 0
+    end
+
+    BMP.fileSize = File:readULong()
+
+    BMP.reserved1 = File:readUShort()
+    BMP.reserved2 = File:readUShort()
+
+    BMP.pixelOffset = File:readULong()
+
+    BMP.setState(1)
+
+    return 1
+end
+
+function BMP.buildMask(mask)
+    if not mask or mask == 0 then
+        return nil
+    end
+
+    local shift = 0
+
+    while bit.band(mask, 1) == 0 do
+        mask = bit.rshift(mask, 1)
+        shift = shift + 1
+    end
+
+    local bits = 0
+    local m = mask
+
+    while bit.band(m,1) == 1 do
+        bits = bits + 1
+        m = bit.rshift(m,1)
+    end
+
+    return {
+        mask = bit.lshift(mask, shift),
+        shift = shift,
+        max = bit.lshift(1,bits)-1
+    }
+end
+
+function BMP.bmpParseInfoHeader()
+    local File = BMP.file
+
+    BMP.headerSize = File:readULong()
+
+    if BMP.headerSize != 12 then
+        BMP.width = File:readLong()
+        BMP.height = File:readLong()
+        BMP.planes = File:readUShort()
+        BMP.bitsPerPixel = File:readUShort()
+        
+        BMP.compression = File:readULong()
+        BMP.imageSize = File:readULong()
+    
+        File:skip(16)
+        BMP.paletteEntrySize = 4
+        
+    elseif BMP.headerSize == 12 then
+        BMP.width = File:readUShort()
+        BMP.height = File:readUShort()
+        BMP.planes = File:readUShort()
+        BMP.bitsPerPixel = File:readUShort()
+        BMP.compression = 0
+        BMP.imageSize = 0
+        BMP.paletteEntrySize = 3
+    else
+        BMP.error = "Unsupported BMP header"
+        BMP.finished = true
+        return true
+    end    
+    
+    BMP.redMask   = nil
+    BMP.greenMask = nil
+    BMP.blueMask  = nil
+    BMP.alphaMask = nil
+    
+    if BMP.compression == 3 then -- BI_BITFIELDS
+        BMP.redMask   = File:readULong()
+        BMP.greenMask = File:readULong()
+        BMP.blueMask  = File:readULong()
+    
+        --   >= V3,   alpha
+        if BMP.headerSize >= 56 then
+            BMP.alphaMask = File:readULong()
+        end
+        
+        BMP.rField = BMP.buildMask(BMP.redMask)
+        BMP.gField = BMP.buildMask(BMP.greenMask)
+        BMP.bField = BMP.buildMask(BMP.blueMask)
+        BMP.aField = BMP.buildMask(BMP.alphaMask)
+    end
+
+    BMP.bitfields = (BMP.compression == 3)
+    
+    BMP.topDown = BMP.height < 0
+    
+    if BMP.topDown then
+        BMP.height = -BMP.height
+    end
+    
+    if BMP.bitsPerPixel == 8 then
+        BMP.readPixel = BMP.readPixel8
+    elseif BMP.bitsPerPixel == 24 then
+        BMP.readPixel = BMP.readPixel24
+    elseif BMP.bitsPerPixel == 32 then
+        BMP.readPixel = BMP.readPixel32
+    elseif BMP.bitsPerPixel == 16 then
+        BMP.readPixel = BMP.readPixel16
+    elseif BMP.bitsPerPixel == 4 then
+        BMP.readPixel = BMP.readPixel4
+    elseif BMP.bitsPerPixel == 2 then
+        BMP.readPixel = BMP.readPixel2
+    elseif BMP.bitsPerPixel == 1 then
+        BMP.readPixel = BMP.readPixel1
+    else
+        BMP.error = "Unsupported bits per pixel - "..BMP.bitsPerPixel
+        BMP.finished = true
+        return true
+    end
+        
+    print("BMP Detected")
+
+    BMP.rowBytes = math.ceil(BMP.width * BMP.bitsPerPixel / 8)
+    BMP.rowSize = math.floor(
+        (BMP.bitsPerPixel * BMP.width + 31) / 32
+    ) * 4
+
+    if BMP.UrlMaterial then
+        local Pos = File:tell()
+        
+        if BMP.loadViaMaterialURL()==true then
+            return    
+        end
+        
+        -- Fallback
+        File:seek(Pos)
+    end
+
+    BMP.setState(2)
+end
+
+function BMP.bmpParsePalette()
+
+    local File = BMP.file
+
+    local count
+    
+    if BMP.bitsPerPixel <= 8 then
+        count = bit.lshift(1, BMP.bitsPerPixel)
+    else
+        count = 0
+    end
+
+    BMP.palette = {}
+
+    for i = 0, count - 1 do
+
+        local b = File:readByte()
+        local g = File:readByte()
+        local r = File:readByte()
+
+        if BMP.paletteEntrySize==4 then
+            File:readByte() -- reserved
+        end
+
+        BMP.palette[i] = {
+            r = r,
+            g = g,
+            b = b
+        }
+
+    end
+
+    BMP.setState(3)
+
+end

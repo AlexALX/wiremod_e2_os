@@ -1,0 +1,150 @@
+--@name Network for Renderer
+--@author AlexALX
+--@shared
+--@include https://raw.githubusercontent.com/Jacbo1/Public-Starfall/main/SafeNet/safeNet.lua as SafeNet
+--@include alx_pc/shared/cl_renderer.txt
+
+SafeNet = require("SafeNet")
+
+if SERVER then
+
+    SafeNet.receive("image_render_init", function()
+        SafeNet.cancelAll()
+            
+        SafeNet.start("image_render_init")
+        SafeNet.writeUInt(SafeNet.readUInt(16),16)
+        SafeNet.writeUInt(SafeNet.readUInt(16),16)
+        SafeNet.writeBool(SafeNet.readBool())
+        SafeNet.writeBool(SafeNet.readBool())
+        SafeNet.writeBool(SafeNet.readBool())
+        SafeNet.writeBool(SafeNet.readBool())
+        SafeNet.send()
+    end)
+    
+    SafeNet.receive("image_render_armode", function()
+        local NoKeepAR = SafeNet.readBool()
+    
+        SafeNet.start("image_render_armode")
+        SafeNet.writeBool(NoKeepAR)
+        SafeNet.send()
+    end)
+    
+    SafeNet.receive("image_render_armode", function()
+        local NoKeepAR = SafeNet.readBool()
+    
+        SafeNet.start("image_render_armode")
+        SafeNet.writeBool(NoKeepAR)
+        SafeNet.send()
+    end)
+    
+    SafeNet.receive("image_render_flush", function()        
+        SafeNet.readStream(function(data)
+            SafeNet.start("image_render_flush")
+            SafeNet.writeStream(data)        
+            SafeNet.send()
+        end)        
+    end)
+    
+    SafeNet.receive("image_render_finish", function()
+        SafeNet.start("image_render_finish")
+        SafeNet.send()
+    end)
+    
+    SafeNet.receive("image_render_abort", function()        
+        SafeNet.start("image_render_abort")
+        SafeNet.send()
+    end)
+
+else
+    
+    local NetworkRenderer = {
+        sequential = false,
+        TopDown = false,
+        hasAlpha = false, 
+        width = 0,
+        height = 0,  
+        x = 0,
+        y = 0 
+    }
+
+    local Renderer = require("alx_pc/shared/cl_renderer.txt")
+    
+    SafeNet.receive("image_render_init", function()
+        NetworkRenderer.width = SafeNet.readUInt(16)
+        NetworkRenderer.height = SafeNet.readUInt(16)
+        local isMaterialRender = SafeNet.readBool()
+        NetworkRenderer.sequential = SafeNet.readBool()
+        NetworkRenderer.TopDown = SafeNet.readBool()
+        NetworkRenderer.hasAlpha = SafeNet.readBool()
+        
+        NetworkRenderer.x = 0
+        NetworkRenderer.y = 0
+        
+        if not NetworkRenderer.TopDown then
+            NetworkRenderer.y = NetworkRenderer.height    
+        end
+        
+        Renderer.Init(NetworkRenderer.width, NetworkRenderer.height,isMaterialRender)    
+    end)
+    
+    SafeNet.receive("image_render_armode", function()
+        local NoKeepAR = SafeNet.readBool()
+        Renderer.SetARMode(NoKeepAR)
+    end)
+    
+    SafeNet.receive("image_render_flush", function()
+        SafeNet.readStream(function(data)        
+            local Stream = bit.stringstream(bit.decompress(data))
+            
+            try(function()
+                
+                local QueueCount = Stream:readUInt16()
+                
+                local x, y, a = NetworkRenderer.x,NetworkRenderer.y,255
+
+                for I=1,QueueCount do
+                    if not NetworkRenderer.sequential then
+                        x = Stream:readUInt16()
+                        y = Stream:readUInt16()
+                    end
+                
+                    local r = Stream:readUInt8()
+                    local g = Stream:readUInt8()
+                    local b = Stream:readUInt8()
+                    if NetworkRenderer.hasAlpha then
+                        a = Stream:readUInt8()
+                    end
+
+                    Renderer.setPixel(x,y,r,g,b,a)
+                    
+                    if NetworkRenderer.sequential then 
+                        x = x+1
+                        if x>=NetworkRenderer.width then
+                            if not NetworkRenderer.TopDown then
+                                y = y-1
+                            else
+                                y = y+1
+                            end
+                            x = 0 
+                        end    
+                    end
+                end
+                
+                NetworkRenderer.x = x
+                NetworkRenderer.y = y
+                
+                Renderer.Flush()
+            end)
+            
+        end)
+    end)
+    
+    SafeNet.receive("image_render_finish", function()
+        Renderer.Finish()
+    end)
+    
+    SafeNet.receive("image_render_abort", function()
+        Renderer.Abort()
+    end)
+    
+end

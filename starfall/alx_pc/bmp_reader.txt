@@ -1,0 +1,166 @@
+--@name BMP Reader
+--@author AlexALX
+--@shared
+--@include alx_pc/shared/networkrenderer/network.txt
+--@include alx_pc/bmp_reader/_init_.txt
+--@include alx_pc/shared/networkrenderer/cl_renderer.txt
+--@include alx_pc/shared/cl_basicreader.txt
+
+/*
+    BMP Reader - Starfall Edition
+    Created by AlexALX (c) 2026
+    -------------------
+    BMP Parser, specifications:
+    - Max resolution is up to 1024x1024 (RT limitation), will be resized if higher
+    - Support most common uncompressed bmp files (32/24/8/4 bits and monochrome, including RGB444/RGB555/RGB565)
+    - Support "flip row order" function
+    - Extremelly slow due to default 5KB per second net limit in starfall
+    NOTE: You can change sf_net_burstrate AND sf_net_burstrate_cl to higher values to make it work faster.
+    
+    Usage:
+    - Spawn one this chip
+    - Connect this it to Starfall Screen (right click)
+    
+    Chat commands:
+    !bmp http://url_with_bmp_file - open bmp file
+    !bmpfile filename.bmp - open bmp file from a garrysmod/data/sf_filedata/ folder
+    !bmpabort - abort rendering
+    !bmpkeepar - set image Aspect Ratio mode (0 or 1) 
+    
+    If you have own web server with PHP, then you can place 
+    img2bmp.php from https://github.com/AlexALX/wiremod_e2_os/blob/master/php/img2bmp.php
+    and then use it to convert any image to BMP (with auto resize) in url:
+    http://path_to_file/img2bmp.php?http://any_image_path/image.jpg
+    
+    ---------
+    
+    There are also disabled materialRender but it mostly works only if download file on every client, then parse.
+    Architecture of this chip are different than others:
+    - It get local file or file via http request only on owner client machine.
+    - Parsing are done on owner machine.
+    - Send RGB to server.
+    - All players receive RGB.
+    - Render on screen via network.
+    
+    This allows to render regardless of sf_render_maxdatamaterialsize variable and load BMP of any size.
+    
+*/
+
+dofile("alx_pc/shared/networkrenderer/network.txt")
+
+if CLIENT then
+    
+    if OWNER then
+
+    local BMPReader = require("alx_pc/bmp_reader/_init_.txt")
+    local Renderer = require("alx_pc/shared/networkrenderer/cl_renderer.txt")
+    local Reader = require("alx_pc/shared/cl_basicreader.txt")
+    
+    local KeepAR = true
+    
+    Reader.Command = "!bmp"
+    
+    function Reader.onLoad(StorageFile, Url)               
+        BMPReader.bmpInit(StorageFile, Renderer, not KeepAR)
+    end
+    
+    function Reader.onError(Err, Url)
+        print(Err)
+    end
+    
+    function Reader.onAbort()
+        BMPReader.bmpFinish()
+        SafeNet.cancelAll()
+        if BMPReader.Renderer then
+            BMPReader.Renderer.Abort()
+        end
+        print("BMP rendering canceled.")    
+    end
+    
+    function Reader.Check()
+        return 1    
+    end
+    
+    Reader.OnChatDef = Reader.onChat
+    function Reader.onChat(Player, Said)
+        if Player!=owner() then return end
+        
+        Reader.OnChatDef(Player,Said)
+        
+        local Find = Said:find(" ")
+        
+        if Find~=nil then
+                    
+            local Cmd = Said:left(Find-1)
+            local Mode = Said:sub(Find+1):lower()
+    
+            if Cmd == Reader.Command.."keepar" then
+                if Mode=="false" or Mode=="0" or Mode=="nokeep" or Mode=="off" then
+                    KeepAR = false
+                    print("Aspect Ratio: DISABLED (Stretch to fit)") 
+                else
+                    KeepAR = true
+                    print("Aspect Ratio: ENABLED (Preserve proportions)") 
+                end
+            end
+        end
+        
+    end
+    
+    Reader.Init()
+    
+    end
+    
+    local HelperFont = render.createFont(
+        "Arial",
+        18,
+        500,
+        true,
+        false,
+        true,
+        false
+    )
+    
+    local HelperText = [[
+BMP Reader - Starfall Edition
+Created by AlexALX (c) 2026
+-------------------
+BMP Parser, specifications:
+- Max resolution is up to 1024x1024 (RT limit) will be resized if higher
+- Support most common uncompressed bmp files. 
+- 32/24/8/4 bits and monochrome
+- including RGB444/RGB555/RGB565
+- Support "flip row order" function
+- Extremelly slow due to default 5KB net limit in starfall
+ NOTE: You can change sf_net_burstrate AND sf_net_burstrate_cl
+
+Usage:
+- Spawn one this chip
+- Connect this it to Starfall Screen (right click)
+Chat commands:
+!bmp http://url_with_bmp_file - open bmp file
+!bmpfile filename.bmp - open bmp file from a 
+garrysmod/data/sf_filedata/ folder
+!bmpabort - abort rendering
+!bmpkeepar - set image Aspect Ratio mode (0 or 1)
+
+If you have own web server with PHP, 
+then you can place img2bmp.php from php dir
+https://github.com/AlexALX/wiremod_e2_os/
+and then use it to convert any image to BMP
+with auto resize in url: http://yoursv/img2bmp.php?http://url/img.jpg
+]]
+    
+    hook.add("render", "cl_renderer_helper", function()
+        render.setColor(Color(255,255,255))
+        render.setFont(HelperFont)
+    
+        render.drawText(
+            0,
+            0,
+            HelperText,
+            align or 0
+        )
+    end)
+
+end

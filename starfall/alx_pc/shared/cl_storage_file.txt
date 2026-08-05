@@ -1,0 +1,97 @@
+--@name Storage File
+--@author AlexALX
+--@client
+--@owneronly
+
+local StorageFile = {}
+StorageFile.__index = StorageFile
+
+function StorageFile.new(fileHandle, path, isTemp)
+    return setmetatable({
+        file = fileHandle,
+        path = path,
+        temp = isTemp,
+        closed = false
+    }, StorageFile)
+end
+
+function StorageFile:close()
+
+    if self.closed then
+        return
+    end
+
+    self.closed = true
+
+    self.file:close()
+
+    if self.temp then
+        file.delete(self.path)
+    end
+end
+
+function StorageFile:read(...)
+    return self.file:read(...)
+end
+
+function StorageFile:seek(...)
+    return self.file:seek(...)
+end
+
+function StorageFile:tell()
+    return self.file:tell()
+end
+
+function StorageFile:size()
+    return self.file:size()
+end
+
+function StorageFile:skip(...)
+    return self.file:skip(...)
+end
+
+function StorageFile:readByte()
+    return self.file:readByte()
+end
+
+function StorageFile:readShort()
+    return self.file:readShort()
+end
+
+function StorageFile:readLong()
+    return self.file:readLong()
+end
+
+function StorageFile:readUShort()
+    return self.file:readUShort()
+end
+
+function StorageFile:readULong()
+    return self.file:readULong()
+end
+
+function StorageFile:readUShortBE()
+    local b1 = self.file:readByte()
+    local b2 = self.file:readByte()
+
+    return b1 * 256 + b2
+end
+
+function StorageFile:readULongBE()
+    local b1 = self.file:readByte()
+    local b2 = self.file:readByte()
+    local b3 = self.file:readByte()
+    local b4 = self.file:readByte()
+
+    return
+        b1 * 16777216 +
+        b2 * 65536 +
+        b3 * 256 +
+        b4
+end
+
+function StorageFile:endOfFile()
+    return self.file:endOfFile()
+end
+
+return StorageFile

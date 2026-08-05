@@ -1,0 +1,86 @@
+--@name Network Renderer
+--@author AlexALX
+--@client
+--@owneronly
+--@include https://raw.githubusercontent.com/Jacbo1/Public-Starfall/main/SafeNet/safeNet.lua as SafeNet
+
+local Renderer = {}
+
+local SafeNet = require("SafeNet")
+
+function Renderer.Init(w,h,isMaterialRender,sequential,alpha)
+    Renderer.queue = {}
+    
+    SafeNet.cancelAll()
+    
+    SafeNet.start("image_render_init")
+    SafeNet.writeUInt(w,16)
+    SafeNet.writeUInt(h,16)
+    SafeNet.writeBool(isMaterialRender)
+    SafeNet.writeBool(sequential and 1 or false)
+    SafeNet.writeBool(sequential!=2)
+    SafeNet.writeBool(alpha and 1 or false)
+    SafeNet.send()
+    Renderer.sequential = sequential and 1 or false
+    Renderer.hasAlpha = alpha and 1 or false
+end
+
+function Renderer.SetARMode(NoKeepAR)
+    SafeNet.start("image_render_armode")
+    SafeNet.writeBool(NoKeepAR and 1 or false)
+    SafeNet.send()
+end
+
+function Renderer.Flush()
+    local Queue = Renderer.queue
+
+    SafeNet.start("image_render_flush")
+    
+    local Stream = SafeNet.stringstream()
+    
+    Stream:writeUInt16(#Queue)
+    
+    for i=1,#Queue do
+        local p = Queue[i]
+        
+        if not Renderer.sequential then
+            Stream:writeUInt16(p.x)
+            Stream:writeUInt16(p.y)
+        end
+            
+        Stream:writeUInt8(p.r)
+        Stream:writeUInt8(p.g)
+        Stream:writeUInt8(p.b)
+        if Renderer.hasAlpha then
+            Stream:writeUInt8(p.a)
+        end
+    end
+    
+    SafeNet.writeStream(bit.compress(Stream:getString()))
+    SafeNet.send()
+    
+    Renderer.queue = {}
+end
+
+function Renderer.Finish()
+    SafeNet.start("image_render_finish")
+    SafeNet.send()
+end
+
+function Renderer.Abort()    
+    SafeNet.start("image_render_abort")
+    SafeNet.send()
+end
+
+function Renderer.setPixel(x,y,r,g,b,a)
+    Renderer.queue[#Renderer.queue + 1] = {
+        x = x,
+        y = y,
+        r = r,
+        g = g,
+        b = b,
+        a = a or 255
+    }
+end
+
+return Renderer

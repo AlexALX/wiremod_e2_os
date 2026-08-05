@@ -1,0 +1,220 @@
+--@name BMP Decoder
+--@author AlexALX
+--@client
+--@owneronly
+
+function BMP.bmpDecodeStep()
+    local File = BMP.file
+    
+    if not BMP.pixelStart then
+
+        File:seek(BMP.pixelOffset)
+
+        BMP.pixelStart = true
+
+        BMP.x = 0
+        BMP.y = 0
+        
+        local scale = math.min(
+            1024 / BMP.width,
+            1024 / BMP.height,
+            1
+        )
+    
+        BMP.scale = scale
+        BMP.lastX = -1
+        BMP.lastY = -1
+        
+        BMP.RenderW = math.floor(BMP.width * BMP.scale)
+        BMP.RenderH = math.floor(BMP.height * BMP.scale) 
+        
+        local sequential = true
+        if not BMP.topDown then
+            sequential = 2
+        end
+        
+        BMP.Renderer.Init(BMP.RenderW, BMP.RenderH, BMP.UrlMaterial, sequential)
+
+    end
+
+    return BMP.readPixel()
+end
+
+function BMP.OutputTransformPixel(x, y)
+    local sx = math.floor(x * BMP.RenderW / BMP.width)
+    local sy = math.floor(y * BMP.RenderH / BMP.height)
+
+    if sx == BMP.lastX and sy == BMP.lastY then
+        return nil
+    end
+
+    BMP.lastX = sx
+    BMP.lastY = sy
+
+    return sx, sy
+end
+
+function BMP.processPixel(r,g,b,a)
+    
+    local DrawY
+    
+    if BMP.topDown then
+        DrawY = BMP.y
+    else
+        DrawY = BMP.height - 1 - BMP.y
+    end
+    
+    local sx, sy = BMP.OutputTransformPixel(BMP.x, DrawY)
+
+    if sx!=nil and BMP.lastFlushedY!=sy then        
+        BMP.Renderer.setPixel(
+            sx,
+            sy,
+            r,
+            g,
+            b,
+            a
+        )
+    end
+
+    BMP.x = BMP.x + 1
+
+    if BMP.x >= BMP.width then
+
+        BMP.x = 0
+        BMP.y = BMP.y + 1
+
+        --  padding
+        local padding = BMP.rowSize - BMP.rowBytes
+
+        if padding > 0 then
+            BMP.file:skip(padding)
+        end
+        
+        BMP.Renderer.Flush()
+        BMP.lastFlushedY = sy
+
+    end
+
+    if BMP.y >= BMP.height then
+        BMP.Renderer.Finish()
+        BMP.finished = true
+        return 1
+    end
+end
+
+function BMP.readPackedPixels(Bits)
+    local File = BMP.file
+
+    local Byte = File:readByte()
+
+    local PixelsPerByte = 8 / Bits
+    local Mask = bit.lshift(1, Bits) - 1
+
+    for i = 0, PixelsPerByte - 1 do
+
+        if BMP.x >= BMP.width then
+            break
+        end
+
+        local Shift = 8 - Bits * (i + 1)
+
+        local Index = bit.band(
+            bit.rshift(Byte, Shift),
+            Mask
+        )
+
+        local Color = BMP.palette[Index]
+        if BMP.processPixel(Color.r, Color.g, Color.b) == 1 then
+            return 1
+        end
+    end
+end
+
+function BMP.unpackField(pixel, field)
+
+    if not field then
+        return 255
+    end
+
+    local v = bit.band(pixel, field.mask)
+    v = bit.rshift(v, field.shift)
+
+    return math.floor(v * 255 / field.max + 0.5)
+end
+
+function BMP.readPixel1()
+    return BMP.readPackedPixels(1)
+end
+
+function BMP.readPixel2()
+    return BMP.readPackedPixels(2)
+end
+
+function BMP.readPixel4()
+    return BMP.readPackedPixels(4)
+end
+
+function BMP.readPixel8()
+    local index = BMP.file:readByte()
+
+    local color = BMP.palette[index]
+
+    if not color then
+        return nil
+    end
+
+    return BMP.processPixel(color.r, color.g, color.b)
+end
+
+function BMP.readPixel16()
+
+    local pixel = BMP.file:readUShort()
+
+    if BMP.compression == 0 then
+        --  BI_RGB = RGB555
+
+        local r = bit.band(bit.rshift(pixel,10),0x1F)
+        local g = bit.band(bit.rshift(pixel,5),0x1F)
+        local b = bit.band(pixel,0x1F)
+
+        r = math.floor(r * 255 / 31 + 0.5)
+        g = math.floor(g * 255 / 31 + 0.5)
+        b = math.floor(b * 255 / 31 + 0.5)
+
+        return BMP.processPixel(r,g,b)
+
+    elseif BMP.compression == 3 then
+
+        local r = BMP.unpackField(pixel, BMP.rField)
+        local g = BMP.unpackField(pixel, BMP.gField)
+        local b = BMP.unpackField(pixel, BMP.bField)
+        local a = BMP.unpackField(pixel, BMP.aField)
+
+        return BMP.processPixel(r,g,b,a)
+
+    else
+        print("Unsupported 16-bit compression")
+    end
+end
+
+function BMP.readPixel24()
+    local file = BMP.file
+
+    local b = file:readByte()
+    local g = file:readByte()
+    local r = file:readByte()
+
+    return BMP.processPixel(r, g, b)
+end
+
+function BMP.readPixel32()
+    local file = BMP.file
+
+    local b = file:readByte()
+    local g = file:readByte()
+    local r = file:readByte()
+    local a = file:readByte()
+
+    return BMP.processPixel(r, g, b, a)
+end

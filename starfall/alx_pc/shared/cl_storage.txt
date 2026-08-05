@@ -1,0 +1,56 @@
+--@name Storage API
+--@author AlexALX
+--@client
+--@owneronly
+--@include alx_pc/shared/cl_storage_file.txt
+
+Storage = Storage or {}
+
+local StorageFile = require("alx_pc/shared/cl_storage_file.txt")
+
+function Storage.openFile(path, callback)
+    if !file.exists(path) then
+        callback(false, nil, "File does not exists")
+        return
+    end
+    
+    local fileHandle = file.open(path, "rb")
+
+    if not fileHandle then
+        callback(false, nil, "Failed to open file")
+        return
+    end
+
+    callback(true, StorageFile.new(fileHandle, path, false))
+end
+
+function Storage.openHttp(url, callback)
+    
+    if !file.isDir("temp") then
+        file.createDir("temp")
+    end
+    
+    http.get(url, function(body)
+        
+        -- Clear memory
+        local tempPath = "temp/bmp.dat"
+        file.write(tempPath,body)
+        body = nil
+        local fileHandle = file.open(tempPath, "rb")
+
+        if not fileHandle then
+            file.delete(tempPath)
+
+            callback(false, nil, "Failed to open temporary file")
+            return
+        end
+
+        callback(true, StorageFile.new(fileHandle, tempPath, true))
+
+    end,
+    function(err)    
+        callback(false, nil, err)
+    end)
+end
+
+return Storage

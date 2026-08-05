@@ -1,0 +1,63 @@
+--@name Basic Reader
+--@author AlexALX
+--@client
+--@owneronly
+--@include alx_pc/shared/cl_storage.txt
+
+local Storage = require("alx_pc/shared/cl_storage.txt")
+
+Reader = Reader or {}
+
+Reader.Command = nil
+
+Reader.onLoad = nil
+Reader.onError = nil
+Reader.onAbort = nil
+Reader.onCheck = nil
+
+function Reader.Init()
+    hook.add("PlayerChat","reader_chat",Reader.onChat)
+end
+
+function Reader.onChat(Player, Said)
+    if Player!=owner() then return end
+    
+    local Find = Said:find(" ")   
+    
+    if Find~=nil then
+                
+        local Cmd = Said:left(Find-1)
+        local Url = Said:sub(Find+1)
+        
+        local Command = Reader.Command
+
+        if Cmd==Command.."abort" or Cmd == Command and Url == "abort" then          
+            Reader.onAbort()
+        elseif Cmd == Command then
+            if !Reader.Check() then return end
+            
+            Storage.openHttp(Url, function(Success,File,Err) 
+                if Success==false then
+                    Reader.onError(Err,Url)
+                    return    
+                end
+                Reader.onLoad(File,Url)    
+            end)
+        elseif Cmd == Command.."file" then
+            if !Reader.Check() then return end
+            
+            Storage.openFile(Url, function(Success,File,Err)                         
+                if Success==false then
+                    Reader.onError(Err,Url)
+                    return    
+                end
+                Reader.onLoad(File,Url)    
+            end)
+        end
+    elseif Said==Reader.Command.."abort" then
+        Reader.onAbort()
+    end
+    
+end
+
+return Reader

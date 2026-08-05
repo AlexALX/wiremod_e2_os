@@ -1,0 +1,103 @@
+--@name BMP Main Script
+--@author AlexALX
+--@client
+--@owneronly
+--@includedir alx_pc/bmp_reader
+
+BMP = BMP or {}
+
+dofile("alx_pc/bmp_reader/parser.txt")
+dofile("alx_pc/bmp_reader/decoder.txt")
+
+function BMP.bmpInit(StorageFile, Renderer, NoKeepAR)
+
+    BMP.file = StorageFile
+
+    BMP.setState(0)
+
+    BMP.width = 0
+    BMP.height = 0
+
+    BMP.finished = false
+    BMP.error = nil
+    
+    BMP.Renderer = Renderer
+    Renderer.SetARMode(NoKeepAR)
+    
+    BMP.UrlMaterial = false
+    BMP.pixelStart = false
+
+    hook.add("think", "bmp_reader_step", BMP.bmpThink)
+    
+    BMP.Renderer.Abort()
+
+end
+
+function BMP.Error(Error)
+    print(Error)
+end
+
+function BMP.loadViaMaterialURL()
+    local File = BMP.file
+
+    File:seek(0)
+
+    local Data = File:read(File:size())
+    local Base64 = http.base64Encode(Data)
+
+    local Body = "data:image/bmp;base64," .. Base64
+
+    BMP.Renderer.init(BMP.width, BMP.height, true)    
+    try(function()
+        BMP.Renderer.materialRender(Body)      
+    end, function(Err)
+        BMP.finished = true        
+        BMP.error = Err.message
+    end)    
+    
+    return true
+end
+
+BMP.states = {
+    [0] = BMP.bmpParseFileHeader,
+    [1] = BMP.bmpParseInfoHeader,
+    [2] = BMP.bmpParsePalette,
+    [3] = BMP.bmpDecodeStep
+}
+
+function BMP.setState(state)
+
+    BMP.state = state
+    BMP.stateFunc = BMP.states[state]
+
+end
+
+function BMP.bmpThink()
+
+    if not BMP.file or BMP.finished then
+        BMP.bmpFinish()
+        return
+    end
+    
+    while quotaUsed() < quotaMax() * 0.9 do
+        local Result = BMP.stateFunc()
+        if Result then
+            break    
+        end
+    end
+    
+end
+
+function BMP.bmpFinish()
+    BMP.finished = true
+    hook.remove("think", "bmp_reader_step")
+    if BMP.file then
+        BMP.file:close()
+    end
+    
+    if BMP.error then
+        BMP.Error(BMP.error)    
+    end
+end
+
+return BMP
