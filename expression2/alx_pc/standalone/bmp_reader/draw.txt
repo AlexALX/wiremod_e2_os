@@ -1,0 +1,195 @@
+#include "alx_pc/standalone/bmp_reader/_shared_"
+#include "alx_pc/standalone/bmp_reader/reader"
+
+function bmpDrawInit() {
+    BmpData["drawInit",number] = 1
+    bmpDsInit()
+    
+    BmpPercent = 0
+    BmpCurrentStep = "draw"
+    BmpCurrentStepText = "Drawing Image"
+    BmpStep = 3
+}
+
+function bmpDraw() {
+    local FullData = BmpData["data",string]
+    local DS = BmpData["DS",wirelink]
+    local Size = BmpData[5,number]
+
+    local X = BmpData[6,number]
+    local Y = BmpData[7,number]
+    local I = BmpData[8,number]
+
+    local Width = BmpData[3,number]
+    local Height = BmpData[4,number]
+
+    local SI = BmpData[9,number]
+
+    local Bytes = BmpData[10,number]
+    local Data = FullData:sub(I,I+Bytes-1)
+
+    local Max = Data:length()
+    local YY = BmpData["Y",number]
+
+    BmpPercent = round(YY/BmpData["max",number]*100,2)
+    
+    local BitCount = BmpData[26,number]
+    local RCol = BmpData[24,number]
+
+    local II = BmpData[21,number]
+
+    local RS = BmpData[14,number]
+    local GS = BmpData[15,number]
+    local BS = BmpData[16,number]
+    local RL = BmpData[17,number]
+    local GL = BmpData[18,number]
+    local BL = BmpData[19,number]
+    local FY = BmpData[20,number]
+
+    local LI = BmpData[27,number]
+    local CTbl = BmpData[22,table]
+    
+    local Xadd = BmpData[31,number]
+    local Yadd = BmpData[32,number]
+    
+    local Scale = BmpData["globalScale",number]
+    local ScreenWidth = BmpData["screenWidth",number]
+    local ScreenHeight = BmpData["screenHeight",number]
+    
+    local PosMul = BmpData["screenSize", number]
+    local CY = (FY == 1 ? 0 : 1)
+    local LastIndex = BmpData["LastIndex",number]
+    local End = BmpData[12,number]
+
+    while(perf(90)) {
+        if (SI>=Max | Y<CY) {
+            SI = Max
+            break
+        }
+
+        local YF = Y
+        if (FY==-1) {
+            YF = Height-Y
+        }
+        
+        local SX = floor(X / Scale) + Xadd
+        local SY = floor(YF / Scale) + Yadd
+        
+        if (X==0 & SY == BmpData["LastSY",number]) {
+            SI += Width * II
+            SI += BmpData[13,number]
+        
+            Y--
+            YY++
+        
+            continue
+        }
+        
+        BmpData["LastSY",number] = SY
+        
+        local Index = SX + SY * PosMul
+
+        if (BitCount<=4) {
+            local PixelsPerByte = (BitCount == 4 ? 2 : 8)
+            local ByteOffset = floor(X / PixelsPerByte)
+            local Sub = Data:bmpRead_uint8(SI + ByteOffset + 1)
+            local LocalPixelIndex = X % PixelsPerByte
+            local PI = (PixelsPerByte - 1) - LocalPixelIndex
+
+            local IND = (BitCount==4 ? (Sub >> PI*4) && 0xF : (Sub >> PI) && 1 )
+            local RGB = CTbl[IND,vector]
+            
+            if (LastIndex!=Index) {
+                DS[Index] = RGB[1]*65536 + RGB[2]*256 + RGB[3]
+                LastIndex = Index
+            }
+            
+            local NextX = ceil((floor(X / Scale) + 1) * Scale)
+            if (NextX <= X) { 
+                NextX = X + 1 
+            }
+            
+            X = NextX
+
+            if (X>=Width) {            
+                local TotalLineBytes = ceil(Width / PixelsPerByte)
+                SI += TotalLineBytes + BmpData[13,number]
+                X = 0
+                Y--
+                YY++
+                if (SI>=Max | YY>BmpData["max",number] | Y<CY) {
+                    if (YY>BmpData["max",number] | Y<CY) { break }
+                }
+            }
+            continue
+        }
+
+        local Sub = 0
+        if (II==3 | II==4) {
+            Sub = Data:bmpRead_uint24(SI+1)
+        } elseif (II==2) {
+            Sub = Data:bmpRead_uint16(SI+1)
+        } else {
+            Sub = Data:bmpRead_uint8(SI+1)
+        }
+
+        if (II<3) {
+            if (RCol==2) {
+                local RGB = CTbl[Sub,vector]
+                if (LastIndex!=Index) {
+                    DS[Index] = RGB[1]*65536 + RGB[2]*256 + RGB[3]
+                    LastIndex = Index
+                }
+            } else {
+                local R = floor((Sub >> RS) && RL)
+                local G = floor((Sub >> GS) && GL)
+                local B = floor(Sub && BL)
+
+                R *= floor(0xFF/RL)
+                G *= floor(0xFF/GL)
+                B *= floor(0xFF/BL)
+
+                if (LastIndex!=Index) {
+                    DS[Index] = R*65536 + G*256 + B
+                    LastIndex = Index  
+                }
+            }
+        } else {
+            if (LastIndex!=Index) {
+                DS[Index] = Sub
+                LastIndex = Index  
+            }
+        }
+
+        BmpData["LastIndex",number] = LastIndex
+        
+        local NextX = ceil((floor(X / Scale) + 1) * Scale)
+        if (NextX <= X) { 
+            NextX = X + 1 
+        }
+        local StepX = NextX - X
+        X = NextX
+        SI += II * StepX
+
+        if (X>=Width) {
+            YY++
+            SI += BmpData[13,number]
+            X = 0
+            Y--
+        }
+    }
+
+    BmpData[8,number] = I
+    BmpData[9,number] = SI
+    BmpData[6,number] = X
+    BmpData[7,number] = Y
+    BmpData["Y",number] = YY
+    BmpData[12,number] = End
+
+    if (SI>=Max | Y<CY | End==1 | YY>BmpData["max",number]) {
+        return 1
+    }
+
+    BmpData[11,string] = Data    
+    return 0
+}

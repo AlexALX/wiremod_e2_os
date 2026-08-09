@@ -1,6 +1,5 @@
 @name Basic Reader
 @inputs LongURL:string FileName:string
-@outputs DS_Out:wirelink ImageProcessor:wirelink
 @persist Funcs:table Command:string
 @strict
 
@@ -9,8 +8,22 @@
     Created by AlexALX (c) 2026
 ]#
 
-if (first() | duped()) {
-    ImageProcessor = wirelink()    
+#include "alx_pc/standalone/includes/screen"
+
+function number checkScreen(DS:wirelink) {
+    if (DS==nowirelink()) {
+        print(_HUD_PRINTTALK,"Digital Screen is not connected.") 
+        return 0
+    }
+
+    local ScreenName = screenName(DS)
+    
+    if (ScreenName=="") {
+        print(_HUD_PRINTTALK,"Entity what you did connected is not Digital Screen.\n"+
+        "It is located in Wire -> Visuals -> Screens -> Digital Screen.\nThis is NOT EGPv3 screen.") 
+        return 0    
+    }
+    return 1  
 }
 
 event chat(Player:entity, Said:string, Team:number) {

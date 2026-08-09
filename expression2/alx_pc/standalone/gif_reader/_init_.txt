@@ -6,6 +6,7 @@
 #include "alx_pc/standalone/gif_reader/lzw"
 #include "alx_pc/standalone/gif_reader/draw"
 #include "alx_pc/standalone/gif_reader/progress"
+#include "alx_pc/standalone/includes/screen"
 
 function number gifInit(Data:string,AnimateMode:number,SizeLimit:number,NoKeepAR:number,MinDelay:number) {
     Gif = table()
@@ -57,10 +58,8 @@ function number gifInit(Data:string,AnimateMode:number,SizeLimit:number,NoKeepAR
     local Height = gifU16()
     
     local WH = Width > Height ? Width : Height
-
-    local IsQuadScreen = DS:entity():getName()=="Quad Digital Screen"
     
-    local DsMaxLimit = (IsQuadScreen ? 1024 : 512) # DS Limit 
+    local DsMaxLimit = screenSize(DS) # DS Limit 
 
     local GifMaxWidth = DsMaxLimit # DS Limit
     
@@ -90,7 +89,9 @@ function number gifInit(Data:string,AnimateMode:number,SizeLimit:number,NoKeepAR
 
         if (WH>DsMaxLimit & GifMaxWidth==DsMaxLimit) {
             timer(0.001,function() {
-                Warning = "Your image is larger than "+(IsQuadScreen ? "Quad " : "")+"Digital Screen supports\n"+
+                local ScreenName = screenName(DS)
+                
+                Warning = "Your image is larger than "+ScreenName+" supports\n"+
                 "Your image will be resized to: "+ResizedWidth+"x"+ResizedHeight
                 
                 if (!GIFNoPrint) {

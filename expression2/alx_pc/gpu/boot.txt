@@ -121,11 +121,11 @@ function initbios() {
         Status = "Not connected"
     } else { Status = "Connected" }
     
-    local ScreenName = DS:entity():getName()
-    if (ScreenName=="Quad Digital Screen") {
-        Status += " (Quad)"    
+    local ScreenName = gpuScreenShortName(DS)
+    if (ScreenName) {
+        Status += " ("+ScreenName+")"
     }
-    
+
     EGP:egpText(I,"Digital Screen - "+Status,vec2(X,Y))
     EGP:egpSize(I,Sz) I++ Y+=Sz
     

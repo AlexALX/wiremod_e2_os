@@ -46,6 +46,7 @@ Main features:
 * Satellite internet device, what provides access to real internet (http e2 extension) for files downloading.
 * Switch/router network system, also with laser transferer and two-way radio devices.
 * Basic **GFX lib** for draw text on Digital Screen.
+* ZGPU Image Renderer (E2 -> ZASM bridge).
 * Standalone BMP, JPG, GIF, PNG Readers and Midi Player.
 * Standalone [Starfall](https://steamcommunity.com/sharedfiles/filedetails/?id=3412004213) BMP Reader.
 * And some other features and devices!

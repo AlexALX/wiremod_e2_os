@@ -1,0 +1,136 @@
+#include "alx_pc/standalone/bmp_reader/_shared_"
+#include "alx_pc/standalone/bmp_reader/reader"
+
+function string stringFromBytes(Byte, Count) {
+    local Out = ""
+    local CharStr = toChar(Byte)
+    for (I = 1, Count) {
+        Out += CharStr
+    }
+    return Out
+}
+
+function bmp_init_rle() {
+    local Offset = BmpData[29,number]
+    local Width = BmpData[3,number]
+    local BitCount = BmpData[26,number]
+    local Compression = BmpData["compression",number]
+    
+    BmpData["RleComp",number] = Compression
+    BmpData["RleSI",number] = Offset - 1
+    BmpData["RleOffset",number] = Offset
+    BmpData["RleRowBytes",number] = ceil(Width * (BitCount / 8) / 4) * 4
+    BmpData["RleRowData",string] = ""
+    BmpData["RleUncompressed",string] = ""
+    
+    if (!BmpNoPrint) {
+        print("RLE Compressed Image Detected, Decompressing...")
+    }
+    
+    BmpThreads = 1
+    BmpPercent = 0
+    
+    BmpCurrentStep = "rle_decompress"
+    BmpCurrentStepText = "Decompressing RLE"
+    BmpStep = 2    
+}
+
+function number bmp_decompress_rle() {
+    local Data = BmpData["data",string]
+    local Size = BmpData["size",number]
+    local Comp = BmpData["RleComp",number]
+    local RowBytes = BmpData["RleRowBytes",number]
+    
+    local RleSI = BmpData["RleSI",number]
+    local CurrentRowData = BmpData["RleRowData",string]
+    local Uncompressed = BmpData["RleUncompressed",string]
+
+    local RlePct = round(RleSI / Size * 100,2)
+    BmpPercent = RlePct
+
+    while(perf(90)) {
+        if (RleSI >= Size) {
+            break
+        }
+
+        local Count = Data:bmpRead_uint8(RleSI + 1)
+        local Command = Data:bmpRead_uint8(RleSI + 2)
+        RleSI += 2
+
+        if (Count == 0) {
+            if (Command == 0) {
+                local PaddingNeeded = RowBytes - CurrentRowData:length()
+                if (PaddingNeeded > 0) { CurrentRowData += stringFromBytes(0, PaddingNeeded) }
+                Uncompressed += CurrentRowData
+                CurrentRowData = ""
+            } elseif (Command == 1) {
+                RleSI = Size
+                break
+            } elseif (Command == 2) {
+                local DeltaX = Data:bmpRead_uint8(RleSI + 1)
+                local DeltaY = Data:bmpRead_uint8(RleSI + 2)
+                RleSI += 2
+                
+                local DeltaBytes = (Comp == 2 ? ceil(DeltaX / 2) : DeltaX)
+                CurrentRowData += stringFromBytes(0, DeltaBytes)
+            } else {
+                if (Comp == 1) {
+                    CurrentRowData += Data:sub(RleSI + 1, RleSI + Command)
+                    RleSI += Command
+                    if (Command % 2 != 0) { RleSI++ }
+                } else {
+                    local AbsoluteBytes = ceil(Command / 2)
+                    CurrentRowData += Data:sub(RleSI + 1, RleSI + AbsoluteBytes)
+                    RleSI += AbsoluteBytes
+                    if (AbsoluteBytes % 2 != 0) { RleSI++ }
+                }
+            }
+        } else {
+            if (Comp == 1) {
+                CurrentRowData += stringFromBytes(Command, Count)
+            } else {
+                local HighNibble = (Command >> 4) && 0xF
+                local LowNibble = Command && 0xF
+                local PackedByte = (HighNibble << 4) + LowNibble
+                local FullBytes = floor(Count / 2)
+                if (FullBytes > 0) { CurrentRowData += stringFromBytes(PackedByte, FullBytes) }
+                if (Count % 2 != 0) { CurrentRowData += stringFromBytes(HighNibble << 4, 1) }
+            }
+        }
+    }
+
+    BmpData["RleSI",number] = RleSI
+    BmpData["RleRowData",string] = CurrentRowData
+    BmpData["RleUncompressed",string] = Uncompressed
+
+    if (RleSI >= Size) {
+        if (CurrentRowData:length() > 0) {
+            local PaddingNeeded = RowBytes - CurrentRowData:length()
+            if (PaddingNeeded > 0) { CurrentRowData += stringFromBytes(0, PaddingNeeded) }
+            Uncompressed += CurrentRowData
+        }
+        
+        local Offset = BmpData["RleOffset",number]
+        
+        local HeaderBeforeComp = Data:sub(1, 30)
+        local HeaderAfterComp = Data:sub(35, Offset - 1)
+        local ZeroComp = toChar(0) + toChar(0) + toChar(0) + toChar(0)
+        
+        Data = HeaderBeforeComp + ZeroComp + HeaderAfterComp + Uncompressed
+        BmpData["data",string] = Data
+        BmpData["size",number] = Data:length()
+
+        BmpData["RleRowData",string] = ""
+        BmpData["RleUncompressed",string] = ""
+        
+        if (!BmpNoPrint) {
+            print("RLE Decompression Finished Successful!")
+        }
+        
+        BmpPercent = 100
+        
+        return 1
+    }
+    
+    return 0
+}

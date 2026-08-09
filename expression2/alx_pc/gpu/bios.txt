@@ -118,9 +118,9 @@ function bios_init() {
             
             if (!DS:entity():isValid()) { Status = "Not connected" } else { Status = "Connected" }
             
-            local ScreenName = DS:entity():getName()
-            if (ScreenName=="Quad Digital Screen") {
-                Status += " (Quad Digital Screen)"    
+            local ScreenName = gpuScreenName(DS)
+            if (ScreenName) {
+                Status += " ("+ScreenName+")"
             }
             
             EGP:egpText(LAST_I,"Digital Screen - "+Status,vec2(30,Y))

@@ -1,0 +1,30 @@
+@name Screen Func
+
+function string screenName(DS:wirelink) {
+    if (DS:entity():type()=="gmod_wire_digitalscreen") {
+        return "Digital Screen"       
+    }
+    
+    local ScreenName = DS:entity():getName()
+    
+    if (ScreenName=="Quad Digital Screen" | ScreenName=="ZGPU Screen Renderer") {
+        return ScreenName        
+    }
+    
+    return ""
+}
+
+function number screenSize(DS:wirelink) {
+    if (DS:entity():type()=="gmod_wire_digitalscreen") {
+        return 512    
+    }
+
+    local ScreenName = DS:entity():getName()
+    if (ScreenName=="Quad Digital Screen") {
+        return 1024    
+    } elseif (ScreenName=="ZGPU Screen Renderer") {
+        return 512    
+    }
+    
+    return 0
+}

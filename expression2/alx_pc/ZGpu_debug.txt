@@ -1,0 +1,37 @@
+@name ZGPU Debugger
+@inputs ZGPU:wirelink ClearMem MemBus:wirelink
+@outputs ReadPtr WritePtr Width Height
+@persist MemoryFlush PtrAddress
+@trigger none 
+@strict
+
+if (first() | duped()) {
+    PtrAddress = 131072
+}
+
+print("\n\n----")
+for(I=0,128) {
+    print(ZGPU[PtrAddress+I])    
+}
+
+event tick() {
+    if (MemoryFlush>0) {
+        while(perf(90)) {
+            ZGPU[PtrAddress+MemoryFlush] = 0    
+            
+            MemoryFlush--
+            if (MemoryFlush<0) { break } 
+        }
+    }
+    
+    ReadPtr = MemBus[0]
+    WritePtr = ZGPU[PtrAddress]
+    Width = ZGPU[PtrAddress+65]
+    Height = ZGPU[PtrAddress+66]
+}
+
+event input(Name:string) {
+    if (Name=="ClearMem" & ClearMem) {
+        MemoryFlush = 99999
+    }
+}

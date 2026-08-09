@@ -1,0 +1,298 @@
+@name
+
+#include "alx_pc/standalone/bmp_reader/_shared_"
+#include "alx_pc/standalone/bmp_reader/rle"
+#include "alx_pc/standalone/includes/screen"
+
+function number bmpParseHeader() {
+    local Data = BmpData["data",string]
+    local DS = BmpData["DS",wirelink]
+    
+    BmpWarning = ""
+    local Format = Data:sub(1,2)
+    if (Format=="BM") {
+        local SizeLimit = BmpData["SizeLimit",number]
+        local NoKeepAR = BmpData["NoKeepAR",number]
+        
+        BmpData["time",number] = curtime()
+        BmpData["real_time",number] = realtime()
+        local Size = BmpData["size",number]
+        local Offset = Data:bmpRead_uint32(11)+1
+        local HSize = Data:bmpRead_uint32(15)
+        
+        local Width = Data:bmpRead_uint32(19)
+        local Height = Data:bmpRead_uint32(23)
+        
+        local Compression = Data:bmpRead_uint32(31)
+
+        local Colors = Data:bmpRead_uint32(47)
+
+        local BitCount = Data:bmpRead_uint16(29)
+        local ColorsB = 4
+        
+        if (HSize==12) { # OS/2 BMP
+            Width = Data:bmpRead_uint16(19)   
+            Height = Data:bmpRead_uint16(21)  
+            Compression = 0
+            Colors = 0
+            BitCount = Data:bmpRead_uint16(25)  
+            ColorsB = 3    
+        }           
+        BmpData["headerSize",number] = HSize 
+        BmpData[5,number] = ColorsB
+        BmpCurrentStep = ""
+        BmpCurrentStepText = ""
+        BmpStep = 0
+        BmpData["compression",number] = Compression
+        BmpData["hasRLE",number] = (Compression == 1 | Compression == 2)
+        
+        if (Height<0) { # flip row order checkbox
+            BmpData[20,number] = -1
+            Height *= -1
+        } else {
+            BmpData[20,number] = 1
+        }
+        
+        if (Width<1 | Height<1 | Size==0) {
+            BmpError = "Invalid BMP resolution.\nWidth and Height is: "+Width+"x"+Height
+            if (!BmpNoPrint) {
+                print(_HUD_PRINTTALK,BmpError)
+            }
+            return 0
+        }
+        
+        if (Size==0) {
+            BmpError = "Unsupported BMP file.\nInvalid BMP Size."
+            if (!BmpNoPrint) {
+                print(_HUD_PRINTTALK,BmpError)
+            }
+            return 0
+        }
+        
+        if (Compression!=0 & Compression!=1 & Compression!=2 & (Compression!=3 | Compression==3 & BitCount==32)) {
+            BmpError = "Unsupported BMP file.\nCompression: "+Compression+"\nBitCount: "+BitCount
+            if (!BmpNoPrint) {
+                print(_HUD_PRINTTALK,BmpError)
+            }
+            return 0
+        }
+        
+        if (!BmpNoPrint) {
+            print("BMP Image")
+        }
+
+        local WH = Width > Height ? Width : Height
+        local DsMaxLimit = screenSize(DS)
+        local BmpMaxSize = DsMaxLimit 
+        
+        if (SizeLimit>0) {
+            BmpMaxSize = min(DsMaxLimit,SizeLimit)     
+        }
+
+        local ResizedWidth  = Width
+        local ResizedHeight = Height
+
+        if (WH>BmpMaxSize) {
+            local Scale = WH / BmpMaxSize
+            ResizedWidth  = floor(Width / Scale)
+            ResizedHeight = floor(Height / Scale)
+    
+            BmpData["globalScale",number] = Scale
+                            
+            local ScreenName = screenName(DS)
+            
+            if (BmpMaxSize==DsMaxLimit) {
+                BmpWarning = "Your image is larger than "+ScreenName+" supports\n"+
+                "Your image will be resized to: "+ResizedWidth+"x"+ResizedHeight
+                            
+                if (!BmpNoPrint) {
+                    print(BmpWarning)
+                }
+            }
+            
+            #return
+        } else {
+            BmpData["globalScale",number] = 1
+        }
+        BmpData["screenWidth", number] = ResizedWidth
+        BmpData["screenHeight", number] = ResizedHeight
+        BmpData["screenSize",number] = max(ResizedWidth,ResizedHeight)
+        
+        BmpStep = 1
+
+        if (BitCount==24 | BitCount==32) {
+            BmpData[14,number] = 16
+            BmpData[15,number] = 8
+            BmpData[16,number] = 0
+            BmpData[17,number] = 0xFF
+            BmpData[18,number] = 0xFF
+            BmpData[19,number] = 0xFF
+        } elseif (BitCount==16) {
+            if (Compression==0) {
+                BmpData[14,number] = 10
+                BmpData[15,number] = 5
+                BmpData[16,number] = 0
+                BmpData[17,number] = 0x1F
+                BmpData[18,number] = 0x1F
+                BmpData[19,number] = 0x1F
+            } else {
+                local RM = Data:bmpRead_uint32(55)
+                local GM = Data:bmpRead_uint32(59)
+                local BM = Data:bmpRead_uint32(63)
+
+                local RS = bmpTrailingZeros(RM)
+                local GS = bmpTrailingZeros(GM)
+                local BS = bmpTrailingZeros(BM)
+
+                BmpData[14,number] = RS
+                BmpData[15,number] = GS
+                BmpData[16,number] = BS
+                BmpData[17,number] = RM >> RS
+                BmpData[18,number] = GM >> GS
+                BmpData[19,number] = BM >> BS
+            }
+        } else {
+            BmpData[22,table] = table()
+            if (Colors==0) {
+                Colors = 1 << BitCount
+            }
+            BmpData[23,number] = Colors
+            BmpData[24,number] = 1
+            BmpCurrentStep = "read_pallete"
+            BmpCurrentStepText = "Reading Pallete"
+            BmpPercent = 0
+            BmpData[25,number] = 0
+        }
+        BmpData[26,number] = BitCount
+
+        local II = BitCount/8
+        BmpData[21,number] = II
+        BmpData[27,number] = 8/BitCount
+
+        BmpData[3,number] = Width
+        BmpData[4,number] = Height
+        #BmpData[5,number] = Size
+        local FSize = BmpData["size",number]
+        
+        local ResizedWidth = BmpData["screenWidth", number]
+        local ResizedHeight = BmpData["screenHeight", number]
+        
+        if (!NoKeepAR) {            
+            local SWH = (ResizedWidth>ResizedHeight ? ResizedWidth : ResizedHeight)
+            BmpData[31,number] = (ResizedHeight>ResizedWidth ? floor((ResizedHeight-ResizedWidth)/2) : 0 )
+            BmpData[32,number] = (ResizedWidth>ResizedHeight ? floor((ResizedWidth-ResizedHeight)/2) : 0 )
+        } else {
+            BmpData[31,number] = 0
+            BmpData[32,number] = 0
+        }
+
+        BmpData[6,number] = 0
+        BmpData[7,number] = Height-1
+
+        local Bytes = ceil(Width*II/4)*4 # how many bytes we read
+        if (FSize<Bytes) { Bytes = FSize-Offset }
+        BmpData[28,number] = Bytes
+        BmpData[10,number] = Bytes 
+
+        BmpData[9,number] = 0
+        BmpData[8,number] = Offset
+
+        BmpData[13,number] = floor(ceil(Width*II/4)*4-Width*II)
+
+        if (BitCount<=8) {
+            Bytes = (Colors>32 ? 32*ColorsB : Colors*ColorsB)
+            BmpData[10,number] = Bytes 
+            BmpData[29,number] = Offset
+            BmpData[8,number] = 14+HSize+1
+            BmpData[30,number] = 0
+        }
+        
+        return 1
+    } else {
+        BmpError = "This is not valid BMP file."
+        if (!BmpNoPrint) {
+            print(_HUD_PRINTTALK,BmpError)
+        }
+    }
+    
+    return 0
+}
+
+function bmpParsePallete() {
+    local Data = BmpData["data",string]
+    
+    local I = BmpData[8,number]
+    
+    local Width = BmpData[3,number]
+    local Height = BmpData[4,number]
+    
+    local Bytes = BmpData[10,number]
+    local Data = Data:sub(I,I+Bytes-1)
+    
+    local Max = Data:length()
+    
+    #Percent = round(I/BmpData["size",number]*100)
+    
+    local RCol = BmpData[24,number]
+    
+    if (RCol==1) {
+        local SI = BmpData[9,number]
+        
+        local Colors = BmpData[23,number]
+        local CTbl = BmpData[22,table]
+        local CTblI = BmpData[30,number]
+        local ColorsB = BmpData[5,number]
+        
+        BmpPercent = round(CTblI/Colors*100,2)
+        
+        while(perf(90)) {
+            if (CTblI>=Colors) {
+                CTblI = Colors
+                BmpPercent = 100
+                break
+            }
+    
+            local Sub = 0
+            if (ColorsB == 4) { Sub = Data:bmpRead_uint32(SI+1) }
+            else { Sub = Data:bmpRead_uint24(SI+1) }
+            local R = floor((Sub >> 16) && 0xFF)
+            local G = floor((Sub >> 8) && 0xFF)
+            local B = floor(Sub && 0xFF)
+    
+            CTbl[CTblI,vector] = vec(R,G,B)
+            SI+=ColorsB
+            CTblI++
+            if (SI>=Max) {
+                SI = Max
+                break
+            }
+        }
+    
+        if (CTblI==Colors) {
+            BmpData[24,number] = 2
+            BmpData[9,number] = 0
+            BmpData[8,number] = BmpData[29,number]
+        } else {
+            BmpData[30,number] = CTblI
+            if (SI==Max) {
+                local Bytes = BmpData[10,number]
+                local Next = I+Bytes
+                BmpData[8,number] = Next
+                BmpData[9,number] = 0
+            } else {
+                BmpData[9,number] = SI
+                BmpData[11,string] = Data
+            }
+        }    
+        return 0
+    }
+    
+    local Compression = BmpData["compression",number]
+    
+    if (Compression == 1 | Compression == 2) {
+        bmp_init_rle()
+        return 2
+    }
+    
+    return 1
+}

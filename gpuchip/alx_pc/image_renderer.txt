@@ -1,0 +1,261 @@
+// Author: AlexALX
+// ZGPU Image Renderer
+// 
+// Renders any RGB image from E2 
+
+dentrypoint 0,asm_draw;
+dentrypoint 4,asm_async;
+dentrypoint 3,asm_error;
+
+mov #regHWClear,0;
+mov #regAsyncFreq,200000;
+mov #regAsyncClk,1;
+
+DSETBUF_FBO
+dexit
+
+color white,255,255,255,255;
+vec2f pos;  
+
+float x;
+float y;
+
+asm_error:
+dexit;
+
+asm_draw:
+dexit;
+
+int48 ReadPtr;
+int48 WritePtr;
+int48 Opcode;
+
+int48 ScreenWidth;
+mov ScreenWidth,512;
+int48 ScreenHeight;
+mov ScreenHeight,512;
+
+float ScaleWidth;
+float ScaleHeight;
+
+vec2f PixelPos;
+color PixelColor;
+
+int48 Row;
+int48 Width;
+int48 Col;
+
+int48 Addr;
+
+float Left;
+float Right;
+float Top;
+float Bottom;
+
+vec2f RectPos;
+vec2f RectSize;
+
+int48 Init;
+mov Init,0;
+
+#define PTR_ReadAddress 131073
+#define PTR_WriteAddress 131072
+#define DATA_Address 131136
+#define MEM_CMD_SIZE 1044512
+
+vec2f debugpos,10,10;
+string debugString,"Value=%f";
+alloc debugValue;
+
+void DebugPrintInt(int48 Val) {
+    dcolor white;
+    mov #debugValue,Val;
+    dwritefmt debugpos,debugString;
+}
+
+float DArrayStruct[6];
+
+int48 processed;
+
+int48 AsyncThread()
+{
+    /*
+    if (Init==0) {
+        mov #PTR_ReadAddress,0;
+        mov Init,1;    
+    }*/
+    
+    mov ReadPtr,#PTR_ReadAddress;
+    mov WritePtr,#PTR_WriteAddress;
+
+    /*
+    if (WritePtr < ReadPtr) {
+        mov ReadPtr,0;  
+        mov #PTR_ReadAddress,ReadPtr;  
+    }*/
+
+    if(ReadPtr == WritePtr)
+        return;
+        
+    // memory limit reached
+    if (ReadPtr>MEM_CMD_SIZE) {
+        mov ReadPtr,0;    
+    }
+
+    mov Addr,DATA_Address;
+    add Addr,ReadPtr;
+
+    mov Opcode,#Addr;
+    
+    mov processed,0;
+
+    if(Opcode == 1)
+    {
+        add Addr,1;
+        mov ScreenWidth,#Addr;
+
+        add Addr,1;
+        mov ScreenHeight,#Addr;
+        
+        mov ScaleWidth,512;
+        div ScaleWidth,ScreenWidth;
+        
+        mov ScaleHeight,512;
+        div ScaleHeight,ScreenHeight;
+        
+        add ReadPtr,3;
+        mov #PTR_ReadAddress,ReadPtr;
+
+        mov DArrayStruct[1], 1; 
+        mov DArrayStruct[2], ScaleWidth; 
+        mov DArrayStruct[3], ScaleHeight; 
+        mov DArrayStruct[4], 2;  
+
+        mov processed,1;
+        
+    } else if(Opcode == 2) {
+        dclr;
+
+        add ReadPtr,1;
+        mov #PTR_ReadAddress,ReadPtr;
+
+        mov processed,1;
+    } else if(Opcode == 3) {    
+        add Addr,1;
+        mov Row,#Addr;
+    
+        add Addr,1;
+        mov Width,#Addr;
+    
+        add Addr,1;
+    
+        mov DArrayStruct[5],Addr;
+        mov DArrayStruct[0],Width;
+        
+        mov Top,Row;
+        mul Top,ScaleHeight;
+        
+        mov #Pos.x,0;
+        mov #Pos.y,Top;
+        
+        DARRAY Pos,DArrayStruct
+        
+        /* Old Slow Method
+        mov #PixelPos.y,Row;
+        
+        for(X = 0; X < Width; X++)
+        {
+            add Addr,1;
+    
+            mov Col,#Addr;
+            
+            mov #PixelColor.r,Col;
+            div #PixelColor.r,65536;
+            
+            mov #PixelColor.g,Col;
+            div #PixelColor.g,256;
+            mod #PixelColor.g,256;
+            
+            mov #PixelColor.b,Col;
+            mod #PixelColor.b,256;
+    
+            mov #PixelPos.x,X;
+            
+            if (DrawPixel(X,Row)==-1) {
+                return -1;    
+            }
+    
+            //dpixel PixelPos,PixelColor;
+        }*/
+    
+        add ReadPtr,3;
+        add ReadPtr,Width;
+    
+        mov #PTR_ReadAddress,ReadPtr;
+    
+        mov processed,1;
+    } else {
+        /* PACKET LOST!!! */
+    }
+
+    if (processed==0) {
+        add ReadPtr,1;
+    }
+    mov #PTR_ReadAddress,ReadPtr;
+    // this was for sync, but it will never work as you espected
+    //mov #65536,ReadPtr;
+}
+
+/* Old Slow Method
+void DrawPixel(int48 X, int48 Row) {
+    // ScaleWidth, ScaleHeight - float
+    // X - float
+    // Row - int48
+
+    // ---------- X ----------
+    
+    mov Left,X;
+    mul Left,ScaleWidth;
+    FINT Left;
+    
+    mov Right,X;
+    add Right,1;
+    mul Right,ScaleWidth;
+    FINT Right;
+    
+    // ---------- Y ----------
+    
+    mov Top,Row;
+    mul Top,ScaleHeight;
+    FINT Top;
+    
+    mov Bottom,Row;
+    add Bottom,1;
+    mul Bottom,ScaleHeight;
+    FINT Bottom;
+    
+    // ---------- Position ----------
+    
+    mov #RectPos.x,Left;
+    mov #RectPos.y,Top;
+    
+    // ---------- Size ----------
+    
+    mov #RectSize.x,Right;
+    sub #RectSize.x,Left;
+    
+    mov #RectSize.y,Bottom;
+    sub #RectSize.y,Top;
+    
+    // ---------- Draw ----------
+    
+    dcolor PixelColor;
+    drectwh RectPos,RectSize;    
+}
+*/
+
+asm_async:
+    if (AsyncThread()==-1) {
+        dexit;    
+    }
+JMP asm_async

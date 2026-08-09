@@ -1,6 +1,6 @@
 @name GIF Reader By AlexALX
-@inputs AnimateMode:string NextFrame:number GifMinDelay:number GifSizeLimit:number GifNoKeepAR:number
-@persist Animate:number MinDelay:number SizeLimit:number NoKeepAR:number
+@inputs AnimateMode:string NextFrame:number GifMinDelay:number
+@persist Animate:number MinDelay:number
 @strict
 
 #[
@@ -44,13 +44,13 @@
     
     Additional Wire Inputs:
     GifMinDelay - Minimum delay between animations (2 sec default)
-    GifSizeLimit - Maximum image dimensions before scale
+    ImageSizeLimit - Maximum image dimensions before scale
      This can be used to scale down any image before drawing
-    GifNoKeepAR - Do not keep Aspect Ratio of image
+    ImageNoKeepAR - Do not keep Aspect Ratio of image
     
 ]#
 
-#include "alx_pc/standalone/includes/basicreader"
+#include "alx_pc/standalone/includes/imagereader"
 #include "alx_pc/standalone/gif_reader/_init_"
 
 function animateMode(ModeString:string) {
@@ -78,18 +78,7 @@ if (first() | duped()) {
     }
     
     Funcs["readerCheck", function] = function() {
-        if (!->DS) {
-            print(_HUD_PRINTTALK,"Digital Screen is not connected.") 
-            return 0
-        }
-        
-        local ScreenName = DS:entity():getName()
-        if (DS:entity():type()!="gmod_wire_digitalscreen" & ScreenName!="Quad Digital Screen") {
-            print(_HUD_PRINTTALK,"The entity you connected is not a Digital Screen.\n"+
-            "It is located in Wire -> Visuals -> Screens -> Digital Screen.\nThis is NOT EGPv3 screen.") 
-            return 0    
-        }
-        return 1
+        return checkScreen(DS)
     } 
     
     Funcs["readerError", function] = function(Error:string, Path:string) {
@@ -98,10 +87,6 @@ if (first() | duped()) {
     
     Animate = animateMode(AnimateMode)
     MinDelay = GifMinDelay
-    SizeLimit = GifSizeLimit
-    NoKeepAR = GifNoKeepAR
-    
-    DS_Out = DS
 }
 
 function gifNextCommand() {
@@ -168,44 +153,12 @@ event chat(Player:entity, Said:string, Team:number) {
                         "Invalid GIF mode"
                     ) 
                 }
-            } elseif (Cmd==Command+"size") {
-                local IsQuadScreen = DS:entity():getName()=="Quad Digital Screen"
-                local MaxSize = IsQuadScreen ? 1024 : 512
-                
-                local Size = Mode:toNumber()                
-                SizeLimit = clamp(Size,1,MaxSize)
-                print(_HUD_PRINTTALK,
-                    "Gif max size set to "+SizeLimit
-                ) 
-                if (Size>MaxSize) {
-                    if (IsQuadScreen) {
-                        print(_HUD_PRINTTALK,
-                            "Size clamped, Quad Digital Screen support max 1024x1024"
-                        ) 
-                    } else {
-                        print(_HUD_PRINTTALK,
-                            "Size clamped, Digital Screen support max 512x512"
-                        ) 
-                    }
-                }
             } elseif (Cmd==Command+"delay") {
                 local Size = Mode:toNumber()
                 MinDelay = max(Size,0.1)
                 print(_HUD_PRINTTALK,
                     "Minimum delay between animations set to "+MinDelay
                 ) 
-            } elseif (Cmd==Command+"keepar") {
-                if (Mode=="false" | Mode=="0" | Mode=="nokeep" | Mode=="off") {
-                    NoKeepAR = 1    
-                    print(_HUD_PRINTTALK,
-                        "Aspect Ratio: DISABLED (Stretch to fit)"
-                    ) 
-                } else {
-                    NoKeepAR = 0   
-                    print(_HUD_PRINTTALK,
-                        "Aspect Ratio: ENABLED (Preserve proportions)"
-                    ) 
-                }
             }
         } elseif (Said:lower()=="!gifnext") {
             gifNextCommand()
@@ -217,22 +170,10 @@ if (~AnimateMode) {
     Animate = animateMode(AnimateMode)
 }
 
-if (~GifSizeLimit) {
-    SizeLimit = GifSizeLimit
-}
-
 if (~GifMinDelay) {
     MinDelay = GifMinDelay
 }
 
-if (~GifNoKeepAR) {
-    NoKeepAR = GifNoKeepAR
-}
-
 if (~NextFrame & NextFrame) {
     gifNextCommand()
-}
-
-if (~DS) {
-    DS_Out = DS    
 }

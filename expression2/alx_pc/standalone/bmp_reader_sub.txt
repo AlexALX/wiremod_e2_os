@@ -1,10 +1,13 @@
 @name Standalone BMP Reader Multithreaded Sub Process
-@outputs Percent
+@outputs BmpPercent
 @persist BmpData:table DS:wirelink BMP_MAIN:entity
 
 #[
     BMP Reader - Multithreaded
     Created by AlexALX (c) 2018
+    
+    This is BMP Thread Chip
+    Spawn more for multithreading
 ]#
 
 if (first()|duped()) {
@@ -15,28 +18,11 @@ runOnLast(1)
 BmpData = table()
 BMP_MAIN = noentity()
 
-function number trailingZeros(N) {
-    return N ? log2(N&&-N) : 32
+#include "alx_pc/standalone/bmp_reader/draw"
+
 }
 
-function number string:read_uint8(Offset) { 
-    return toByte(This, Offset) 
-}
-
-function number string:read_uint16(Offset) {
-    return (toByte(This, Offset+1) << 8)+toByte(This, Offset) 
-}
-
-function number string:read_uint24(Offset) {
-    return (toByte(This, Offset+2) << 16) + (toByte(This, Offset+1) << 8) + toByte(This, Offset) 
-}
-
-function number string:read_uint32(Offset) {
-    #return toByte(This, Offset+3)*16777216+toByte(This, Offset+2)*65536+toByte(This, Offset+1)*256+toByte(This, Offset) 
-    return (toByte(This, Offset+3) << 24) + (toByte(This, Offset+2) << 16) + (toByte(This, Offset+1) << 8) + toByte(This, Offset) 
-}
-
-function alxos_bmp_draw() {
+if (clk("bmpDraw")) {
     local Global = gTable("BMP_MULTI")
     if (Global["BMP_STOP",number]==1) {
         stopAllTimers()
@@ -44,192 +30,13 @@ function alxos_bmp_draw() {
         exit()   
     } 
     
-    local Data = BmpData["data",string]
-    local Size = BmpData[5,number]
-
-    local X = BmpData[6,number]
-    local Y = BmpData[7,number]
-    local I = BmpData[8,number]
-
-    local Width = BmpData[3,number]
-    local Height = BmpData[4,number]
-
-    local SI = BmpData[9,number]
-
-    local Bytes = BmpData[10,number]
-    local Data = Data:sub(I,I+Bytes-1)
-
-    #if (X==0 & Y==Height-1) {
-        #print(Data:sub(55,59))
-        #Data = Data:sub(55,Data:length())
-        #print(Data:replace(NB,"0"))
-    #}
-
-    local Max = Data:length()
-    local YY = BmpData["Y",number]
-
-    #[if (SI==Max) {
-        BmpData[100,string] = Data+BmpData[100,string]
-    }]#
-
-    Percent = round(YY/BmpData["max",number]*100)
-    
-    local BitCount = BmpData[26,number]
-    local RCol = BmpData[24,number]
-
-    #local Of = BmpData[13,number]
-
-    local II = BmpData[21,number]
-
-    local RS = BmpData[14,number]
-    local GS = BmpData[15,number]
-    local BS = BmpData[16,number]
-    local RL = BmpData[17,number]
-    local GL = BmpData[18,number]
-    local BL = BmpData[19,number]
-    local FY = BmpData[20,number]
-
-    local LI = BmpData[27,number]
-    local CTbl = BmpData[22,table]
-    
-    local Xadd = BmpData[31,number]
-    local Yadd = BmpData[32,number]
-    
-    local PosMul = (Xadd>Yadd ? Height : Width)
-    
-    local CY = (FY == 1 ? 0 : 1)
-    
-    while(perf(90)) {
-        if (SI>=Max | Y<CY) {
-            SI = Max
-            break
-        }
-
-        if (BitCount<=4) {
-            local Sub = Data:read_uint8(SI+1)
-
-            local YF = Y
-            if (FY==-1) {
-                YF = Height-Y
-            }
-            YF += Yadd
-
-            for (PI=LI-1,0,-1) {
-                local IND = (BitCount==4 ? (Sub >> PI*4) && 0xF : (Sub >> PI) && 1 )
-                local RGB = CTbl[IND,vector]
-                DS[(X+Xadd)+YF*PosMul] = RGB[1]*65536 + RGB[2]*256 + RGB[3]
-                X++
-                if (X>=Width) {
-                    break  
-                }
-            }
-            SI++
-            if (X>=Width) {
-                SI += BmpData[13,number]
-                X = 0
-                Y--
-                YY++
-                if (SI>=Max | YY>BmpData["max",number] | Y<CY) {
-                    SI = Max
-                    break
-                }
-            }
-            continue
-        }
-
-        local Sub = 0
-        if (II==3 || II==4) {
-            Sub = Data:read_uint24(SI+1)
-        } elseif (II==2) {
-            Sub = Data:read_uint16(SI+1)
-        } else {
-            Sub = Data:read_uint8(SI+1)
-        }
-
-        local YF = Y
-        if (FY==-1) {
-            YF = Height-Y
-        }
-        YF += Yadd
-
-        if (II<3) {
-            if (RCol==2) {
-                local RGB = CTbl[Sub,vector]
-                DS[(X+Xadd)+YF*PosMul] = RGB[1]*65536 + RGB[2]*256 + RGB[3]
-            } else {
-                local R = floor((Sub >> RS) && RL)
-                local G = floor((Sub >> GS) && GL)
-                local B = floor(Sub && BL)
-
-                R *= floor(0xFF/RL)
-                G *= floor(0xFF/GL)
-                B *= floor(0xFF/BL)
-
-                DS[(X+Xadd)+YF*PosMul] = R*65536 + G*256 + B
-            }
-        } else {
-            DS[(X+Xadd)+YF*PosMul] = Sub #R*65536 + G*256 + B
-        }
-
-        X++
-        SI+=II
-
-        if (X>=Width) {
-            YY++
-            SI += BmpData[13,number]
-            X = 0
-            Y--
-        }
-
-    }
-
-    #BmpData[13,number] = Of
-    BmpData[9,number] = SI
-    BmpData[6,number] = X
-    BmpData[7,number] = Y
-    BmpData["Y",number] = YY
-
-    local End = BmpData[12,number]
-
-    if (Y<CY | End==1 | YY>BmpData["max",number]) {
-        Percent = 100
+    if (bmpDraw()) {
         dsSendDirect("BMP_MULTI_FINISH",BMP_MAIN,entity())   
-        BMP_MAIN = noentity() 
-        return
-    }
-
-    if (SI<Max) {
-        BmpData[11,string] = Data
+        BMP_MAIN = noentity()      
     } else {
-
-        local Bytes = BmpData[10,number]
-        local Next = I+Bytes
-        
-        local Sz = BmpData["size",number]
-
-        if (Next>Sz) {
-            #Bytes = Next*(-1)
-            BmpData[12,number] = 1
-            Bytes = Next-Sz
-            Next = Sz
-            #BmpData[10,number] = Bytes
-        }
-
-        BmpData[8,number] = Next
-        #BmpData[9,number] = Bytes
-        BmpData[9,number] = 0
-
-        #print(I+" "+Next+" | "+Bytes)
+        timer("bmpDraw",1)
     }
-    timer("bmp",1)
-
-}
-
-}
-
-if (clk("bmp")) {
-    alxos_bmp_draw()
-    exit()
+    exit() 
 }
 
 if (dsClk("BMP_MULTI_INIT")) {
@@ -244,7 +51,26 @@ if (dsClk("BMP_MULTI_INIT")) {
 if (dsClk("BMP_MULTI_START")) {
     BmpData = dsGetTable()
     DS = BmpData["DS",wirelink]
-    alxos_bmp_draw()
+    
+    if (BmpData["ThreadIndex",number]==1) {
+        BmpData["LastSY",number] = -1
+    } else {
+        local StartY = BmpData[7,number]
+        local PrevY = StartY + 1
+    
+        local PrevYF = PrevY
+    
+        if (BmpData[20,number]==-1) {
+            PrevYF = BmpData[4,number] - PrevY
+        }
+
+        BmpData["LastSY",number] =
+            floor(PrevYF / BmpData["globalScale",number]) +
+            BmpData[32,number]
+    }
+    
+    bmpDraw()
+    timer("bmpDraw",1)
 }
 
 if (last() & BMP_MAIN!=noentity()) {

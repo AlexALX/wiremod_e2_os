@@ -1,6 +1,7 @@
 #include "alx_pc/standalone/jpg_reader/_shared_"
 #include "alx_pc/standalone/jpg_reader/bitreader"
 #include "alx_pc/standalone/jpg_reader/huffman"
+#include "alx_pc/standalone/includes/screen"
 
 function string jpgMarkerName(Marker:number) {
     switch (Marker) {
@@ -235,9 +236,7 @@ function jpgParseSOF(Type:number)
     
     local WH = Width > Height ? Width : Height
     
-    local IsQuadScreen = DS:entity():getName()=="Quad Digital Screen"
-    
-    local DsMaxLimit = (IsQuadScreen ? 1024 : 512) # DS Limit 
+    local DsMaxLimit = screenSize(DS) # DS Limit 
     local JpgMaxWidth = DsMaxLimit # Default Limit
     local SizeLimit = Jpg["MaxSize",number]
 
@@ -258,7 +257,9 @@ function jpgParseSOF(Type:number)
         Jpg["screenHeight", number] = ResizedHeight
 
         if (WH>DsMaxLimit & JpgMaxWidth==DsMaxLimit) {
-            Warning = "Your image is larger than "+(IsQuadScreen ? "Quad " : "")+"Digital Screen supports\n"+
+            local ScreenName = screenName(DS)
+            
+            Warning = "Your image is larger than "+ScreenName+" supports\n"+
             "Your image will be resized to: "+ResizedWidth+"x"+ResizedHeight    
             
             if (!JPGNoPrint) {

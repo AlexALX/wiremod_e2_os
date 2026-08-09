@@ -1,0 +1,33 @@
+@persist BmpData:table BmpCustomInit:number BmpInitCallback:function
+@persist BmpNoPrint:number
+
+if (first()|duped()) {
+    BmpData = table()
+    
+    BmpCustomInit = 0
+    BmpMaxSteps = 3
+}
+
+function bmpDsInit() {
+    local DS = BmpData["DS",wirelink]
+        
+    BmpDrew = 1
+    
+    DS[1048569] = 2
+    DS[1048574] = 0
+    DS[1048575] = 1
+    
+    local NoKeepAR = BmpData["NoKeepAR",number]
+    local ResizedWidth = BmpData["screenWidth", number]
+    local ResizedHeight = BmpData["screenHeight", number]
+    
+    if (!NoKeepAR) {            
+        local SWH = max(ResizedWidth,ResizedHeight)
+        DS[1048573] = SWH
+        DS[1048572] = SWH
+    } else {
+        DS[1048573] = ResizedWidth
+        DS[1048572] = ResizedHeight
+    }
+    
+}

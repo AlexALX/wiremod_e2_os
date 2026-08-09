@@ -149,8 +149,7 @@ function alxos_jpg_init(Args:table) {
     EGP:egpColor(LAST_I,0,168,168,255) 
     DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
     
-    local ScreenName = DS:entity():getName()
-    local MaxSize = (ScreenName=="Quad Digital Screen" ? "1024" : "512")
+    local MaxSize = gpuScreenSize(DS):toString()
     
     DialogData[-10,table]:pushNumber(LAST_I)
     local DefaultMaxSize = GpuPersistData["jpgMaxSize",number] != 0 ? GpuPersistData["jpgMaxSize",number]:toString() : MaxSize
@@ -657,8 +656,7 @@ function number alxos_jpg_key(Key:string,Pressed) {
             local InpMaxSize = DialogData[-4,table][4,table][2,string]:toNumber()
             local InpKeepAR = DialogData[-4,table][5,table][2,string]
             
-            local ScreenName = DS:entity():getName()
-            local MaxSize = (ScreenName=="Quad Digital Screen" ? 1024 : 512)
+            local MaxSize = gpuScreenSize(DS)
             
             if (InpMaxSize==0) { InpMaxSize = MaxSize }
             if (InpKeepAR=="") { InpKeepAR = "1" }

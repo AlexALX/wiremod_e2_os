@@ -1,0 +1,173 @@
+#include "alx_pc/standalone/bmp_reader/_shared_"
+#include "alx_pc/standalone/bmp_reader/parser"
+#include "alx_pc/standalone/bmp_reader/draw"
+
+function bmpInitCallback(Func:function) {
+    BmpInitCallback = Func
+    BmpCustomInit = 1
+}
+
+function bmpSetDS(DS:wirelink) {
+    BmpData["DS",wirelink] = DS    
+}
+
+function bmpInit(Body:string, Size, SizeLimit, NoKeepAR) {
+    Error = ""
+
+    BmpData = table()
+    BmpStep = 0
+    BmpCurrentStep = ""
+    BmpCurrentStepText = ""
+    BmpDrew = 0    
+    BmpPercent = 0
+    BmpRenderTime = 0
+    BmpRenderRealTime = 0
+
+    BmpData["data",string] = Body   
+    BmpData["size",number] = Size
+    BmpData["SizeLimit",number] = SizeLimit
+    BmpData["NoKeepAr",number] = NoKeepAR
+}
+
+function bmpRun() {
+    timer("bmp",1)    
+}
+
+function bmpFinish() {
+    BmpCurrentStep = "done"
+    BmpCurrentStepText = "Done"
+    BmpPercent = 100
+    BmpRenderTime = curtime() - BmpData["time",number]
+    BmpRenderRealTime = realtime() - BmpData["real_time",number]
+    
+    BmpData = table()
+    
+    if (!BmpNoPrint) {
+        print(_HUD_PRINTTALK,"BMP successfully parsed. Render time: "+round(BmpRenderTime,2)+"s")
+    }
+}
+
+function bmpInitSingleDraw() {
+    
+    local Data = BmpData["data",string]
+    
+    local I = BmpData[8,number]
+    
+    local Width = BmpData[3,number]
+    local Height = BmpData[4,number]
+    
+    local Bytes = BmpData[10,number]
+    local Data = Data:sub(I,I+Bytes-1)
+    
+    local Max = Data:length()
+    
+    local BitCount = BmpData[26,number]
+    
+    BmpData["LastIndex",number] = -1
+    
+    local ChildE2s = 1
+    local C = 1
+
+    local SubLines = ceil(Height / ChildE2s)
+    if (SubLines==0) { SubLines = 1 }
+    local LineDiff = (SubLines * ChildE2s - Height)
+    local StartLine = BmpData["StartLine",number]
+
+    BmpData["Y",number] = 0
+    
+    local RowBytes = ceil(Width * BmpData[21,number]) + BmpData[13,number]
+    
+    if (LineDiff > 0 & C==ChildE2s) {
+        SubLines -= LineDiff
+    }
+    
+    BmpDataClone = BmpData
+    
+    BmpDataClone["ThreadIndex",number] = C
+    
+    BmpDataClone[7,number] = Height-StartLine
+    if (BmpData[20,number]==1) { BmpDataClone[7,number] = BmpDataClone[7,number] - 1 }
+     
+    local FileOffset = StartLine * RowBytes + BmpData[8,number]
+    BmpDataClone[8,number] = FileOffset
+    
+    local FullBlockBytes = SubLines * RowBytes
+    
+    local FileRemainder = BmpData["size",number] - FileOffset
+    if (FullBlockBytes > FileRemainder) {
+        FullBlockBytes = FileRemainder
+    }
+    
+    BmpDataClone[10,number] = FullBlockBytes
+
+    BmpDataClone["max",number] = SubLines
+    
+    BmpData["canDraw",number] = 1
+    bmpDraw()
+    timer("bmp",1)    
+}
+
+function bmpPostParse() {
+    if (!BmpData["drawInit",number]) {
+        bmpDrawInit()
+    }
+
+    if (BmpCustomInit) {
+        BmpInitCallback()
+    } else {
+        bmpInitSingleDraw()
+    }    
+}
+
+function number bmpStep() {
+    local Data = BmpData["data",string]
+    
+    if (BmpStep == 2) {
+        local IsDone = bmp_decompress_rle()
+        if (IsDone) {
+            bmpPostParse()
+            return 0
+        }
+        
+        timer("bmp", 1)
+        return 0
+    } elseif (BmpStep==3 & BmpData["canDraw",number]) {
+        if (!bmpDraw()) {
+            timer("bmp",1)
+        } else {
+            BmpPercent = 100
+            bmpFinish()
+            return 1
+        }
+        
+        return 0
+    }
+    
+    if (BmpStep==0) {
+        local Result = bmpParseHeader()
+        if (Result==1) {
+            return bmpStep()
+        }
+    } elseif (BmpData["drawInit",number]==0) {
+        local Result = bmpParsePallete()
+        
+        if (Result==0) {
+            timer("bmp",1)
+            return 0
+        } elseif (Result==2) {
+            timer("bmp",1)
+            return 0
+        }
+        
+        bmpPostParse()
+    } else {
+        # multi thread init
+        bmpPostParse()    
+    }
+    return 0
+}
+
+if (clk("bmp")) {
+    bmpStep()
+    exit()
+}

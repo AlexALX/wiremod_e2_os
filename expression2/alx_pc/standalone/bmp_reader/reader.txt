@@ -1,0 +1,20 @@
+function number bmpTrailingZeros(N) {
+    return N ? log2(N&&-N) : 32
+}
+
+function number string:bmpRead_uint8(Offset) { 
+    return toByte(This, Offset) 
+}
+
+function number string:bmpRead_uint16(Offset) {
+    return (toByte(This, Offset+1) << 8)+toByte(This, Offset) 
+}
+
+function number string:bmpRead_uint24(Offset) {
+    return (toByte(This, Offset+2) << 16) + (toByte(This, Offset+1) << 8) + toByte(This, Offset) 
+}
+
+function number string:bmpRead_uint32(Offset) {
+    #return toByte(This, Offset+3)*16777216+toByte(This, Offset+2)*65536+toByte(This, Offset+1)*256+toByte(This, Offset) 
+    return (toByte(This, Offset+3) << 24) + (toByte(This, Offset+2) << 16) + (toByte(This, Offset+1) << 8) + toByte(This, Offset) 
+}

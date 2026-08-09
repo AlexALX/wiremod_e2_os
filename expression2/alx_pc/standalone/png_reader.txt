@@ -1,6 +1,4 @@
 @name PNG Reader By AlexALX
-@inputs PngSizeLimit:number PngNoKeepAR:number
-@persist SizeLimit:number NoKeepAR:number
 @strict
 
 #[
@@ -36,7 +34,7 @@
     PngNoKeepAR - Do not keep Aspect Ratio of image
 ]#
 
-#include "alx_pc/standalone/includes/basicreader"
+#include "alx_pc/standalone/includes/imagereader"
 #include "alx_pc/standalone/png_reader/_init_"
 
 if (first() | duped()) {
@@ -54,86 +52,10 @@ if (first() | duped()) {
     }
     
     Funcs["readerCheck", function] = function() {
-        if (!->DS) {
-            print(_HUD_PRINTTALK,"Digital Screen is not connected.") 
-            return 0
-        }
-        
-        local ScreenName = DS:entity():getName()
-        if (DS:entity():type()!="gmod_wire_digitalscreen" & ScreenName!="Quad Digital Screen") {
-            print(_HUD_PRINTTALK,"Entity what you did connected is not Digital Screen.\n"+
-            "It is located in Wire -> Visuals -> Screens -> Digital Screen.\nThis is NOT EGPv3 screen.") 
-            return 0    
-        }
-        return 1  
-    } 
+        return checkScreen(DS)  
+    }
     
     Funcs["readerError", function] = function(Error:string, Path:string) {
         print(_HUD_PRINTTALK, Error)
     }
-    
-    SizeLimit = PngSizeLimit
-    NoKeepAR = PngNoKeepAR
-    
-    DS_Out = DS
-}
-
-event chat(Player:entity, Said:string, Team:number) {
-    if (!Command) { exit() }
-    
-    if (Player==owner()) { 
-        
-        local Find = Said:lower():find(" ")
-        
-        if (Find) {
-            local Cmd = Said:left(Find-1)
-            local Mode = Said:sub(Find+1):lower()
-
-            if (Cmd==Command+"size") {
-                local IsQuadScreen = DS:entity():getName()=="Quad Digital Screen"
-                local MaxSize = IsQuadScreen ? 1024 : 512
-                
-                local Size = Mode:toNumber()                
-                SizeLimit = clamp(Size,1,MaxSize)
-                print(_HUD_PRINTTALK,
-                    "Png max size set to "+SizeLimit
-                ) 
-                if (Size>MaxSize) {
-                    if (IsQuadScreen) {
-                        print(_HUD_PRINTTALK,
-                            "Size clamped, Quad Digital Screen support max 1024x1024"
-                        ) 
-                    } else {
-                        print(_HUD_PRINTTALK,
-                            "Size clamped, Digital Screen support max 512x512"
-                        ) 
-                    }
-                }
-            } elseif (Cmd==Command+"keepar") {
-                if (Mode=="false" | Mode=="0" | Mode=="nokeep" | Mode=="off") {
-                    NoKeepAR = 1    
-                    print(_HUD_PRINTTALK,
-                        "Aspect Ratio: DISABLED (Stretch to fit)"
-                    ) 
-                } else {
-                    NoKeepAR = 0   
-                    print(_HUD_PRINTTALK,
-                        "Aspect Ratio: ENABLED (Preserve proportions)"
-                    ) 
-                }
-            }
-        }
-    }
-}
-
-if (~PngSizeLimit) {
-    SizeLimit = PngSizeLimit
-}
-
-if (~PngNoKeepAR) {
-    NoKeepAR = PngNoKeepAR
-}
-
-if (~DS) {
-    DS_Out = DS    
 }

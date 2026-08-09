@@ -1,5 +1,6 @@
 #include "alx_pc/standalone/png_reader/_shared_"
 #include "alx_pc/standalone/png_reader/reader"
+#include "alx_pc/standalone/includes/screen"
 
 function number pngParseChunksStep()
 {
@@ -19,9 +20,7 @@ function number pngParseChunksStep()
         
         local WH = Width > Height ? Width : Height
         
-        local IsQuadScreen = DS:entity():getName()=="Quad Digital Screen"
-        
-        local DsMaxLimit = (IsQuadScreen ? 1024 : 512) # DS Limit 
+        local DsMaxLimit = screenSize(DS) # DS Limit 
         local PngMaxWidth = DsMaxLimit # Default Limit
         local SizeLimit = Png["MaxSize",number]
     
@@ -42,7 +41,9 @@ function number pngParseChunksStep()
             Png["screenHeight", number] = ResizedHeight
     
             if (WH>DsMaxLimit & PngMaxWidth==DsMaxLimit) {
-                Warning = "Your image is larger than "+(IsQuadScreen ? "Quad " : "")+"Digital Screen supports\n"+
+                local ScreenName = screenName(DS)
+                
+                Warning = "Your image is larger than "+ScreenName+" supports\n"+
                 "Your image will be resized to: "+ResizedWidth+"x"+ResizedHeight    
                 
                 if (!PNGNoPrint) {

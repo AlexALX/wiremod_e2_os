@@ -871,7 +871,9 @@ function number cmd_wcd_readfile(CmdData:table) {
         }
             
         CmdData[8,number] = ceil(End/BytesInSector)
-        CurTask[1,number] = CmdData[8,number]
+        local N = CmdData[8,number]
+        
+        CurTask[1,number] = N + ceil((N + 1) / 9)
 
         local StartC = floor(CmdData[3,number]/BytesInSector)       
         StartC += File["sector",number]
@@ -893,9 +895,9 @@ function number cmd_wcd_readfile(CmdData:table) {
                 CmdData[9,number] = 1 
                 CmdData[11,string] = ""   
                 
-                local TotalElements = StringArray:count()
-                CurTask[1,number] = TotalElements > 1 ? TotalElements - 1 : 1
-                CurTask[2,number] = 0
+                #local TotalElements = StringArray:count()
+                #CurTask[1,number] = TotalElements > 1 ? TotalElements - 1 : 1
+                #CurTask[2,number] = 0
                 
                 CmdData[15,number] = 0  
                 return 1
@@ -914,7 +916,7 @@ function number cmd_wcd_readfile(CmdData:table) {
         }
         CmdData[6,number] = Of
         CurTask[2,number] = I
-        CurTask[1,number] = Max
+        #CurTask[1,number] = Max
         CmdData[7,number] = I
         CmdData[12,array] = StringArray
         
@@ -927,6 +929,8 @@ function number cmd_wcd_readfile(CmdData:table) {
         if (Idx == 0) { Idx = 1 }
         local Count = StringArray:count()
         
+        local Processed = 0
+        
         while (Count > 1) {
             while (Idx <= Count) {
                 if (!perf(90)) {
@@ -935,7 +939,7 @@ function number cmd_wcd_readfile(CmdData:table) {
                     CmdData[14,number] = Idx
                     CmdData[15,number] = TotalProcessed
                     
-                    CurTask[2,number] = TotalProcessed
+                    CurTask[2,number] = CurTask[2,number] + floor(Processed / 9)
                     return 1
                 }
                 
@@ -944,6 +948,7 @@ function number cmd_wcd_readfile(CmdData:table) {
                 } else {
                     TempArray:pushString(StringArray[Idx,string] + StringArray[Idx+1,string])
                     TotalProcessed += 1
+                    Processed += 1
                 }
                 Idx += 2
             }
@@ -961,7 +966,7 @@ function number cmd_wcd_readfile(CmdData:table) {
         local CalcE = CalcS+CmdData[4,number]
         CmdResult[1,string] = Ret:sub(CalcS+1,CalcE)
 
-        CurTask[2,number] = CurTask[1,number]
+        #CurTask[2,number] = CurTask[1,number]
         CurTask = table()
         
         local CD = FS["hddinfo",table]

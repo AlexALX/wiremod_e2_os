@@ -911,7 +911,9 @@ function number cmd_wm1_readfile(CmdData:table) {
         
         CmdData[7,number] = ceil(End/BytesInSector) #EndC*FS["sectors_in_cluster",number]
         
-        CurTask[1,number] = CmdData[7,number]
+        local N = CmdData[7,number]
+        
+        CurTask[1,number] = N + ceil((N + 1) / 3)
         #[if (CmdData[7,number]<0) {
             CmdResult[1,number] = -1
             return 0   
@@ -969,8 +971,8 @@ function number cmd_wm1_readfile(CmdData:table) {
                 #print(CmdData[3,number]+" "+CmdData[4,number])
 
         
-                CurTask[1,number] = StringArray:count()
-                CurTask[2,number] = 0
+                #CurTask[1,number] = StringArray:count()
+                #CurTask[2,number] = 0
                 CmdData[15,number] = 0
 
                 CmdData[5,number] = 3               
@@ -1006,6 +1008,8 @@ function number cmd_wm1_readfile(CmdData:table) {
         local TempArray = CmdData[13,array]
         local Idx = CmdData[14,number]
         local TotalProcessed = CmdData[15,number]
+        
+        local Processed = 0
     
         local Count = StringArray:count()
         while (Count > 1) {
@@ -1016,7 +1020,7 @@ function number cmd_wm1_readfile(CmdData:table) {
                     CmdData[13,array] = TempArray
                     CmdData[14,number] = Idx
                     
-                    CurTask[2,number] = TotalProcessed
+                    CurTask[2,number] = CurTask[2,number] = CurTask[2,number] + floor(Processed / 3)
                     CmdData[15,number] = TotalProcessed
                     return 1
                 }
@@ -1026,6 +1030,7 @@ function number cmd_wm1_readfile(CmdData:table) {
                 } else {
                     TempArray:pushString(StringArray[Idx,string] + StringArray[Idx+1,string])
                     TotalProcessed += 1
+                    Processed += 1
                 }
                 
                 Idx += 2

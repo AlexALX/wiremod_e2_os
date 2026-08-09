@@ -1,0 +1,75 @@
+@name Basic Image Reader
+@inputs DS:wirelink ImageSizeLimit:number ImageNoKeepAR:number
+@outputs DS_Out:wirelink ImageProcessor:wirelink
+@persist SizeLimit NoKeepAR
+@strict
+
+#[
+    Basic Image Reader
+    Created by AlexALX (c) 2026
+]#
+
+#include "alx_pc/standalone/includes/basicreader"
+
+if (first() | duped()) {
+    ImageProcessor = wirelink()    
+        
+    NoKeepAR = ImageNoKeepAR # 0 - keep asset ratio, 1 - scale to screen size
+    SizeLimit = ImageSizeLimit
+    DS_Out = DS
+}
+
+event chat(Player:entity, Said:string, Team:number) {
+    if (!Command) { exit() }
+    
+    if (Player==owner()) { 
+        
+        local Find = Said:lower():find(" ")
+        
+        if (Find) {
+            local Cmd = Said:left(Find-1)
+            local Mode = Said:sub(Find+1):lower()
+
+            if (Cmd==Command+"keepar") {
+                if (Mode=="false" | Mode=="0" | Mode=="nokeep" | Mode=="off") {
+                    NoKeepAR = 1
+                    print(_HUD_PRINTTALK,
+                        "Aspect Ratio: DISABLED (Stretch to fit)"
+                    ) 
+                } else {
+                    NoKeepAR = 0   
+                    print(_HUD_PRINTTALK,
+                        "Aspect Ratio: ENABLED (Preserve proportions)"
+                    ) 
+                }
+            } elseif (Cmd==Command+"size") {
+                local ScreenName = screenName(DS)
+                local MaxSize = screenSize(DS)
+                
+                local Size = Mode:toNumber()                
+                SizeLimit = clamp(Size,1,MaxSize)
+                print(_HUD_PRINTTALK,
+                    "Image max size set to "+SizeLimit+"x"+SizeLimit
+                )
+                if (Size>MaxSize) {
+                    print(_HUD_PRINTTALK,
+                        "Size clamped, "+ScreenName+" support max "+MaxSize+"x"+MaxSize
+                    ) 
+                }
+            }
+        }
+    }
+}
+
+if (~ImageNoKeepAR) {
+    NoKeepAR = ImageNoKeepAR
+}
+
+if (~ImageSizeLimit) {
+    SizeLimit = ImageSizeLimit
+}
+
+if (~DS) {
+    DS_Out = DS    
+}
+

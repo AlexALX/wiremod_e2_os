@@ -1,6 +1,6 @@
 @name BMP Helper for DS
 @persist Header:string Inited:number
-@inputs Error:string Percent:number
+@inputs BmpError:string BmpPercent:number BmpStep:number BmpDrew:number BmpCurrentStep:string
 @strict
 
 #include "alx_pc/standalone/helpers/_shared_"
@@ -13,25 +13,25 @@ function displayHelp() {
 BMP Parser, specifications:
 - Max resolution is up to 512x512 (DS limit)
   or 1024x1024 (Quad DS Limit)
-- Support most common uncompressed bmp files: 
+- Support most common bmp files: 
 - 32/24/8/4 bits and monochrome
 - including RGB444/RGB555/RGB565
+- Support OS/2 BMP files
+- Support RLE Compression
 - Support \"flip row order\" function
 - Slow, but multithreaded
 
-Usage:
-- Spawn one BMP Main Process E2
-- Connect this E2 to Digital Screen
-- Spawn one or more BMP Sub Process E2's
-
-Chat commands:
+Usage via chat commands:
 !bmp http://url - open bmp file
 Note: long url may be cut, use input LongURL 
 instead for such case (via string value) 
+
 !bmpfile filename.bmp.txt - open bmp file 
 from garrysmod/data/e2files/ folder
 file extension must be renamed to .txt
+
 !bmpabort - abort rendering
+!bmpsize - limit image scale (1-512)
 !bmpkeepar - set Aspect Ratio mode (0 or 1)
 
 If you have own web server with PHP, 
@@ -43,8 +43,6 @@ http://yoursv/img2bmp.php?http://url/img.jpg
 "
 
     dsDrawTextStart(2, 0, Text)
-    
-    Inited = 0
 }
 
 function displayError(Msg:string) {
@@ -58,66 +56,83 @@ BMP Reader Error:
 "
 
     dsDrawTextStart(2, 0, Text)
-    
-    Inited = 0
 }
 
 function displayProgressStart() {
+    if (Inited) { return }
+    
     local ProcessorDS = ImageProcessor["DS_Out",wirelink]
     local IsSameScreen = ProcessorDS==DS
     
-    if (IsSameScreen) {
+    if (IsSameScreen & (BmpDrew | BmpStep>2)) {
+        dsStopQueues()
+        Inited = 0
         return
     }
     
-    local Threads = ImageProcessor["Threads",number]
+    local Threads = ImageProcessor["BmpThreads",number]
     
     displayInit()
     
     displayBlockDraw(0.5)
     
+    local MaxSteps = ImageProcessor["BmpMaxSteps",number]
+    
     local Text = Header+
 "
 Step:
-1 / 1
+1 / "+MaxSteps+"
 
 Current task:
-Drawing Image ("+Threads+" Thread"+(Threads>1 ? "s" : "")+")
+Loading BMP
 
 Progress:
 
 "
     
     dsDrawTextStart(2, 0, Text)
-    
-    Inited = 1
 }
 
 function displayProgress()
 { 
-    if (!Inited & Percent>0) { 
-        displayProgressStart()
+    local ProcessorDS = ImageProcessor["DS_Out",wirelink]
+    local IsSameScreen = ProcessorDS==DS
+    
+    if (IsSameScreen & BmpDrew) {
+        dsStopQueues()
+        return
+    }    
+    
+    if (BlockDraw & BmpCurrentStep!="done") {
         return
     }
     
-    if (Percent>=100) {
-        Inited = 0
-    }
-    
-    if (BlockDraw & Percent<100) {
-        return
+    if (BmpCurrentStep=="done") {
+        Inited = 0    
     }
     
     local FontLine = DsFontHeight + DsFontSpacing
     
+    local Threads = ImageProcessor["BmpThreads",number]
+    local ThreadsTxt = ""
+    if (BmpStep>2) {    
+        ThreadsTxt = " ("+Threads+" Thread"+(Threads>1 ? "s" : "")+")"
+    }
+
+    local MaxSteps = ImageProcessor["BmpMaxSteps",number]
+
+    local Task = ImageProcessor["BmpCurrentStepText",string]
+
     displayBlockDraw(0.5)
 
-    dsDrawCachedText(2, 10 * FontLine, Percent+"%")
+    dsDrawCachedText(2, 4 * FontLine, BmpStep+" / "+MaxSteps)
+    dsDrawCachedText(2, 7 * FontLine, Task+ThreadsTxt)
+    dsDrawCachedText(2, 10 * FontLine, BmpPercent+"%")
 }
 
 function displayMode() {
-    if (Error){ 
-        displayError(Error)
+    if (BmpError){ 
+        displayError(BmpError)
     } else {
         displayHelp()    
     }   
@@ -126,19 +141,33 @@ function displayMode() {
 if (first() | duped()) {
     Header = 
 "BMP Reader - Multithreaded
-Created by AlexALX (c) 2018
+Created by AlexALX (c) 2018-2026
 -------------------"
     
     displayMode()
 }
 
 
-event input(InputName:string) {
+event input(InputName:string) {    
     if (InputName=="DS" & DS!=nowirelink()) {
         displayMode()
-    } elseif (InputName=="Error" & Error) {
-        displayError(Error)    
-    } elseif (InputName=="Percent") {
-        displayProgress()    
+    } elseif (InputName=="BmpError" & BmpError) {
+        displayError(BmpError)    
+    } elseif (InputName=="BmpStep") {
+        if (BmpStep) {        
+            displayProgressStart()
+        } else {
+            Inited = 0    
+        }
+    } elseif ((InputName=="BmpPercent" | InputName=="BmpCurrentStep") & BmpStep) { 
+        displayProgress() 
+    } elseif (InputName=="BmpDrew" & BmpDrew) {
+        local ProcessorDS = ImageProcessor["DS_Out",wirelink]
+        local IsSameScreen = ProcessorDS==DS
+            
+        if (IsSameScreen) {
+            Inited = 0
+            dsStopQueues()    
+        }
     }
 }

@@ -37,6 +37,7 @@ BOOT_HDD = table()
 
 EgpCleanHandler = ""
 PlugHandler = ""
+DSEvent = function() {}
 
 function initGpu() {
     local Info = dsGetTable()
@@ -111,7 +112,7 @@ function screen_connect() {
     local ID = Info[1,number]
     local WL = Info[2,wirelink]    
     local WLI = WL:entity():id()
-    if (WL) {        
+    if (WL) {                
         if (!EGP:entity():isValid() & WL:entity():type()=="gmod_wire_egp") {
             EGP = WL
             Screens[WLI,number] = findscreen(ID)
@@ -119,10 +120,11 @@ function screen_connect() {
                 alxos_bsod(GpuData["BSOD",array])    
             }
         } elseif (!DS:entity():isValid()) {
-            local ScreenName = WL:entity():getName()
-            if (WL:entity():type()=="gmod_wire_digitalscreen" | ScreenName=="Quad Digital Screen") {
+            local ScreenName = gpuScreenName(WL)            
+            if (WL:entity():type()=="gmod_wire_digitalscreen" | ScreenName!="") {
                 DS = WL
                 Screens[WLI,number] = findscreen(ID)
+                DSEvent()
             }
         }
     }    
@@ -166,6 +168,7 @@ if (inputClk()) {
                 dsSendDirect("BSOD",BIOS,array(3))
             } elseif (!DS:entity():id() | Screens[DS:entity():id(),number]==ID) {
                 DS = nowirelink()
+                DSEvent()
             }
         }
     }    

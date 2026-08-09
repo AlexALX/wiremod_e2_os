@@ -1,7 +1,8 @@
 @name Standalone BMP Reader Multithreaded Main Process
-@inputs DigitalScreen:wirelink LongURL:string BMP_NoKeepAR
-@outputs Percent Threads RenderTime RenderRealTime Error:string
-@persist NoKeepAR BmpData:table MaxThreads 
+@outputs BmpPercent BmpThreads BmpRenderTime BmpRenderRealTime 
+@outputs BmpStep:number BmpMaxSteps:number BmpDrew:number
+@outputs BmpError:string BmpWarning:string BmpCurrentStep:string BmpCurrentStepText:string
+@persist SizeLimit NoKeepAR MaxThreads BmpInitFunc:function
 @strict
 
 #[
@@ -10,22 +11,25 @@
     -------------------
     BMP Parser, specifications:
     - Max resolution is up to 512x512 (DS limitation) or 1024x1024 (Quad Digital Screen)
-    - Support most common uncompressed bmp files (32/24/8/4 bits and monochrome, including RGB444/RGB555/RGB565)
+    - Support most common bmp files (32/24/8/4 bits and monochrome, including RGB444/RGB555/RGB565)
+    - Support OS/2 BMP files
+    - Support RLE Compression
     - Support "flip row order" function
     - Slow, but multithreaded
     
     Usage:
     - Spawn one BMP Main Process E2 (this file)
     - Connect this E2 to Digital Screen (this is not EGP screen! located in Wire -> Visuals -> Screens -> Digital Screen)
-    - Or connect "DigitalScreen" input to Quad Digital Screen E2 VirtualScreen output (this is custom device dupe)
-    - Spawn one or more BMP Sub Process E2's
+    - Or connect "DS" input to Quad Digital Screen E2 VirtualScreen output (this is custom device dupe)
+    - Spawn two or more BMP Sub Process E2's for multithread
     
     Chat commands:
     !bmp http://url_with_bmp_file - open bmp file
     Note: long url may be cut, use input LongURL instead for such case (via string value) 
     !bmpfile filename.bmp.txt - open bmp file from a garrysmod/data/e2files/ folder, file extension must be renamed to .txt
     !bmpabort - abort rendering
-    !bmpkeepar - set image Aspect Ratio mode (0 or 1) 
+    !bmpsize - set maximum image dimensions before scaling (1 to 512 for DS, 1024 for Quad DS)
+    !bmpkeepar - set image Aspect Ratio mode (0 or 1)
     
     If you have own web server with PHP, then you can place 
     img2bmp.php from https://github.com/AlexALX/wiremod_e2_os/blob/master/php/img2bmp.php
@@ -34,269 +38,27 @@
     
 ]#
 
-#include "alx_pc/standalone/includes/basicreader"
+#include "alx_pc/standalone/includes/imagereader"
+#include "alx_pc/standalone/bmp_reader/_init_"
 
-function dsClear() {
-    local Global = gTable("BMP_MULTI")
-    Global["BMP_STOP",number] = 1
-    #dsSend("BMP_MULTI_STOP","BMP_SUB",entity())
-    BmpData = table()
-    DigitalScreen[1048569] = 2
-    DigitalScreen[1048574] = 0
-    DigitalScreen[1048575] = 1
-    Percent = 0
-    RenderTime = 0
-    RenderRealTime = 0
-}
-
-function number trailingZeros(N) {
-    return N ? log2(N&&-N) : 32
-}
-
-function number string:read_uint8(Offset) { 
-    return toByte(This, Offset) 
-}
-
-function number string:read_uint16(Offset) {
-    return (toByte(This, Offset+1) << 8)+toByte(This, Offset) 
-}
-
-function number string:read_uint24(Offset) {
-    return (toByte(This, Offset+2) << 16) + (toByte(This, Offset+1) << 8) + toByte(This, Offset) 
-}
-
-function number string:read_uint32(Offset) {
-    #return toByte(This, Offset+3)*16777216+toByte(This, Offset+2)*65536+toByte(This, Offset+1)*256+toByte(This, Offset) 
-    return (toByte(This, Offset+3) << 24) + (toByte(This, Offset+2) << 16) + (toByte(This, Offset+1) << 8) + toByte(This, Offset) 
-}
-
-function alxos_bmp_draw() {
-    local Data = BmpData["data",string]
-    local Size = BmpData[5,number]
-    if (Size==0) {
-        local Format = Data:sub(1,2)
-        if (Format=="BM") {
-            BmpData["time",number] = curtime()
-            BmpData["real_time",number] = realtime()
-            local Size = BmpData["size",number]
-            local Offset = Data:read_uint32(11)+1
-            local HSize = Data:read_uint32(15)
-            
-            local Width = Data:read_uint32(19)
-            local Height = Data:read_uint32(23)
-            
-            local Compression = Data:read_uint32(31)
-
-            local Colors = Data:read_uint32(47)
-
-            local BitCount = Data:read_uint16(29)
-            local ColorsB = 4
-            
-            if (HSize==12) { # OS/2 BMP
-                Width = Data:read_uint16(19)   
-                Height = Data:read_uint16(21)  
-                Compression = 0
-                Colors = 0
-                BitCount = Data:read_uint16(25)  
-                ColorsB = 3    
-            }            
-            BmpData[5,number] = ColorsB
-            
-            if (Height<0) { # flip row order checkbox
-                BmpData[20,number] = -1
-                Height *= -1
-            } else {
-                BmpData[20,number] = 1
-            }
-            
-            if (Width<1 | Height<1 | Size==0) {
-                Error = "Invalid BMP resolution.\nWidth and Height is: "+Width+"x"+Height
-                print(_HUD_PRINTTALK,Error)
-                return
-            }
-            
-            if (Size==0) {
-                Error = "Unsupported BMP file.\nInvalid BMP Size."
-                print(_HUD_PRINTTALK,Error)
-                return
-            }
-            
-            if (Compression!=0 & (Compression!=3 | Compression==3 & BitCount==32)) {
-                Error = "Unsupported BMP file.\nCompression: "+Compression+"\nBitCount: "+BitCount
-                print(_HUD_PRINTTALK,Error)
-                return
-            }
-            
-            local ScreenName = DigitalScreen:entity():getName()
-            local MaxSize = (ScreenName=="Quad Digital Screen" ? 1024 : 512)
-
-            if (Width>MaxSize | Height>MaxSize) {
-                Error = "Max BMP resolution is "+MaxSize+"x"+MaxSize+"\nYour's current is "+Width+"x"+Height+"."
-                print(_HUD_PRINTTALK,Error)
-                return
-            }
-
-            if (BitCount==24 || BitCount==32) {
-                BmpData[14,number] = 16
-                BmpData[15,number] = 8
-                BmpData[16,number] = 0
-                BmpData[17,number] = 0xFF
-                BmpData[18,number] = 0xFF
-                BmpData[19,number] = 0xFF
-            } elseif (BitCount==16) {
-                if (Compression==0) {
-                    BmpData[14,number] = 10
-                    BmpData[15,number] = 5
-                    BmpData[16,number] = 0
-                    BmpData[17,number] = 0x1F
-                    BmpData[18,number] = 0x1F
-                    BmpData[19,number] = 0x1F
-                } else {
-                    local RM = Data:read_uint32(55)
-                    local GM = Data:read_uint32(59)
-                    local BM = Data:read_uint32(63)
-
-                    local RS = trailingZeros(RM)
-                    local GS = trailingZeros(GM)
-                    local BS = trailingZeros(BM)
-
-                    BmpData[14,number] = RS
-                    BmpData[15,number] = GS
-                    BmpData[16,number] = BS
-                    BmpData[17,number] = RM >> RS
-                    BmpData[18,number] = GM >> GS
-                    BmpData[19,number] = BM >> BS
-                }
-            } else {
-                BmpData[22,table] = table()
-                if (Colors==0) {
-                    Colors = 1 << BitCount
-                }
-                BmpData[23,number] = Colors
-                BmpData[24,number] = 1
-                BmpData[25,number] = 0
-            }
-            BmpData[26,number] = BitCount
-
-            local II = BitCount/8
-            BmpData[21,number] = II
-            BmpData[27,number] = 8/BitCount
-
-            BmpData[3,number] = Width
-            BmpData[4,number] = Height
-            #BmpData[5,number] = Size
-            local FSize = BmpData["size",number]
-            
-            if (!NoKeepAR) {
-                local SWH = (Width>Height ? Width : Height)
-                BmpData[31,number] = (Height>Width ? floor((Height-Width)/2) : 0 )
-                BmpData[32,number] = (Width>Height ? floor((Width-Height)/2) : 0 )
-                DigitalScreen[1048573] = SWH
-                DigitalScreen[1048572] = SWH
-            } else {
-                BmpData[31,number] = 0
-                BmpData[32,number] = 0
-                DigitalScreen[1048573] = Width
-                DigitalScreen[1048572] = Height
-            }
-
-            BmpData[6,number] = 0
-            BmpData[7,number] = Height-1
-
-            local Bytes = ceil(Width*II/4)*4 # how many bytes we read
-            if (FSize<Bytes) { Bytes = FSize-Offset }
-            BmpData[28,number] = Bytes
-            BmpData[10,number] = Bytes 
-
-            BmpData[9,number] = 0
-            BmpData[8,number] = Offset
-
-            BmpData[13,number] = floor(ceil(Width*II/4)*4-Width*II)
-
-            if (BitCount<=8) {
-                Bytes = (Colors>32 ? 32*ColorsB : Colors*ColorsB)
-                BmpData[10,number] = Bytes 
-                BmpData[29,number] = Offset
-                BmpData[8,number] = 14+HSize+1
-                BmpData[30,number] = 0
-            }
-
-            alxos_bmp_draw()
-
-        } else {
-            Error = "This is not valid BMP file."
-            print(_HUD_PRINTTALK,Error)
-            return
-        }
-    } else {
+if (first()|duped()) {
+    
+    BmpInitFunc = function() {
+        local Data = BmpData["data",string]
+        
         local I = BmpData[8,number]
-
+        
         local Width = BmpData[3,number]
         local Height = BmpData[4,number]
-
+        
         local Bytes = BmpData[10,number]
         local Data = Data:sub(I,I+Bytes-1)
-
+        
         local Max = Data:length()
-        
-        #Percent = round(I/BmpData["size",number]*100)
-        
-        local RCol = BmpData[24,number]
-
-        if (RCol==1) {
-            local SI = BmpData[9,number]
-            
-            local Colors = BmpData[23,number]
-            local CTbl = BmpData[22,table]
-            local CTblI = BmpData[30,number]
-            local ColorsB = BmpData[5,number]
-            
-            while(perf(90)) {
-                if (CTblI>=Colors) {
-                    CTblI = Colors
-                    break
-                }
-
-                local Sub = 0
-                if (ColorsB == 4) { Sub = Data:read_uint32(SI+1) }
-                else { Sub = Data:read_uint24(SI+1) }
-                local R = floor((Sub >> 16) && 0xFF)
-                local G = floor((Sub >> 8) && 0xFF)
-                local B = floor(Sub && 0xFF)
-
-                CTbl[CTblI,vector] = vec(R,G,B)
-                SI+=ColorsB
-                CTblI++
-                if (SI>=Max) {
-                    SI = Max
-                    break
-                }
-            }
-
-            if (CTblI==Colors) {
-                BmpData[24,number] = 2
-                BmpData[9,number] = 0
-                BmpData[8,number] = BmpData[29,number]
-            } else {
-                BmpData[30,number] = CTblI
-                if (SI==Max) {
-                    local Bytes = BmpData[10,number]
-                    local Next = I+Bytes
-                    BmpData[8,number] = Next
-                    BmpData[9,number] = 0
-                } else {
-                    BmpData[9,number] = SI
-                    BmpData[11,string] = Data
-                }
-            }
-            timer("bmp",1)
-
-            return
-        }
         
         local BitCount = BmpData[26,number]
         
-        if (BmpData["MULTI_INIT",number] > 0) {
+        if (BmpData["MULTI_INIT",number] > 0) {            
             local ChildE2s = BmpData["MULTI_E2_COUNT",number]
             if (BmpData["MULTI_INIT",number] == 1) {
                 local Global = gTable("BMP_MULTI")
@@ -306,14 +68,19 @@ function alxos_bmp_draw() {
                 if (MaxThreads>0 & ChildE2s > MaxThreads) { ChildE2s = MaxThreads }
                 if (ChildE2s>Height) { ChildE2s = Height }
                 
-                Threads = ChildE2s
+                BmpThreads = ChildE2s
                 
                 BmpData["MULTI_E2_COUNT",number] = ChildE2s
                 BmpData["MULTI_INIT",number] = 2
+                BmpData["LastIndex",number] = -1
             }
             if (!ChildE2s) {
-                Error = "FATAL ERROR: no child e2 spawned."
-                print(_HUD_PRINTTALK,Error) 
+                BmpWarning = "No child e2 spawned, using main thread."
+                print(_HUD_PRINTTALK,"Warning: "+BmpWarning)
+                
+                BmpThreads = 1
+                
+                bmpInitSingleDraw()                
             } else {
                 #local Lines = (Width > Height ? Width : Height)
                 local SubLines = ceil(Height / ChildE2s)
@@ -321,8 +88,10 @@ function alxos_bmp_draw() {
                 local LineDiff = (SubLines * ChildE2s - Height)
                 local StartLine = BmpData["StartLine",number]
                 local C = BmpData["C",number]
-                BmpData["DS",wirelink] = DigitalScreen
                 BmpData["Y",number] = 0
+                
+                local RowBytes = ceil(Width * BmpData[21,number]) + BmpData[13,number]
+                
                 while(perf(80)) {
                     if (C>ChildE2s) {
                         break
@@ -332,13 +101,23 @@ function alxos_bmp_draw() {
                     }
                     BmpDataClone = BmpData:clone()
                     
+                    BmpDataClone["ThreadIndex",number] = C
+                    
                     BmpDataClone[7,number] = Height-StartLine
                     if (BmpData[20,number]==1) { BmpDataClone[7,number] = BmpDataClone[7,number] - 1 }
-                    #if (BitCount<=4) {
-                    #    BmpDataClone[8,number] = ceil(StartLine*BmpData[27,number])+BmpData[13,number]+BmpData[8,number]
-                    #} else {
-                        BmpDataClone[8,number] = ceil(StartLine*(ceil(Width*BmpData[21,number])+BmpData[13,number]))+BmpData[8,number]                    
-                    #}
+                     
+                    local FileOffset = StartLine * RowBytes + BmpData[8,number]
+                    BmpDataClone[8,number] = FileOffset
+                    
+                    local FullBlockBytes = SubLines * RowBytes
+                    
+                    local FileRemainder = BmpData["size",number] - FileOffset
+                    if (FullBlockBytes > FileRemainder) {
+                        FullBlockBytes = FileRemainder
+                    }
+                    
+                    BmpDataClone[10,number] = FullBlockBytes
+
                     BmpDataClone["max",number] = SubLines            
                     
                     dsSendDirect("BMP_MULTI_START",BmpData["MULTI_E2",table][C,wirelink]:entity(),BmpDataClone)   
@@ -367,20 +146,8 @@ function alxos_bmp_draw() {
         BmpData["StartLine",number] = 0
         dsSend("BMP_MULTI_INIT","BMP_SUB",entity())
             
-        timer("bmp",50) 
+        timer("bmp",50)        
     }
-
-}
-
-function bmpInit(Body:string, Size) {
-    Error = ""
-    dsClear()  
-    BmpData["data",string] = Body   
-    BmpData["size",number] = Size
-    timer("bmp",1)
-}
-
-if (first()|duped()) {
     
     Command = "!bmp"
     
@@ -395,87 +162,38 @@ if (first()|duped()) {
     }
     
     Funcs["readerLoad", function] = function(Body:string, Size:number, Path:string) {
-        bmpInit(Body, Size)
+        
+        local Global = gTable("BMP_MULTI")
+        Global["BMP_STOP",number] = 1
+        stopAllTimers()
+        
+        #dsSend("BMP_MULTI_STOP","BMP_SUB",entity())        
+        bmpInit(Body, Size, SizeLimit, NoKeepAR)
+        bmpInitCallback(BmpInitFunc)
+        bmpSetDS(DS)
+        bmpRun()
     }
     
     Funcs["readerCheck", function] = function() {
-        if (!->DigitalScreen) {
-            print(_HUD_PRINTTALK,"Digital Screen is not connected.") 
-            return 0
-        }
-        
-        local ScreenName = DigitalScreen:entity():getName()
-        if (DigitalScreen:entity():type()!="gmod_wire_digitalscreen" & ScreenName!="Quad Digital Screen") {
-            print(_HUD_PRINTTALK,"Entity what you did connected is not Digital Screen.\n"+
-            "It is located in Wire -> Visuals -> Screens -> Digital Screen.\nThis is NOT EGPv3 screen.") 
-            return 0    
-        }
-        return 1  
-    } 
+        return checkScreen(DS)
+    }
     
     Funcs["readerError", function] = function(Error:string, Path:string) {
         print(_HUD_PRINTTALK, Error)
     }
-    
-    BmpData = table()
-    
-    NoKeepAR = BMP_NoKeepAR # 0 - keep asset ratio, 1 - scale to screen size
-    Percent = 0
+
+    BmpPercent = 0
     MaxThreads = 0 # maximum threads, 0 - unlimited (may crash)
-    
-    DS_Out = DigitalScreen
-
-}
-
-event chat(Player:entity, Said:string, Team:number) {
-    if (!Command) { exit() }
-    
-    if (Player==owner()) { 
-        
-        local Find = Said:lower():find(" ")
-        
-        if (Find) {
-            local Cmd = Said:left(Find-1)
-            local Mode = Said:sub(Find+1):lower()
-
-            if (Cmd==Command+"keepar") {
-                if (Mode=="false" | Mode=="0" | Mode=="nokeep" | Mode=="off") {
-                    NoKeepAR = 1    
-                    print(_HUD_PRINTTALK,
-                        "Aspect Ratio: DISABLED (Stretch to fit)"
-                    ) 
-                } else {
-                    NoKeepAR = 0   
-                    print(_HUD_PRINTTALK,
-                        "Aspect Ratio: ENABLED (Preserve proportions)"
-                    ) 
-                }
-            }
-        }
-    }
-}
-
-if (~BMP_NoKeepAR) {
-    NoKeepAR = BMP_NoKeepAR
-}
-
-if (~DigitalScreen) {
-    DS_Out = DigitalScreen    
-}
-
-if (clk("bmp")) {
-    alxos_bmp_draw()
-    exit()
 }
 
 if (clk("bmp_stage")) {
     local ChildE2s = BmpData["MULTI_E2_COUNT",number]
     local PercentT = 0
     for (I = 1, ChildE2s) {
-        PercentT += BmpData["MULTI_E2",table][I,wirelink]["Percent",number]
+        PercentT += BmpData["MULTI_E2",table][I,wirelink]["BmpPercent",number]
     }
     PercentT = PercentT / ChildE2s
-    Percent = PercentT
+    BmpPercent = round(PercentT,2)
     timer("bmp_stage",100)
     exit()   
 }
@@ -493,12 +211,8 @@ if (dsClk("BMP_MULTI_INIT")) {
 if (dsClk("BMP_MULTI_FINISH")) {
     BmpData["MULTI_DONE",number] = BmpData["MULTI_DONE",number]+1
     if (BmpData["MULTI_DONE",number] == BmpData["MULTI_E2",table]:count()) {
-        RenderTime = curtime() - BmpData["time",number]
-        RenderRealTime = realtime() - BmpData["real_time",number]
-        print(_HUD_PRINTTALK,"BMP successfully parsed. Render time: "+round(RenderTime,2)+"s")
-        Percent = 100
+        bmpFinish()
         stopAllTimers()
-        BmpData = table()
     }
     exit()
 }

@@ -1,0 +1,200 @@
+@name ZGPU Screen Renderer
+@inputs ZGPU:wirelink MemBus:wirelink
+@outputs VirtualScreen:wirelink
+@persist ScrW ScrH 
+@persist DsBuffer:array DirtyRows:array BlockDraw
+@persist PtrAddress DataAddress MemSize # CacheFix LastPos
+@persist UpdateQueue:array QueueRead QueueWrite
+@trigger none 
+@strict
+
+#[
+    ALX Wiremod E2 PC
+    Created by AlexALX (c) 2026
+]#
+
+function dsClear() {
+    DsBuffer = array()
+    DirtyRows = array()
+    
+    BlockDraw = 0
+    
+    UpdateQueue = array()
+    QueueRead = 1
+    QueueWrite = 0
+    
+    #ZGPU[PtrAddress] = 0
+    #CacheFix = 0
+    #LastPos = 0
+}
+
+if (first() | duped()) {
+    ScrW = 512
+    ScrH = 512
+        
+    VirtualScreen = wirelink()
+    
+    PtrAddress = 131072
+    DataAddress = PtrAddress + 64
+    
+    dsClear()
+    
+    # ZGPU 1MB memsize needed for us
+    # -4064 is for boundary
+    MemSize = 1044512
+}
+
+event writeCell(Address:number, Value:number) {    
+    if (Address < 1048500) {
+        # block draw for buffer
+        # this fixes huge fps drop
+        BlockDraw = 2
+        
+        DsBuffer[Address, number] = Value
+        
+        local GlobalY = floor(Address / ScrW)
+      
+        if (DirtyRows[GlobalY, number] == 0) {
+            DirtyRows[GlobalY, number] = 1
+              
+            QueueWrite++
+            UpdateQueue[QueueWrite, number] = GlobalY
+        }
+    } else {
+        if (Address == 1048573) {            
+            ScrW = Value
+            dsClear()
+        } elseif (Address == 1048572) {    
+            ScrH = Value
+            
+            local Ptr = ZGPU[PtrAddress]
+            
+            # Set pointer to start of image always
+            ZGPU[PtrAddress+1] = Ptr
+        
+            # CMD_SET_SIZE
+            ZGPU[DataAddress + Ptr] = 1 
+            ZGPU[DataAddress+1 + Ptr] = ScrW        
+            ZGPU[DataAddress+2 + Ptr] = ScrH
+            
+            # CMD_CLEAR_SCREEN
+            ZGPU[DataAddress+3 + Ptr] = 2
+            
+            # TODO:
+            # check READ_PTR and queue overflow
+            
+            # Commit
+            ZGPU[PtrAddress] = Ptr + 4
+        } elseif (Address == 1048570) {        
+            local Row = Value
+        
+            QueueWrite++
+            UpdateQueue[QueueWrite, number] = -(Row + 1)
+        
+            local RowBase = Row * ScrW
+        
+            for (X = 0, ScrW - 1) {
+                DsBuffer[RowBase + X, number] = 0
+            }
+            
+            #BlockDraw = 2
+            #  | Address == 1048570 clear COL not supported
+        } else {  
+            #DsBuffer[Address, number] = Value
+        }
+    }
+}
+
+event tick() {
+    if (QueueWrite == 0) {
+        #[ 
+        This will never work as espected
+        ZGpu running on client side on every player, 
+        so it will always will be not what you want
+        
+        local ReadPtr = MemBus[0]
+        local WritePtr = ZGPU[PtrAddress]
+        
+        if (ReadPtr<WritePtr & LastPos==ReadPtr) {
+            CacheFix++
+            
+            if (CacheFix==100) {
+                CacheFix = 0
+                QueueCount = UpdateQueue:count()
+                ZGPU[PtrAddress] = 0
+            }
+        }
+        
+        LastPos = ReadPtr
+        
+        ]#
+        
+        #[if (CacheFix!=-1) {
+            # fix ZGPU SYNC
+            ZGPU[PtrAddress+2] = CacheFix
+            CacheFix++
+            
+            if (CacheFix==10024) {
+                CacheFix = -1  
+            }
+        } ]# 
+        exit() 
+    }
+    
+    # move to next tick
+    if (BlockDraw>0) {
+        BlockDraw--
+        exit()    
+    }
+    
+    while (QueueRead <= QueueWrite & perf(90)) {
+          
+        local TargetY = UpdateQueue[QueueRead, number]
+        QueueRead++
+        
+        local Ptr = ZGPU[PtrAddress]
+        
+        if (Ptr>MemSize) {
+            Ptr = 0
+            ZGPU[PtrAddress] = 0   
+        }
+        
+        if (TargetY<0) { 
+            # CMD_CLEAR_ROW
+            local Value = -TargetY - 1
+            
+            DirtyRows[Value, number] = 0
+        
+            ZGPU[DataAddress + Ptr] = 3
+            ZGPU[DataAddress + Ptr + 1] = Value
+            ZGPU[DataAddress + Ptr + 2] = ScrW
+        
+            for (X = 0, ScrW - 1) {
+                ZGPU[DataAddress + Ptr + 3 + X] = 0
+            }
+
+            ZGPU[PtrAddress] = Ptr + 3 + ScrW
+        } else {
+            DirtyRows[TargetY, number] = 0
+            
+            ZGPU[DataAddress + Ptr] = 3
+            ZGPU[DataAddress+1 + Ptr] = TargetY
+            ZGPU[DataAddress+2 + Ptr] = ScrW
+            
+            local RowBase = TargetY * ScrW
+    
+            for (X = 0, ScrW - 1) {
+                ZGPU[DataAddress + 3 + Ptr + X] = DsBuffer[RowBase + X, number]
+            }
+            
+            ZGPU[PtrAddress] = Ptr + 3 + ScrW
+        }    
+    }
+
+    if (QueueRead > QueueWrite) {
+        QueueRead = 1
+        QueueWrite = 0
+        UpdateQueue = array()
+    }    
+}
+

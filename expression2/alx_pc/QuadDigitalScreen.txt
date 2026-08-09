@@ -7,6 +7,11 @@
 @trigger none 
 @strict
 
+#[
+    ALX Wiremod E2 PC
+    Created by AlexALX (c) 2026
+]#
+
 function dsClear() {
     DsBuffer = array()
     DirtyRows = array()
