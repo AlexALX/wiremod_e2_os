@@ -163,6 +163,10 @@ event input(InputName:string) {
         displayProgress()
     } elseif (InputName == "Warning" & Warning) {
         displayWarning(Warning)           
+    } elseif (InputName == "CurrentState") {
+        if (CurrentState=="done") {
+            displayProgress()        
+        }
     }
 }
 
