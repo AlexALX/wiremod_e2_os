@@ -15,9 +15,25 @@ function BMP.bmpDecodeStep()
         BMP.x = 0
         BMP.y = 0
         
+        local MaxSize = 1024
+        if BMP.SizeLimit>0 then
+            MaxSize = math.clamp(BMP.SizeLimit,1,MaxSize)    
+        end
+        
+        local WH = math.max(BMP.width,BMP.height)
+        
+        if MaxSize==1024 and WH>1024  then
+            local Scale = WH / MaxSize
+            local ResizedWidth  = math.floor(BMP.width / Scale)
+            local ResizedHeight = math.floor(BMP.height / Scale)
+                            
+            print("Your image is larger than Starfall Screen supports\n"..
+                "Your image will be resized to: "..ResizedWidth.."x"..ResizedHeight)
+        end
+        
         local scale = math.min(
-            1024 / BMP.width,
-            1024 / BMP.height,
+            MaxSize / BMP.width,
+            MaxSize / BMP.height,
             1
         )
     
@@ -28,13 +44,24 @@ function BMP.bmpDecodeStep()
         BMP.RenderW = math.floor(BMP.width * BMP.scale)
         BMP.RenderH = math.floor(BMP.height * BMP.scale) 
         
-        local sequential = true
-        if not BMP.topDown then
-            sequential = 2
+        local sequential = true     
+        -- RLE compression delta might shift
+        if BMP.compression == 1 or BMP.compression == 2 then
+            sequential = false 
         end
         
-        BMP.Renderer.Init(BMP.RenderW, BMP.RenderH, BMP.UrlMaterial, sequential)
+        BMP.Renderer.Init(BMP.RenderW, BMP.RenderH, BMP.SizeLimit, BMP.NoKeepAR, BMP.UrlMaterial, sequential, BMP.topDown)
 
+        if BMP.compression==1 or BMP.compression==2 then
+            BMP.rleState = {
+                count = 0,
+                mode = 0,
+                value = 0,
+                absoluteRemaining = 0,
+                absoluteBytesRead = 0,
+                rle4Odd = false
+            }    
+        end
     end
 
     return BMP.readPixel()
@@ -44,14 +71,162 @@ function BMP.OutputTransformPixel(x, y)
     local sx = math.floor(x * BMP.RenderW / BMP.width)
     local sy = math.floor(y * BMP.RenderH / BMP.height)
 
+    if BMP.lastFlushedY == sy then
+        return nil, sy
+    end
+
     if sx == BMP.lastX and sy == BMP.lastY then
-        return nil
+        return nil, sy
     end
 
     BMP.lastX = sx
     BMP.lastY = sy
 
     return sx, sy
+end
+
+function BMP.readPixelRLE8()
+    local st = BMP.rleState
+    local File = BMP.file
+
+    if st.count == 0 and st.absoluteRemaining == 0 then
+        local count = File:readByte()
+        local command = File:readByte()
+
+        if count == 0 then
+            if command == 0 then
+                --BMP.x = 0
+                --BMP.y = BMP.y + 1
+                --BMP.Renderer.Flush()
+                return
+            elseif command == 1 then
+                BMP.Renderer.Finish()
+                BMP.finished = true
+                return 1
+            elseif command == 2 then 
+                local dx = File:readByte()
+                local dy = File:readByte()
+                BMP.x = BMP.x + dx
+                BMP.y = BMP.y + dy
+                return
+            else
+                st.absoluteRemaining = command
+                st.mode = 1
+                st.absoluteBytesRead = 0
+            end
+        else 
+            st.count = count
+            st.value = command
+            st.mode = 0
+        end
+    end
+
+    if st.mode == 0 and st.count > 0 then
+        st.count = st.count - 1
+        local color = BMP.palette[st.value]
+        if color then
+            return BMP.processPixel(color.r, color.g, color.b)
+        end
+    elseif st.mode == 1 and st.absoluteRemaining > 0 then
+        st.absoluteRemaining = st.absoluteRemaining - 1
+        local index = File:readByte()
+        st.absoluteBytesRead = st.absoluteBytesRead + 1
+
+        if st.absoluteRemaining == 0 and bit.band(st.absoluteBytesRead, 1) != 0 then
+            File:skip(1)
+        end
+
+        local color = BMP.palette[index]
+        if color then
+            return BMP.processPixel(color.r, color.g, color.b)
+        end
+    end
+end
+
+function BMP.readPixelRLE4()
+    local st = BMP.rleState
+    local File = BMP.file
+
+    if st.count == 0 and st.absoluteRemaining == 0 then
+        local count = File:readByte()
+        local command = File:readByte()
+
+        if count == 0 then
+            if command == 0 then
+                --BMP.x = 0
+                --BMP.y = BMP.y + 1
+                --BMP.Renderer.Flush()
+                st.rle4Odd = false
+                return
+            elseif command == 1 then 
+                BMP.Renderer.Finish()
+                BMP.finished = true
+                return 1
+            elseif command == 2 then 
+                local dx = File:readByte()
+                local dy = File:readByte()
+                BMP.x = BMP.x + dx
+                BMP.y = BMP.y + dy
+                
+                while BMP.x >= BMP.width and BMP.width > 0 do
+                    BMP.x = BMP.x - BMP.width
+                    BMP.y = BMP.y + 1
+                    BMP.Renderer.Flush()
+                end
+                
+                st.rle4Odd = false 
+                return
+            else
+                st.absoluteRemaining = command
+                st.mode = 1
+                st.absoluteBytesRead = 0
+                st.rle4Odd = false
+            end
+        else
+            st.count = count
+            st.value = command 
+            st.mode = 0
+            st.rle4Odd = false
+        end
+    end
+
+    if st.mode == 0 and st.count > 0 then
+        st.count = st.count - 1
+        local index
+        if not st.rle4Odd then
+            index = bit.band(bit.rshift(st.value, 4), 0x0F)
+        else
+            index = bit.band(st.value, 0x0F)
+        end
+        st.rle4Odd = not st.rle4Odd
+
+        local color = BMP.palette[index]
+        if color then
+            return BMP.processPixel(color.r, color.g, color.b)
+        end
+    elseif st.mode == 1 and st.absoluteRemaining > 0 then
+        st.absoluteRemaining = st.absoluteRemaining - 1
+        
+        local index
+        if not st.rle4Odd then
+            st.value = File:readByte()
+            st.absoluteBytesRead = st.absoluteBytesRead + 1
+            index = bit.band(bit.rshift(st.value, 4), 0x0F)
+            st.rle4Odd = true
+        else
+            index = bit.band(st.value, 0x0F)
+            st.rle4Odd = false
+        end
+
+        if st.absoluteRemaining == 0 and bit.band(st.absoluteBytesRead, 1) != 0 then
+            File:skip(1)
+        end
+
+        local color = BMP.palette[index]
+        if color then
+            return BMP.processPixel(color.r, color.g, color.b)
+        end
+    end
 end
 
 function BMP.processPixel(r,g,b,a)
@@ -66,7 +241,7 @@ function BMP.processPixel(r,g,b,a)
     
     local sx, sy = BMP.OutputTransformPixel(BMP.x, DrawY)
 
-    if sx!=nil and BMP.lastFlushedY!=sy then        
+    if sx!=nil then        
         BMP.Renderer.setPixel(
             sx,
             sy,
@@ -83,21 +258,27 @@ function BMP.processPixel(r,g,b,a)
 
         BMP.x = 0
         BMP.y = BMP.y + 1
+        
+        BMP.lastX = -1
 
-        --  padding
-        local padding = BMP.rowSize - BMP.rowBytes
-
-        if padding > 0 then
-            BMP.file:skip(padding)
+        if BMP.compression != 1 and BMP.compression != 2 then
+            --  padding
+            local padding = BMP.rowSize - BMP.rowBytes
+    
+            if padding > 0 then
+                BMP.file:skip(padding)
+            end
         end
         
-        BMP.Renderer.Flush()
-        BMP.lastFlushedY = sy
-
+        if BMP.lastFlushedY != sy then
+            BMP.Renderer.Flush()
+            BMP.lastFlushedY = sy
+        end
     end
 
     if BMP.y >= BMP.height then
         BMP.Renderer.Finish()
+        BMP.bmpFinish()
         BMP.finished = true
         return 1
     end

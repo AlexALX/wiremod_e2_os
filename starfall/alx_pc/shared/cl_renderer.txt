@@ -6,16 +6,24 @@ local Renderer = {}
 
 Renderer.RT_NAME = "alx_pc_image"
 
-function Renderer.Init(w,h,isMaterialRender)
+function Renderer.Init(w,h,SizeLimit,NoKeepAR,isMaterialRender)
     Renderer.queue = {}
     
     Renderer.Dirty = false
     Renderer.MaterialRender = materialRender
+    Renderer.NoKeepAR = NoKeepAR
     
-    if not materialRender then
+    local MaxSize = 1024
+    if Renderer.SizeLimit then
+        MaxSize = math.clamp(SizeLimit,1,MaxSize)    
+    end
+    
+    Renderer.SizeLimit = MaxSize
+    
+    if not materialRender then    
         local scale = math.min(
-            1024 / w,
-            1024 / h,
+            Renderer.SizeLimit / w,
+            Renderer.SizeLimit / h,
             1
         )
     
@@ -103,10 +111,6 @@ function Renderer.CalculateDrawSize()
     end
 end
 
-function Renderer.SetARMode(NoKeepAR)
-    Renderer.NoKeepAR = NoKeepAR    
-end
-
 function Renderer.Flush()
     Renderer.Dirty = true    
 end
@@ -159,12 +163,10 @@ function Renderer.Update()
         render.clear()
         
         render.selectRenderTarget(nil)
+        if #Renderer.queue == 0 then
+            Renderer.Dirty = false
+        end
         return    
-    end
-    
-    if #Renderer.queue==0 and Renderer.isFinish then
-        Renderer.FinishRender()
-        return  
     end
 
     while #Renderer.queue > 0 and quotaUsed()<quotaMax()*0.9 do
@@ -188,6 +190,17 @@ function Renderer.Update()
     end
 
     render.selectRenderTarget(nil)
+    
+    if #Renderer.queue==0 then
+        if Renderer.isFinish then
+            Renderer.FinishRender()
+        end
+        
+        if #Renderer.queue == 0 then
+            Renderer.Dirty = false
+        end
+    end
+    
 end
 
 function Renderer.Think()    

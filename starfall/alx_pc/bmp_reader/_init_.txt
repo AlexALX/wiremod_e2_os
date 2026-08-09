@@ -9,9 +9,11 @@ BMP = BMP or {}
 dofile("alx_pc/bmp_reader/parser.txt")
 dofile("alx_pc/bmp_reader/decoder.txt")
 
-function BMP.bmpInit(StorageFile, Renderer, NoKeepAR)
+function BMP.bmpInit(StorageFile, Renderer, SizeLimit, NoKeepAR)
 
     BMP.file = StorageFile
+    
+    BMP.startTime = timer.curtime()
 
     BMP.setState(0)
 
@@ -22,7 +24,8 @@ function BMP.bmpInit(StorageFile, Renderer, NoKeepAR)
     BMP.error = nil
     
     BMP.Renderer = Renderer
-    Renderer.SetARMode(NoKeepAR)
+    BMP.NoKeepAR = NoKeepAR
+    BMP.SizeLimit = SizeLimit
     
     BMP.UrlMaterial = false
     BMP.pixelStart = false
@@ -97,6 +100,9 @@ function BMP.bmpFinish()
     
     if BMP.error then
         BMP.Error(BMP.error)    
+    else
+        local RenderTime = timer.curtime() - BMP.startTime
+        print("BMP successfully parsed. Render time: "..math.round(RenderTime,2).."s")       
     end
 end
 

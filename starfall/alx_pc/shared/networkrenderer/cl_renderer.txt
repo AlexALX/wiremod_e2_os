@@ -8,35 +8,53 @@ local Renderer = {}
 
 local SafeNet = require("SafeNet")
 
-function Renderer.Init(w,h,isMaterialRender,sequential,alpha)
+local function toBool(val)
+    if type(val) == "boolean" then
+        return val
+    elseif type(val) == "number" then
+        return val > 0
+    end
+    return false
+end
+
+function Renderer.Init(w,h,SizeLimit,NoKeepAR,isMaterialRender,sequential,topDown,alpha)
     Renderer.queue = {}
+    Renderer.netBytesAccumulated = 0
     
-    SafeNet.cancelAll()
-    
+    if SafeNet.cancelAll!=nil then
+        SafeNet.cancelAll()
+    end
+
     SafeNet.start("image_render_init")
     SafeNet.writeUInt(w,16)
     SafeNet.writeUInt(h,16)
-    SafeNet.writeBool(isMaterialRender)
-    SafeNet.writeBool(sequential and 1 or false)
-    SafeNet.writeBool(sequential!=2)
-    SafeNet.writeBool(alpha and 1 or false)
+    SafeNet.writeUInt(SizeLimit,16)
+    SafeNet.writeBool(toBool(NoKeepAR))
+    SafeNet.writeBool(toBool(isMaterialRender))
+    SafeNet.writeBool(toBool(sequential))
+    SafeNet.writeBool(toBool(topDown))
+    SafeNet.writeBool(toBool(alpha))
     SafeNet.send()
-    Renderer.sequential = sequential and 1 or false
-    Renderer.hasAlpha = alpha and 1 or false
-end
-
-function Renderer.SetARMode(NoKeepAR)
-    SafeNet.start("image_render_armode")
-    SafeNet.writeBool(NoKeepAR and 1 or false)
-    SafeNet.send()
+    Renderer.sequential = sequential
+    Renderer.hasAlpha = toBool(alpha)
 end
 
 function Renderer.Flush()
-    local Queue = Renderer.queue
+    Renderer.FlushBuffer()
+end
 
-    SafeNet.start("image_render_flush")
+function Renderer.FlushBuffer()
+    local Queue = Renderer.queue
+    if #Queue == 0 then return end
     
-    local Stream = SafeNet.stringstream()
+    local IsSafeStream = SafeNet.stringstream!=nil
+    
+    local Stream 
+    if IsSafeStream then
+        Stream = SafeNet.stringstream()    
+    else
+        Stream = bit.stringstream() 
+    end
     
     Stream:writeUInt16(#Queue)
     
@@ -56,13 +74,22 @@ function Renderer.Flush()
         end
     end
     
-    SafeNet.writeStream(bit.compress(Stream:getString()))
+    local RawData = Stream:getString()
+    local Data = bit.compress(RawData)
+    local Size = Data:len()
+        
+    SafeNet.start("image_render_flush")
+    SafeNet.writeUInt(Size,16)
+    SafeNet.writeData(Data, Size)
     SafeNet.send()
     
     Renderer.queue = {}
+    Renderer.netBytesAccumulated = 0
 end
 
 function Renderer.Finish()
+    Renderer.FlushBuffer()
+    
     SafeNet.start("image_render_finish")
     SafeNet.send()
 end
@@ -81,6 +108,18 @@ function Renderer.setPixel(x,y,r,g,b,a)
         b = b,
         a = a or 255
     }
+    
+    local pixelSize = Renderer.hasAlpha and 4 or 3
+    if not Renderer.sequential then
+        pixelSize = pixelSize + 4
+    end
+    
+    Renderer.netBytesAccumulated = Renderer.netBytesAccumulated + pixelSize
+    
+    if Renderer.netBytesAccumulated >= 19000 then
+        Renderer.FlushBuffer()
+    end
+    
 end
 
 return Renderer

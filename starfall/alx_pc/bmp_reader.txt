@@ -4,6 +4,7 @@
 --@include alx_pc/shared/networkrenderer/network.txt
 --@include alx_pc/bmp_reader/_init_.txt
 --@include alx_pc/shared/networkrenderer/cl_renderer.txt
+--@include alx_pc/shared/cl_renderer.txt
 --@include alx_pc/shared/cl_basicreader.txt
 
 /*
@@ -12,10 +13,13 @@
     -------------------
     BMP Parser, specifications:
     - Max resolution is up to 1024x1024 (RT limitation), will be resized if higher
-    - Support most common uncompressed bmp files (32/24/8/4 bits and monochrome, including RGB444/RGB555/RGB565)
+    - Support most common bmp files (32/24/8/4 bits and monochrome, including RGB444/RGB555/RGB565)
+    - Support OS/2 BMP files
+    - Support RLE Compression
     - Support "flip row order" function
-    - Extremelly slow due to default 5KB per second net limit in starfall
+    - Extremelly slow due to default 5KB per second net limit in starfall (multiplayer)
     NOTE: You can change sf_net_burstrate AND sf_net_burstrate_cl to higher values to make it work faster.
+    In Single Player it uses purely local rendering so no network used
     
     Usage:
     - Spawn one this chip
@@ -25,6 +29,7 @@
     !bmp http://url_with_bmp_file - open bmp file
     !bmpfile filename.bmp - open bmp file from a garrysmod/data/sf_filedata/ folder
     !bmpabort - abort rendering
+    !bmpsize - set maximum image dimensions before scaling (1 to 1024)
     !bmpkeepar - set image Aspect Ratio mode (0 or 1) 
     
     If you have own web server with PHP, then you can place 
@@ -51,63 +56,87 @@ dofile("alx_pc/shared/networkrenderer/network.txt")
 if CLIENT then
     
     if OWNER then
+        
+        -- for debug in Single Player
+        local ForceNetwork = false
 
-    local BMPReader = require("alx_pc/bmp_reader/_init_.txt")
-    local Renderer = require("alx_pc/shared/networkrenderer/cl_renderer.txt")
-    local Reader = require("alx_pc/shared/cl_basicreader.txt")
-    
-    local KeepAR = true
-    
-    Reader.Command = "!bmp"
-    
-    function Reader.onLoad(StorageFile, Url)               
-        BMPReader.bmpInit(StorageFile, Renderer, not KeepAR)
-    end
-    
-    function Reader.onError(Err, Url)
-        print(Err)
-    end
-    
-    function Reader.onAbort()
-        BMPReader.bmpFinish()
-        SafeNet.cancelAll()
-        if BMPReader.Renderer then
-            BMPReader.Renderer.Abort()
+        local BMPReader = require("alx_pc/bmp_reader/_init_.txt")   
+        local Reader = require("alx_pc/shared/cl_basicreader.txt")
+        
+        local Renderer
+        if not ForceNetwork and game.isSinglePlayer() then
+            Renderer = require("alx_pc/shared/cl_renderer.txt")
+        else
+            Renderer = require("alx_pc/shared/networkrenderer/cl_renderer.txt")    
         end
-        print("BMP rendering canceled.")    
-    end
-    
-    function Reader.Check()
-        return 1    
-    end
-    
-    Reader.OnChatDef = Reader.onChat
-    function Reader.onChat(Player, Said)
-        if Player!=owner() then return end
         
-        Reader.OnChatDef(Player,Said)
+        local KeepAR = true
+        local SizeLimit = 0
         
-        local Find = Said:find(" ")
+        Reader.Command = "!bmp"
         
-        if Find~=nil then
+        function Reader.onLoad(StorageFile, Url)               
+            BMPReader.bmpInit(StorageFile, Renderer, SizeLimit, not KeepAR)
+        end
+        
+        function Reader.onError(Err, Url)
+            print(Err)
+        end
+        
+        function Reader.onAbort()
+            BMPReader.bmpFinish()
+            SafeNet.cancelAll()
+            if BMPReader.Renderer then
+                BMPReader.Renderer.Abort()
+            end
+            print("BMP rendering canceled.")    
+        end
+        
+        function Reader.Check()
+            return 1    
+        end
+        
+        Reader.OnChatDef = Reader.onChat
+        function Reader.onChat(Player, Said)
+            if Player!=owner() then return end
+            
+            Reader.OnChatDef(Player,Said)
+            
+            local Find = Said:find(" ")
+            
+            if Find~=nil then
+                        
+                local Cmd = Said:left(Find-1)
+                local Mode = Said:sub(Find+1):lower()
+        
+                if Cmd == Reader.Command.."keepar" then
+                    if Mode=="false" or Mode=="0" or Mode=="nokeep" or Mode=="off" then
+                        KeepAR = false
+                        print("Aspect Ratio: DISABLED (Stretch to fit)") 
+                    else
+                        KeepAR = true
+                        print("Aspect Ratio: ENABLED (Preserve proportions)") 
+                    end
+                elseif Cmd == Reader.Command.."size" then                
+                    local MaxSize = 1024
                     
-            local Cmd = Said:left(Find-1)
-            local Mode = Said:sub(Find+1):lower()
-    
-            if Cmd == Reader.Command.."keepar" then
-                if Mode=="false" or Mode=="0" or Mode=="nokeep" or Mode=="off" then
-                    KeepAR = false
-                    print("Aspect Ratio: DISABLED (Stretch to fit)") 
-                else
-                    KeepAR = true
-                    print("Aspect Ratio: ENABLED (Preserve proportions)") 
+                    local ModeSize = tonumber(Mode)
+                    if ModeSize==nil then
+                        print("Invalid size") 
+                        return    
+                    end
+                         
+                    SizeLimit = math.clamp(ModeSize,1,MaxSize)
+                    print("Image max size set to "..SizeLimit.."x"..SizeLimit)
+                    if ModeSize>MaxSize then
+                        print("Size clamped, Starfall support max "..MaxSize.."x"..MaxSize) 
+                    end
                 end
             end
+            
         end
         
-    end
-    
-    Reader.Init()
+        Reader.Init()
     
     end
     
@@ -127,21 +156,21 @@ Created by AlexALX (c) 2026
 -------------------
 BMP Parser, specifications:
 - Max resolution is up to 1024x1024 (RT limit) will be resized if higher
-- Support most common uncompressed bmp files. 
-- 32/24/8/4 bits and monochrome
+- Support most common bmp files: 32/24/8/4 bits and monochrome
 - including RGB444/RGB555/RGB565
+- Support OS/2 BMP files
+- Support RLE Compression
 - Support "flip row order" function
-- Extremelly slow due to default 5KB net limit in starfall
+- Extremelly slow due to default 5KB net limit in starfall (multiplayer)
  NOTE: You can change sf_net_burstrate AND sf_net_burstrate_cl
+ In Single Player it uses purely local rendering so no network used
 
-Usage:
-- Spawn one this chip
-- Connect this it to Starfall Screen (right click)
-Chat commands:
-!bmp http://url_with_bmp_file - open bmp file
+Usage via chat commands:
+!bmp http://url_with_bmp_file - open bmp file from web
 !bmpfile filename.bmp - open bmp file from a 
 garrysmod/data/sf_filedata/ folder
 !bmpabort - abort rendering
+!bmpsize - limit image scale (1-1024)
 !bmpkeepar - set image Aspect Ratio mode (0 or 1)
 
 If you have own web server with PHP, 

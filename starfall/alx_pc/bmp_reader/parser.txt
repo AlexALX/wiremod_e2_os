@@ -79,10 +79,6 @@ function BMP.bmpParseInfoHeader()
         BMP.compression = 0
         BMP.imageSize = 0
         BMP.paletteEntrySize = 3
-    else
-        BMP.error = "Unsupported BMP header"
-        BMP.finished = true
-        return true
     end    
     
     BMP.redMask   = nil
@@ -115,15 +111,23 @@ function BMP.bmpParseInfoHeader()
     end
     
     if BMP.bitsPerPixel == 8 then
-        BMP.readPixel = BMP.readPixel8
+        if BMP.compression == 1 then
+            BMP.readPixel = BMP.readPixelRLE8
+        else
+            BMP.readPixel = BMP.readPixel8
+        end
+    elseif BMP.bitsPerPixel == 4 then
+        if BMP.compression == 2 then
+            BMP.readPixel = BMP.readPixelRLE4
+        else
+            BMP.readPixel = BMP.readPixel4
+        end
     elseif BMP.bitsPerPixel == 24 then
         BMP.readPixel = BMP.readPixel24
     elseif BMP.bitsPerPixel == 32 then
         BMP.readPixel = BMP.readPixel32
     elseif BMP.bitsPerPixel == 16 then
         BMP.readPixel = BMP.readPixel16
-    elseif BMP.bitsPerPixel == 4 then
-        BMP.readPixel = BMP.readPixel4
     elseif BMP.bitsPerPixel == 2 then
         BMP.readPixel = BMP.readPixel2
     elseif BMP.bitsPerPixel == 1 then
