@@ -1,0 +1,118 @@
+// Author: AlexALX
+// this was not finished due to sync issues with e2
+
+#define PTR_WriteAddress 63488
+#define PTR_ReadAddress 63489
+#define DATA_Address 63492
+#define MEM_CMD_SIZE 904
+
+// HW Reset
+//mov #65534,1;
+//dexit;
+
+int48 main()
+{
+    mov ReadPtr, #PTR_ReadAddress;
+    mov WritePtr, #PTR_WriteAddress;
+
+    // Queue is empty
+    if (ReadPtr == WritePtr)
+        return 0;
+        
+    // Boundary check
+    if (ReadPtr > MEM_CMD_SIZE) {
+        mov #PTR_ReadAddress, 0;
+        mov ReadPtr, 0;    
+    }
+
+    mov Addr, DATA_Address;
+    add Addr, ReadPtr;
+
+    mov Opcode, #Addr;
+    mov processed,0;
+    
+    out 1, Opcode;
+    //out 2, Addr;
+
+    if (Opcode == 1)
+    {
+        // CMD_NOTE_ON (Size = 8)
+        add Addr, 1; mov Voice, #Addr;
+        add Addr, 1; mov Program, #Addr;
+        add Addr, 1; mov Note, #Addr;
+        add Addr, 1; mov Velocity, #Addr;
+        add Addr, 1; mov Volume, #Addr;
+        add Addr, 1; mov Pan, #Addr;
+        add Addr, 1; mov Expression, #Addr;
+
+        //out 3, Voice;
+        //out 4, Note;
+
+        // Trigger SPU Hardware Channel
+        chwave Voice, Program;
+        chpitch Voice, Note;
+        chvolume Voice, Volume;
+        chstart Voice;
+
+        add ReadPtr, 8;
+        mov #PTR_ReadAddress, ReadPtr;
+        mov processed,1;
+    }
+    else if (Opcode == 2)
+    {
+        // CMD_NOTE_OFF (Size = 2)
+        add Addr, 1; mov Voice, #Addr;
+
+        //out 3, Voice;
+
+        chstop Voice;
+
+        add ReadPtr, 2;
+        mov #PTR_ReadAddress, ReadPtr;
+        mov processed,1;
+    }
+    else if (Opcode == 3)
+    {
+        // CMD_PANIC (Size = 1)
+        int48 i;
+        for (i = 0; i < 16; i++) {
+            chstop i;
+        }
+
+        add ReadPtr, 1;
+        mov #PTR_ReadAddress, ReadPtr;
+        mov processed,1;
+    }
+    else
+    {
+        // Skip corrupted data packet
+        //add ReadPtr, 1;
+        //mov #PTR_ReadAddress, ReadPtr;
+    }
+
+    if (processed==0) {
+        //add ReadPtr,1;
+        //mov #PTR_ReadAddress,ReadPtr;
+        mov #PTR_ReadAddress, WritePtr;
+    }
+    
+    return 0;
+}
+
+mainloop:
+    call main;
+jmp mainloop
+
+int48 ReadPtr;
+int48 WritePtr;
+int48 Addr;
+int48 Opcode;
+
+int48 Voice;
+int48 Program;
+int48 Note;
+int48 Velocity;
+int48 Volume;
+int48 Pan;
+int48 Expression;
+int48 processed;

@@ -8,64 +8,88 @@
 function table midiBackendZSPU() {
     local Backend = table()
     
+    local PtrAddress = 0
+    local DataAddress = PtrAddress + 4
+    local MemSize = 904
+    
+    Backend["Init",function] = function() {
+        ZSPU[PtrAddress] = 0
+        ZSPU[PtrAddress+1] = 0
+    }
+    
     Backend["Check",function] = function() {
         if (!->ZSPU) {
             print(_HUD_PRINTTALK,"ZSPU is not connected.") 
             return 0
         }
         if (ZSPU:entity():type()!="gmod_wire_spu") {
-            print(_HUD_PRINTTALK,"Entity what you did connected is not ZSPU.\n"+
+            print(_HUD_PRINTTALK,"Entity connected is not ZSPU.\n"+
             "It is located in Wire -> Chip, Gates -> SPU.") 
             return 1    
         }
         return 1  
     }
     
-    Backend["TickStart",function] = function() {
-        Midi["zspuWrite",number] = 1
+    Backend["Play",function] = function() {}
+    Backend["Pause",function] = function() {}
+    Backend["Stop",function] = function() {
+        # CMD_PANIC (Opcode = 3)
+        local Ptr = ZSPU[PtrAddress]
+        if (Ptr > MemSize) { Ptr = 0 }
+        
+        ZSPU[DataAddress + Ptr] = 3
+        ZSPU[PtrAddress] = Ptr + 1
     }
     
-    Backend["TickEnd",function] = function() {
-        ZSPU[0] = (Midi["zspuWrite",number] - 1) / 4        
-    }
+    Backend["TickStart",function] = function() {}
+    Backend["TickEnd",function] = function() {}
         
     Backend["VoiceOn",function] = function(Voice:number)
     {
         local V = Midi["voices",table][Voice,table]
-    
-        local Index = Midi["zspuWrite",number]
-    
-        ZSPU[Index + 0] = 1
-        ZSPU[Index + 1] = Voice
-        ZSPU[Index + 2] = V["program",number]
-        ZSPU[Index + 3] = V["note",number]
-        ZSPU[Index + 4] = V["velocity",number]
-        ZSPU[Index + 5] = V["volume",number]
-        ZSPU[Index + 6] = V["pan",number]
-        ZSPU[Index + 7] = V["expression",number]
-    
-        local NextIndex = Index + 8
-        if (NextIndex > 120) {
-            NextIndex = 1
+        local Ptr = ZSPU[PtrAddress]
+        
+        if (Ptr > MemSize) {
+            Ptr = 0
+            ZSPU[PtrAddress] = 0
         }
     
-        Midi["zspuWrite",number] = NextIndex
+        # Packet structure for CMD_NOTE_ON (Opcode = 1)
+        ZSPU[DataAddress + Ptr]     = 1
+        ZSPU[DataAddress + 1 + Ptr] = Voice
+        ZSPU[DataAddress + 2 + Ptr] = V["program",number]
+        ZSPU[DataAddress + 3 + Ptr] = V["note",number]
+        ZSPU[DataAddress + 4 + Ptr] = V["velocity",number]
+        ZSPU[DataAddress + 5 + Ptr] = V["volume",number]
+        ZSPU[DataAddress + 6 + Ptr] = V["pan",number]
+        ZSPU[DataAddress + 7 + Ptr] = V["expression",number]
     
-        ZSPU[0] = ZSPU[0] + 1
+        # Step forward by 8 cells (1 opcode + 7 parameters)
+        ZSPU[PtrAddress] = Ptr + 8
     }
     
     Backend["VoiceOff",function] = function(Voice:number)
     {
-        local Index = Midi["zspuWrite",number]
+        local Ptr = ZSPU[PtrAddress]
+        if (Ptr > MemSize) {
+            Ptr = 0
+            ZSPU[PtrAddress] = 0
+        }
     
-        ZSPU[Index + 0] = 2
-        ZSPU[Index + 1] = Voice
+        # Packet structure for CMD_NOTE_OFF (Opcode = 2)
+        ZSPU[DataAddress + Ptr]     = 2
+        ZSPU[DataAddress + 1 + Ptr] = Voice
     
-        local NextIndex = Index + 2
-        if (NextIndex > 126) { NextIndex = 1 } # 127 - 1    Voice
-        Midi["zspuWrite", number] = NextIndex
+        # Step forward by 2 cells (1 opcode + 1 parameter)
+        ZSPU[PtrAddress] = Ptr + 2
+    }
     
-        ZSPU[0] = ZSPU[0] + 1
+    Backend["VoiceVolume",function] = function(Voice:number) {}
+    Backend["VoiceExpression",function] = function(Voice:number) {
+        Backend["VoiceVolume",function](Voice)
+    }
+    Backend["VoicePan",function] = function(Voice:number) {
+        # Wire Sound does support pan.   
     }
     
     return Backend
