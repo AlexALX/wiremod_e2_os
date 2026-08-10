@@ -9,10 +9,15 @@
     Midi Parser specifications:
     - Support MIDI Type 0 and 1 (multiple tracks)
     - Have 3 play modes with different sound set
-    - Due to gmod limitations it actually plays 9-10 channels only :(
-    - May not play all notes simultaneously :(
-    - Sound quality for complex midi pretty poor
+    - May not play all notes simultaneously
+    - Sound quality for complex midi pretty poor with default limits
     
+    Recommended e2 settings for better playback:
+    wire_expression2_maxsounds 128
+    wire_expression2_sound_burst_max 64
+    wire_expression2_sound_burst_rate 0
+    And then do wire_expression2_reload or reload map
+
     Usage:
     - Spawn Midi Reader (this file)
     - Create 16 any props (entities)

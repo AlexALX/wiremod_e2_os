@@ -7,19 +7,22 @@
 function displayHelp() {
     local Text = Header+
 "
-Midi Player, specifications:
-- Support MIDI Type 0 and 1 (multiple tracks) 
+Specifications:
+- Support MIDI Type 0 and 1 (multiple tracks)
 - Have 3 play modes with different sound set
-- Due to gmod limit it plays 9-10 channels only :(
-- May not play all notes simultaneously :(
-
+- May not play all notes simultaneously
+- Sound quality is poor with default e2 limits
+Recommended e2 settings for better playback:
+wire_expression2_maxsounds 128
+wire_expression2_sound_burst_max 64
+wire_expression2_sound_burst_rate 0
+And then do wire_expression2_reload or reload map
 Usage via chat commands:
 !midi http://midfileurl - open midi file from the web
 Note: long url may be cut, use input LongURL instead
-!midifile filename.mid.txt - open midi file from a garrysmod/data/e2files/ folder, file extension must be renamed to .txt
+!midifile filename.mid.txt - open midi file from a garrysmod/data/e2files/, file extension must be .txt
 !midiabort - abort playing
-!midimode mode - change playing mode, available modes: synth, instrumental, addon
-
+!midimode - playing mode (synth, instrumental, addon)
 More information you can read inside expression2 chip
 "
 
@@ -100,8 +103,7 @@ function displayMode() {
 
 if (first() | duped()) {
     Header = 
-"Midi Player
-Created by AlexALX (c) 2026
+"Midi Player | Created by AlexALX (c) 2026
 -------------------"
     String = ""
     

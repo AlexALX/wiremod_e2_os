@@ -5,7 +5,7 @@
 
 @outputs MidiPlayMode:string MidiWarning:string
 @persist VoicesArray:array MidiProgram:function MidiSample:function 
-@persist ActiveNotes:number 
+@persist ActiveNotes:number NoSoundWarning:number
 
 #include "alx_pc/standalone/midi/_shared_"
 #include "alx_pc/standalone/midi/backends/e2modes/_shared_"
@@ -105,6 +105,7 @@ function table midiBackendE2(Mode:string) {
     
     Backend["Play",function] = function() {
         ActiveNotes = 0
+        NoSoundWarning = 0
     }
     
     Backend["Pause",function] = function() {
@@ -114,13 +115,22 @@ function table midiBackendE2(Mode:string) {
     Backend["Stop",function] = function() {
         soundPurge()
         MidiWarning = ""
+        NoSoundWarning = 0
     }
 
-    Backend["TickStart",function] = function() {
-        if (MidiWarning=="" & ActiveNotes>9) {
-            MidiWarning = "Midi with more than 9 activeNotes detected\nSound may play incorrectly due to gmod limitations"
+    Backend["TickStart",function] = function() {        
+        if (MidiWarning=="" & NoSoundWarning) {
+            MidiWarning = "Sound playback may be throttled or muted\n"+
+            "due to Expression2 ConVar limits.\n"+
+            "Check Recommended E2 settings for midi."
+            
             if (!MidiNoPrint) {
                 print(MidiWarning)   
+                
+                print("\nRecommended e2 settings for better playback:")
+                print("wire_expression2_maxsounds 128")
+                print("wire_expression2_sound_burst_max 64")
+                print("wire_expression2_sound_burst_rate 0")                
             }
         } 
     }
@@ -153,7 +163,10 @@ function table midiBackendE2(Mode:string) {
         
         ActiveNotes++
     
-        if (!soundPlaying(SoundId)) { return }
+        if (!soundPlaying(SoundId)) { 
+            NoSoundWarning = 1
+            return 
+        }
         
         local Pitch = round(
             100 * (2 ^ (

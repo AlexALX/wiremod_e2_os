@@ -57,8 +57,7 @@ This addon also included part of **GeneralUser-GS** wav files for midi "addon" p
 https://github.com/mrbumpy409/GeneralUser-GS
 
 ### Notes about Midi Player
-* Due to gmod limitations it actually plays 9-10 channels only
 * May not play all notes simultaneously
-* Sound quality for complex midi pretty poor
+* Sound quality for complex midi pretty poor with default e2 limits (check recommended e2 settings)
 
 Created by AlexALX (c) 2016-2026
