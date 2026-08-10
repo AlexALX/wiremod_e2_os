@@ -26,36 +26,61 @@ event chat(Player:entity, Said:string, Team:number) {
         
         local Find = Said:lower():find(" ")
         
+        local Cmd = Said:lower()
+        local Mode = ""        
         if (Find) {
-            local Cmd = Said:left(Find-1)
-            local Mode = Said:sub(Find+1):lower()
+            Cmd = Said:left(Find-1):lower()
+            Mode = Said:sub(Find+1):lower()
+        }
 
-            if (Cmd==Command+"keepar") {
-                if (Mode=="false" | Mode=="0" | Mode=="nokeep" | Mode=="off") {
-                    NoKeepAR = 1
-                    print(_HUD_PRINTTALK,
-                        "Aspect Ratio: DISABLED (Stretch to fit)"
-                    ) 
-                } else {
-                    NoKeepAR = 0   
-                    print(_HUD_PRINTTALK,
-                        "Aspect Ratio: ENABLED (Preserve proportions)"
-                    ) 
-                }
-            } elseif (Cmd==Command+"size") {
-                local ScreenName = screenName(DS)
-                local MaxSize = screenSize(DS)
-                
-                local Size = Mode:toNumber()                
-                SizeLimit = clamp(Size,1,MaxSize)
+        if (Cmd==Command+"keepar") {
+            if (Mode=="") {
                 print(_HUD_PRINTTALK,
-                    "Image max size set to "+SizeLimit+"x"+SizeLimit
+                    "Set image Aspect Ratio mode, append 0 or 1 to command."
                 )
-                if (Size>MaxSize) {
-                    print(_HUD_PRINTTALK,
-                        "Size clamped, "+ScreenName+" support max "+MaxSize+"x"+MaxSize
-                    ) 
-                }
+                exit()
+            }
+            
+            if (Mode=="false" | Mode=="0" | Mode=="nokeep" | Mode=="off") {
+                NoKeepAR = 1
+                print(_HUD_PRINTTALK,
+                    "Aspect Ratio: DISABLED (Stretch to fit)"
+                ) 
+            } else {
+                NoKeepAR = 0   
+                print(_HUD_PRINTTALK,
+                    "Aspect Ratio: ENABLED (Preserve proportions)"
+                )
+            }
+        } elseif (Cmd==Command+"size") {
+            if (DS==nowirelink()) {
+                print(_HUD_PRINTTALK,
+                    "Screen not connected. Cannot detect maximum resolution." 
+                )
+                exit()
+            }
+            
+            local ScreenName = screenName(DS)
+            local MaxSize = screenSize(DS)
+
+            if (Mode=="") {
+                print(_HUD_PRINTTALK,
+                    "Set max image size before it will do resize.\n"+
+                    "Example usage: "+Command+"size 128\n"+
+                    "Current "+ScreenName+" support max "+MaxSize+"x"+MaxSize
+                )
+                exit()
+            }
+            
+            local Size = Mode:toNumber()                
+            SizeLimit = clamp(Size,1,MaxSize)
+            print(_HUD_PRINTTALK,
+                "Image max size set to "+SizeLimit+"x"+SizeLimit
+            )
+            if (Size>MaxSize) {
+                print(_HUD_PRINTTALK,
+                    "Size clamped, "+ScreenName+" support max "+MaxSize+"x"+MaxSize
+                ) 
             }
         }
     }

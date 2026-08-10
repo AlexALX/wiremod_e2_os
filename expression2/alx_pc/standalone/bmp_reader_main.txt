@@ -151,6 +151,8 @@ if (first()|duped()) {
     
     Command = "!bmp"
     
+    ExtWarning = "File extension must be changed to .txt!\nOr file will not load."
+    
     Funcs = table()
     
     Funcs["readerAbort", function] = function() {

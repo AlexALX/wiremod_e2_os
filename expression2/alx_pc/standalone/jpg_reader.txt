@@ -80,35 +80,48 @@ event chat(Player:entity, Said:string, Team:number) {
         
         local Find = Said:lower():find(" ")
         
+        local Cmd = Said:lower()
+        local Mode = ""        
         if (Find) {
-            local Cmd = Said:left(Find-1)
-            local Mode = Said:sub(Find+1):lower()
+            Cmd = Said:left(Find-1):lower()
+            Mode = Said:sub(Find+1):lower()
+        }
 
-            if (Cmd==Command+"mode") { 
-                if (Mode == "fullpreview") {
-                    PreviewMode = 2
-                    print(_HUD_PRINTTALK,
-                        "Jpg mode set to fullpreview\n"+
-                        "Every scan read will rerender image\n"+
-                        "This mode is very slow\n"+
-                        "Note: this mode works only for progressive images"
-                    ) 
-                } elseif (Mode == "preview") {
-                    PreviewMode = 1    
-                    print(_HUD_PRINTTALK,
-                        "Jpg mode set to preview\n"+
-                        "Image preview will display once after the 2nd scan\n"+
-                        "This mode balances speed and visualization\n"+
-                        "Note: this mode works only for progressive images"
-                    ) 
-                } else {
-                    PreviewMode = 0 
-                    print(_HUD_PRINTTALK,
-                        "Jpg mode set to normal\n"+
-                        "No preview will be displayed, rendering only the final image\n"+
-                        "This mode is fastest"
-                    ) 
-                }
+        if (Cmd==Command+"mode") { 
+            if (Mode=="") {
+                print(_HUD_PRINTTALK,
+                    "Available Jpg Modes:\n"+
+                    "normal - no preview, fastest render\n"+
+                    "preview - first AC scan preview\n"+
+                    "fullpreview - every scan rerender (slow)\n"+
+                    "Note: this mode works only for progressive images" 
+                )
+                exit()
+            }
+            
+            if (Mode == "fullpreview") {
+                PreviewMode = 2
+                print(_HUD_PRINTTALK,
+                    "Jpg mode set to fullpreview\n"+
+                    "Every scan read will rerender image\n"+
+                    "This mode is very slow\n"+
+                    "Note: this mode works only for progressive images"
+                ) 
+            } elseif (Mode == "preview") {
+                PreviewMode = 1    
+                print(_HUD_PRINTTALK,
+                    "Jpg mode set to preview\n"+
+                    "Image preview will display once after the 2nd scan\n"+
+                    "This mode balances speed and visualization\n"+
+                    "Note: this mode works only for progressive images"
+                ) 
+            } else {
+                PreviewMode = 0 
+                print(_HUD_PRINTTALK,
+                    "Jpg mode set to normal\n"+
+                    "No preview will be displayed, rendering only the final image\n"+
+                    "This mode is fastest"
+                ) 
             }
         }
     }

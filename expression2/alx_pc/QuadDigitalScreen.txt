@@ -55,7 +55,14 @@ event writeCell(Address:number, Value:number) {
             UpdateQueue[QueueCount, number] = GlobalY
         }
     } else {
-        if (Address == 1048573) {
+        if (Address == 1048574) {            
+            LinkTopLeft[1048574, number] = Value
+            LinkTopRight[1048574, number] = Value
+            LinkBottomLeft[1048574, number] = Value
+            LinkBottomRight[1048574, number] = Value
+
+            dsClear()
+        } elseif (Address == 1048573) {
             VirtW = Value
             
             ScrW = floor(Value / 2)

@@ -66,6 +66,8 @@ function animateMode(ModeString:string) {
 if (first() | duped()) {
     Command = "!gif"
     
+    ExtWarning = "File extension must be changed to .txt!\nOr file will not load."
+    
     Funcs = table()
     
     Funcs["readerAbort", function] = function() {
@@ -123,43 +125,62 @@ event chat(Player:entity, Said:string, Team:number) {
         
         local Find = Said:lower():find(" ")
         
+        local Cmd = Said:lower()
+        local Mode = ""        
         if (Find) {
-            local Cmd = Said:left(Find-1)
-            local Mode = Said:sub(Find+1):lower()
+            Cmd = Said:left(Find-1):lower()
+            Mode = Said:sub(Find+1):lower()
+        }
 
-            if (Cmd==Command+"mode") { 
-                if (Mode == "manual") {
-                    Animate = 1
-                    print(_HUD_PRINTTALK,
-                        "Gif mode set to manual\n"+
-                        "Next frame will be read after input"
-                    )
-                } elseif (Mode == "animate") {
-                    Animate = 2
-                    print(_HUD_PRINTTALK,
-                        "Gif mode set to animated\n"+
-                        "Every frame read will be rendered automatically\n"+
-                        "This mode is very slow\n"+
-                        "STRONGLY recommend set !gifsize 128 for this mode!"
-                    ) 
-                } elseif(Mode == "normal") {
-                    Animate = 0
-                    print(_HUD_PRINTTALK,
-                        "Gif mode set to normal\n"+
-                        "No animation will be displayed, rendering only the first frame"
-                    ) 
-                } else {
-                    print(_HUD_PRINTTALK,
-                        "Invalid GIF mode"
-                    ) 
-                }
-            } elseif (Cmd==Command+"delay") {
-                local Size = Mode:toNumber()
-                MinDelay = max(Size,0.1)
+        if (Cmd==Command+"mode") {
+            if (Mode=="") {
                 print(_HUD_PRINTTALK,
-                    "Minimum delay between animations set to "+MinDelay
+                    "Available Gif Modes:\n"+
+                    "normal - no animation, just first frame\n"+
+                    "manual - play animation manually via input (button or command)\n"+
+                    "animate - play animation, but it's slow (1 frame per few seconds)"
+                )
+                exit()
+            }
+            
+            if (Mode == "manual") {
+                Animate = 1
+                print(_HUD_PRINTTALK,
+                    "Gif mode set to manual\n"+
+                    "Next frame will be read after input"
+                )
+            } elseif (Mode == "animate") {
+                Animate = 2
+                print(_HUD_PRINTTALK,
+                    "Gif mode set to animated\n"+
+                    "Every frame read will be rendered automatically\n"+
+                    "This mode is very slow\n"+
+                    "STRONGLY recommend set !gifsize 128 for this mode!"
+                ) 
+            } elseif(Mode == "normal") {
+                Animate = 0
+                print(_HUD_PRINTTALK,
+                    "Gif mode set to normal\n"+
+                    "No animation will be displayed, rendering only the first frame"
+                ) 
+            } else {
+                print(_HUD_PRINTTALK,
+                    "Invalid GIF mode"
                 ) 
             }
+        } elseif (Cmd==Command+"delay") {
+            if (Mode=="") {
+                print(_HUD_PRINTTALK,
+                    "Gif delay command usage: !gifdelay 0.2"
+                )
+                exit()
+            }
+            
+            local Size = Mode:toNumber()
+            MinDelay = max(Size,0.1)
+            print(_HUD_PRINTTALK,
+                "Minimum delay between animations set to "+MinDelay
+            )
         } elseif (Said:lower()=="!gifnext") {
             gifNextCommand()
         }

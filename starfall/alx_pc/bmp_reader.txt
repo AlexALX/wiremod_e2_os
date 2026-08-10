@@ -104,33 +104,48 @@ if CLIENT then
             
             local Find = Said:find(" ")
             
-            if Find~=nil then
-                        
-                local Cmd = Said:left(Find-1)
-                local Mode = Said:sub(Find+1):lower()
-        
-                if Cmd == Reader.Command.."keepar" then
-                    if Mode=="false" or Mode=="0" or Mode=="nokeep" or Mode=="off" then
-                        KeepAR = false
-                        print("Aspect Ratio: DISABLED (Stretch to fit)") 
-                    else
-                        KeepAR = true
-                        print("Aspect Ratio: ENABLED (Preserve proportions)") 
-                    end
-                elseif Cmd == Reader.Command.."size" then                
-                    local MaxSize = 1024
-                    
-                    local ModeSize = tonumber(Mode)
-                    if ModeSize==nil then
-                        print("Invalid size") 
-                        return    
-                    end
-                         
-                    SizeLimit = math.clamp(ModeSize,1,MaxSize)
-                    print("Image max size set to "..SizeLimit.."x"..SizeLimit)
-                    if ModeSize>MaxSize then
-                        print("Size clamped, Starfall support max "..MaxSize.."x"..MaxSize) 
-                    end
+            local Cmd = Said:lower()
+            local Mode = ""
+            if Find!=nil then
+                Cmd = Said:left(Find-1):lower()
+                Mode = Said:sub(Find+1):lower()
+            end
+
+            if Cmd == Reader.Command.."keepar" then
+                if Mode=="" then
+                    print("Set image Aspect Ratio mode, append 0 or 1 to command.")
+                    return
+                end
+                
+                if Mode=="false" or Mode=="0" or Mode=="nokeep" or Mode=="off" then
+                    KeepAR = false
+                    print("Aspect Ratio: DISABLED (Stretch to fit)") 
+                else
+                    KeepAR = true
+                    print("Aspect Ratio: ENABLED (Preserve proportions)") 
+                end
+            elseif Cmd == Reader.Command.."size" then                
+                local MaxSize = 1024
+
+                if Mode=="" then
+                    print(
+                        "Set max image size before it will do resize.\n"..
+                        "Example usage: "..Reader.Command.."size 128\n"..
+                        "Current Starfall Screen support max "..MaxSize.."x"..MaxSize
+                    )
+                    return
+                end
+                
+                local ModeSize = tonumber(Mode)
+                if ModeSize==nil then
+                    print("Invalid size") 
+                    return    
+                end
+                     
+                SizeLimit = math.clamp(ModeSize,1,MaxSize)
+                print("Image max size set to "..SizeLimit.."x"..SizeLimit)
+                if ModeSize>MaxSize then
+                    print("Size clamped, Starfall support max "..MaxSize.."x"..MaxSize) 
                 end
             end
             

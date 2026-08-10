@@ -61,13 +61,33 @@ event writeCell(Address:number, Value:number) {
             UpdateQueue[QueueWrite, number] = GlobalY
         }
     } else {
-        if (Address == 1048573) {            
+        if (Address == 1048574) {
+            UpdateQueue = array()
+            DsBuffer = array()
+            QueueWrite = 0
+            
+            local Ptr = ZGPU[PtrAddress]
+            
+            if (Ptr>MemSize) {
+                Ptr = 0
+                ZGPU[PtrAddress] = 0   
+            }
+
+            # CMD_CLEAR_SCREEN
+            ZGPU[DataAddress + Ptr] = 2
+            ZGPU[PtrAddress] = Ptr + 1
+        } elseif (Address == 1048573) {            
             ScrW = Value
             dsClear()
         } elseif (Address == 1048572) {    
             ScrH = Value
             
             local Ptr = ZGPU[PtrAddress]
+            
+            if (Ptr>MemSize) {
+                Ptr = 0
+                ZGPU[PtrAddress] = 0   
+            }
             
             # Set pointer to start of image always
             ZGPU[PtrAddress+1] = Ptr
@@ -159,7 +179,7 @@ event tick() {
             ZGPU[PtrAddress] = 0   
         }
         
-        if (TargetY<0) { 
+        if (TargetY<0) {             
             # CMD_CLEAR_ROW
             local Value = -TargetY - 1
             

@@ -23,39 +23,48 @@ function Reader.onChat(Player, Said)
     if Player!=owner() then return end
     
     local Find = Said:find(" ")   
-    
-    if Find~=nil then
-                
-        local Cmd = Said:left(Find-1)
-        local Url = Said:sub(Find+1)
-        
-        local Command = Reader.Command
 
-        if Cmd==Command.."abort" or Cmd == Command and Url == "abort" then          
-            Reader.onAbort()
-        elseif Cmd == Command then
-            if !Reader.Check() then return end
-            
-            Storage.openHttp(Url, function(Success,File,Err) 
-                if Success==false then
-                    Reader.onError(Err,Url)
-                    return    
-                end
-                Reader.onLoad(File,Url)    
-            end)
-        elseif Cmd == Command.."file" then
-            if !Reader.Check() then return end
-            
-            Storage.openFile(Url, function(Success,File,Err)                         
-                if Success==false then
-                    Reader.onError(Err,Url)
-                    return    
-                end
-                Reader.onLoad(File,Url)    
-            end)
-        end
-    elseif Said==Reader.Command.."abort" then
+    local Cmd = Said:lower()
+    local Url = ""
+    if Find!=nil then
+        Cmd = Said:left(Find-1):lower()
+        Url = Said:sub(Find+1)
+    end
+        
+    local Command = Reader.Command
+
+    if Cmd==Command.."abort" or Cmd == Command and Url:lower() == "abort" then          
         Reader.onAbort()
+    elseif Cmd == Command then
+        if !Reader.Check() then return end
+        
+        if (Url=="") then
+            print("Load file from the web.") 
+            return
+        end
+        
+        Storage.openHttp(Url, function(Success,File,Err) 
+            if Success==false then
+                Reader.onError(Err,Url)
+                return    
+            end
+            Reader.onLoad(File,Url)    
+        end)
+    elseif Cmd == Command.."file" then
+        if !Reader.Check() then return end
+        
+        if Url=="" then
+            print("Load file from the disk in garrysmod/data/sf_filedata/ folder.")
+            return
+        end
+
+        Storage.openFile(Url, function(Success,File,Err)                         
+            if Success==false then
+                Reader.onError(Err,Url)
+                return    
+            end
+            Reader.onLoad(File,Url)    
+        end)
     end
     
 end

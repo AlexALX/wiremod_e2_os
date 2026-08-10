@@ -60,6 +60,8 @@ if (first() | duped()) {
     midiBackendSet(midiBackendE2(Mode))
     
     Command = "!midi"
+    
+    ExtWarning = "File extension must be changed to .txt!\nOr file will not load."
 
     Funcs = table()
     
@@ -91,6 +93,8 @@ function midiSetMode(Mode:string) {
     } elseif (Mode=="addon") {
         midiBackendSet(midiBackendE2("addon"))
         print(_HUD_PRINTTALK,"MIDI playing mode changed to Addon.\nNote: this mode works only if ALX PC addon installed on server")
+    } elseif (Mode=="") {
+        print(_HUD_PRINTTALK,"Available modes: synth, instrumental, addon.")
     } else {
         print(_HUD_PRINTTALK,"Invalid MIDI playing mode.\nAvailable modes: synth, instrumental, addon.")
     }    
@@ -103,13 +107,15 @@ event chat(Player:entity, Said:string, Team:number) {
         
         local Find = Said:lower():find(" ")
         
+        local Cmd = Said:lower()
+        local Mode = ""        
         if (Find) {
-            local Cmd = Said:left(Find-1)
-            local Mode = Said:sub(Find+1)
+            Cmd = Said:left(Find-1):lower()
+            Mode = Said:sub(Find+1):lower()
+        }
 
-            if (Cmd==Command+"mode") { 
-                midiSetMode(Mode:lower())
-            }
+        if (Cmd==Command+"mode") {
+            midiSetMode(Mode)
         } elseif (Said==Command+"pause") {
             midiPause()        
         } elseif (Said==Command+"repeat") {
