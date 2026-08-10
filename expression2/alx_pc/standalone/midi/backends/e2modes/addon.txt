@@ -40,71 +40,71 @@ function table midiProgramAddon(Program:number) {
         case 0, case 1, case 2, case 3,
             local S = table()
             for(I = 0, 27) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-D1.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-d1.wav"
                 S[I + "_root", number] = 26
             }
             for(I = 28, 30) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-F1.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-f1.wav"
                 S[I + "_root", number] = 29
             }
             for(I = 31, 34) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-A#1.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-a#1.wav"
                 S[I + "_root", number] = 34
             }
             for(I = 35, 40) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-D2.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-d2.wav"
                 S[I + "_root", number] = 38
             }
             for(I = 41, 46) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-G#2.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-g#2.wav"
                 S[I + "_root", number] = 44
             }
             for(I = 47, 50) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-C3.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-c3.wav"
                 S[I + "_root", number] = 48
             }
             for(I = 51, 55) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-F3.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-f3.wav"
                 S[I + "_root", number] = 53
             }
             for(I = 56, 57) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-A#3.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-a#3.wav"
                 S[I + "_root", number] = 58
             }
             for(I = 58, 60) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-C4.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-c4.wav"
                 S[I + "_root", number] = 60
             }
             for(I = 61, 64) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-D#3.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-d#3.wav"
                 S[I + "_root", number] = 63
             }
             for(I = 65, 69) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-F#4.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-f#4.wav"
                 S[I + "_root", number] = 67
             }
             for(I = 70, 71) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-C5.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-c5.wav"
                 S[I + "_root", number] = 72
             }
             for(I = 72, 76) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-D#5.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-d#5.wav"
                 S[I + "_root", number] = 75
             }
             for(I = 77, 81) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-A5.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-a5.wav"
                 S[I + "_root", number] = 81
             }
             for(I = 82, 87) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-D6.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-d6.wav"
                 S[I + "_root", number] = 86
             }
             for(I = 88, 92) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-G6.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-g6.wav"
                 S[I + "_root", number] = 91
             }
             for(I = 93, 127) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-C7.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-c7.wav"
                 S[I + "_root", number] = 96
             }
             T["samples", table] = S
@@ -114,47 +114,47 @@ function table midiProgramAddon(Program:number) {
         case 16, case 17, case 18, case 19, case 20, case 21, case 22, case 23,
             local S = table()
             for(I = 0, 41) {
-                S[I + "_path", string] = "generaluser-gs/Hammond Organ-1.wav"
+                S[I + "_path", string] = "generaluser-gs/hammond organ-1.wav"
                 S[I + "_root", number] = 57
             }
             for(I = 42, 47) {
-                S[I + "_path", string] = "generaluser-gs/Hammond Organ-2.wav"
+                S[I + "_path", string] = "generaluser-gs/hammond organ-2.wav"
                 S[I + "_root", number] = 56
             }
             for(I = 48, 52) {
-                S[I + "_path", string] = "generaluser-gs/Hammond Organ-3.wav"
+                S[I + "_path", string] = "generaluser-gs/hammond organ-3.wav"
                 S[I + "_root", number] = 54
             }
             for(I = 53, 59) {
-                S[I + "_path", string] = "generaluser-gs/Hammond Organ-4.wav"
+                S[I + "_path", string] = "generaluser-gs/hammond organ-4.wav"
                 S[I + "_root", number] = 53
             }
             for(I = 60, 65) {
-                S[I + "_path", string] = "generaluser-gs/Hammond Organ-5.wav"
+                S[I + "_path", string] = "generaluser-gs/hammond organ-5.wav"
                 S[I + "_root", number] = 53
             }
             for(I = 66, 71) {
-                S[I + "_path", string] = "generaluser-gs/Hammond Organ-6.wav"
+                S[I + "_path", string] = "generaluser-gs/hammond organ-6.wav"
                 S[I + "_root", number] = 51
             }
             for(I = 72, 78) {
-                S[I + "_path", string] = "generaluser-gs/Hammond Organ-7.wav"
+                S[I + "_path", string] = "generaluser-gs/hammond organ-7.wav"
                 S[I + "_root", number] = 63
             }
             for(I = 79, 87) {
-                S[I + "_path", string] = "generaluser-gs/Hammond Organ-8.wav"
+                S[I + "_path", string] = "generaluser-gs/hammond organ-8.wav"
                 S[I + "_root", number] = 61
             }
             for(I = 88, 91) {
-                S[I + "_path", string] = "generaluser-gs/Hammond Organ-9.wav"
+                S[I + "_path", string] = "generaluser-gs/hammond organ-9.wav"
                 S[I + "_root", number] = 61
             }
             for(I = 92, 104) {
-                S[I + "_path", string] = "generaluser-gs/Hammond Organ-10.wav"
+                S[I + "_path", string] = "generaluser-gs/hammond organ-10.wav"
                 S[I + "_root", number] = 57
             }
             for(I = 105, 115) {
-                S[I + "_path", string] = "generaluser-gs/Hammond Organ-11.wav"
+                S[I + "_path", string] = "generaluser-gs/hammond organ-11.wav"
                 S[I + "_root", number] = 57
             }
             T["samples", table] = S
@@ -164,51 +164,51 @@ function table midiProgramAddon(Program:number) {
         case 24, case 25, case 26, case 27,
             local S = table()
             for(I = 0, 44) {
-                S[I + "_path", string] = "generaluser-gs/Nylon Guitar-F2.wav"
+                S[I + "_path", string] = "generaluser-gs/nylon guitar-f2.wav"
                 S[I + "_root", number] = 53
             }
             for(I = 45, 48) {
-                S[I + "_path", string] = "generaluser-gs/Nylon Guitar-A#2.wav"
+                S[I + "_path", string] = "generaluser-gs/nylon guitar-a#2.wav"
                 S[I + "_root", number] = 58
             }
             for(I = 49, 50) {
-                S[I + "_path", string] = "generaluser-gs/Nylon Guitar-D3.wav"
+                S[I + "_path", string] = "generaluser-gs/nylon guitar-d3.wav"
                 S[I + "_root", number] = 62
             }
             for(I = 51, 53) {
-                S[I + "_path", string] = "generaluser-gs/Nylon Guitar-D#3.wav"
+                S[I + "_path", string] = "generaluser-gs/nylon guitar-d#3.wav"
                 S[I + "_root", number] = 63
             }
             for(I = 54, 55) {
-                S[I + "_path", string] = "generaluser-gs/Nylon Guitar-G3.wav"
+                S[I + "_path", string] = "generaluser-gs/nylon guitar-g3.wav"
                 S[I + "_root", number] = 67
             }
             for(I = 56, 57) {
-                S[I + "_path", string] = "generaluser-gs/Nylon Guitar-G#3.wav"
+                S[I + "_path", string] = "generaluser-gs/nylon guitar-g#3.wav"
                 S[I + "_root", number] = 68
             }
             for(I = 58, 59) {
-                S[I + "_path", string] = "generaluser-gs/Nylon Guitar-B3.wav"
+                S[I + "_path", string] = "generaluser-gs/nylon guitar-b3.wav"
                 S[I + "_root", number] = 71
             }
             for(I = 60, 62) {
-                S[I + "_path", string] = "generaluser-gs/Nylon Guitar-C4.wav"
+                S[I + "_path", string] = "generaluser-gs/nylon guitar-c4.wav"
                 S[I + "_root", number] = 72
             }
             for(I = 63, 64) {
-                S[I + "_path", string] = "generaluser-gs/Nylon Guitar-E4.wav"
+                S[I + "_path", string] = "generaluser-gs/nylon guitar-e4.wav"
                 S[I + "_root", number] = 76
             }
             for(I = 65, 67) {
-                S[I + "_path", string] = "generaluser-gs/Nylon Guitar-F4.wav"
+                S[I + "_path", string] = "generaluser-gs/nylon guitar-f4.wav"
                 S[I + "_root", number] = 77
             }
             for(I = 68, 99) {
-                S[I + "_path", string] = "generaluser-gs/Nylon Guitar-A4.wav"
+                S[I + "_path", string] = "generaluser-gs/nylon guitar-a4.wav"
                 S[I + "_root", number] = 81
             }
             for(I = 100, 108) {
-                S[I + "_path", string] = "generaluser-gs/Nylon Guitar-A4xt.wav"
+                S[I + "_path", string] = "generaluser-gs/nylon guitar-a4xt.wav"
                 S[I + "_root", number] = 81
             }
             T["samples", table] = S
@@ -218,27 +218,27 @@ function table midiProgramAddon(Program:number) {
         case 28, case 29, case 30, case 31,
             local S = table()
             for(I = 0, 42) {
-                S[I + "_path", string] = "generaluser-gs/Dist. Gt. Low-E2.wav"
+                S[I + "_path", string] = "generaluser-gs/dist gt low-e2.wav"
                 S[I + "_root", number] = 40
             }
             for(I = 43, 44) {
-                S[I + "_path", string] = "generaluser-gs/Dist. Gt. Low-G2.wav"
+                S[I + "_path", string] = "generaluser-gs/dist gt low-g2.wav"
                 S[I + "_root", number] = 43
             }
             for(I = 45, 47) {
-                S[I + "_path", string] = "generaluser-gs/Dist. Gt. Low-A2.wav"
+                S[I + "_path", string] = "generaluser-gs/dist gt low-a2.wav"
                 S[I + "_root", number] = 45
             }
             for(I = 48, 69) {
-                S[I + "_path", string] = "generaluser-gs/Dist. Gt. Low-C3.wav"
+                S[I + "_path", string] = "generaluser-gs/dist gt low-c3.wav"
                 S[I + "_root", number] = 48
             }
             for(I = 70, 85) {
-                S[I + "_path", string] = "generaluser-gs/Dist. Gt. Low-C3-ds.wav"
+                S[I + "_path", string] = "generaluser-gs/dist gt low-c3-ds.wav"
                 S[I + "_root", number] = 48
             }
             for(I = 86, 112) {
-                S[I + "_path", string] = "generaluser-gs/Distortion Gt-A5.wav"
+                S[I + "_path", string] = "generaluser-gs/distortion gt-a5.wav"
                 S[I + "_root", number] = 81
             }
             T["samples", table] = S
@@ -248,43 +248,43 @@ function table midiProgramAddon(Program:number) {
         case 32, case 33, case 34, case 35, case 36, case 37, case 38, case 39,
             local S = table()
             for(I = 0, 30) {
-                S[I + "_path", string] = "generaluser-gs/Finger Bass-E0.wav"
+                S[I + "_path", string] = "generaluser-gs/finger bass-e0.wav"
                 S[I + "_root", number] = 54
             }
             for(I = 31, 35) {
-                S[I + "_path", string] = "generaluser-gs/Finger Bass-A0.wav"
+                S[I + "_path", string] = "generaluser-gs/finger bass-a0.wav"
                 S[I + "_root", number] = 60
             }
             for(I = 36, 40) {
-                S[I + "_path", string] = "generaluser-gs/Finger Bass-D1.wav"
+                S[I + "_path", string] = "generaluser-gs/finger bass-d1.wav"
                 S[I + "_root", number] = 64
             }
             for(I = 41, 92) {
-                S[I + "_path", string] = "generaluser-gs/Finger Bass-G1.wav"
+                S[I + "_path", string] = "generaluser-gs/finger bass-g1.wav"
                 S[I + "_root", number] = 69
             }
             for(I = 93, 96) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Ramp-093.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_ramp-093.wav"
                 S[I + "_root", number] = 93
             }
             for(I = 97, 102) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Ramp-099.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_ramp-099.wav"
                 S[I + "_root", number] = 99
             }
             for(I = 103, 108) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Ramp-105.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_ramp-105.wav"
                 S[I + "_root", number] = 105
             }
             for(I = 109, 114) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Ramp-111.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_ramp-111.wav"
                 S[I + "_root", number] = 111
             }
             for(I = 115, 120) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Ramp-117.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_ramp-117.wav"
                 S[I + "_root", number] = 117
             }
             for(I = 121, 127) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Ramp-123.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_ramp-123.wav"
                 S[I + "_root", number] = 123
             }
             T["samples", table] = S
@@ -294,87 +294,87 @@ function table midiProgramAddon(Program:number) {
         case 40, case 41, case 42, case 43, case 44, case 45, case 46, case 47, case 48, case 49, case 50, case 51, case 52, case 53, case 54, case 55,
             local S = table()
             for(I = 0, 39) {
-                S[I + "_path", string] = "generaluser-gs/StrLoop - C1.wav"
+                S[I + "_path", string] = "generaluser-gs/strloop - c1.wav"
                 S[I + "_root", number] = 36
             }
             for(I = 40, 42) {
-                S[I + "_path", string] = "generaluser-gs/StrLoop - D#1.wav"
+                S[I + "_path", string] = "generaluser-gs/strloop - d#1.wav"
                 S[I + "_root", number] = 39
             }
             for(I = 43, 45) {
-                S[I + "_path", string] = "generaluser-gs/StrLoop - F#1.wav"
+                S[I + "_path", string] = "generaluser-gs/strloop - f#1.wav"
                 S[I + "_root", number] = 42
             }
             for(I = 46, 48) {
-                S[I + "_path", string] = "generaluser-gs/StrLoop - A1.wav"
+                S[I + "_path", string] = "generaluser-gs/strloop - a1.wav"
                 S[I + "_root", number] = 45
             }
             for(I = 49, 51) {
-                S[I + "_path", string] = "generaluser-gs/StrLoop - C2.wav"
+                S[I + "_path", string] = "generaluser-gs/strloop - c2.wav"
                 S[I + "_root", number] = 48
             }
             for(I = 52, 54) {
-                S[I + "_path", string] = "generaluser-gs/StrLoop - D#2.wav"
+                S[I + "_path", string] = "generaluser-gs/strloop - d#2.wav"
                 S[I + "_root", number] = 51
             }
             for(I = 55, 57) {
-                S[I + "_path", string] = "generaluser-gs/StrLoop - F#2.wav"
+                S[I + "_path", string] = "generaluser-gs/strloop - f#2.wav"
                 S[I + "_root", number] = 54
             }
             for(I = 58, 60) {
-                S[I + "_path", string] = "generaluser-gs/StrLoop - A2.wav"
+                S[I + "_path", string] = "generaluser-gs/strloop - a2.wav"
                 S[I + "_root", number] = 57
             }
             for(I = 61, 63) {
-                S[I + "_path", string] = "generaluser-gs/StrLoop - C3.wav"
+                S[I + "_path", string] = "generaluser-gs/strloop - c3.wav"
                 S[I + "_root", number] = 60
             }
             for(I = 64, 66) {
-                S[I + "_path", string] = "generaluser-gs/StrLoop - D#3.wav"
+                S[I + "_path", string] = "generaluser-gs/strloop - d#3.wav"
                 S[I + "_root", number] = 63
             }
             for(I = 67, 69) {
-                S[I + "_path", string] = "generaluser-gs/StrLoop - F#3.wav"
+                S[I + "_path", string] = "generaluser-gs/strloop - f#3.wav"
                 S[I + "_root", number] = 66
             }
             for(I = 70, 72) {
-                S[I + "_path", string] = "generaluser-gs/StrLoop - A3.wav"
+                S[I + "_path", string] = "generaluser-gs/strloop - a3.wav"
                 S[I + "_root", number] = 69
             }
             for(I = 73, 75) {
-                S[I + "_path", string] = "generaluser-gs/StrLoop - C4.wav"
+                S[I + "_path", string] = "generaluser-gs/strloop - c4.wav"
                 S[I + "_root", number] = 72
             }
             for(I = 76, 78) {
-                S[I + "_path", string] = "generaluser-gs/StrLoop - D#4.wav"
+                S[I + "_path", string] = "generaluser-gs/strloop - d#4.wav"
                 S[I + "_root", number] = 75
             }
             for(I = 79, 81) {
-                S[I + "_path", string] = "generaluser-gs/StrLoop - F#4.wav"
+                S[I + "_path", string] = "generaluser-gs/strloop - f#4.wav"
                 S[I + "_root", number] = 78
             }
             for(I = 82, 84) {
-                S[I + "_path", string] = "generaluser-gs/StrLoop - A4.wav"
+                S[I + "_path", string] = "generaluser-gs/strloop - a4.wav"
                 S[I + "_root", number] = 81
             }
             for(I = 85, 87) {
-                S[I + "_path", string] = "generaluser-gs/StrLoop - C5.wav"
+                S[I + "_path", string] = "generaluser-gs/strloop - c5.wav"
                 S[I + "_root", number] = 84
             }
             for(I = 88, 90) {
-                S[I + "_path", string] = "generaluser-gs/StrLoop - D#5.wav"
+                S[I + "_path", string] = "generaluser-gs/strloop - d#5.wav"
                 S[I + "_root", number] = 87
             }
             for(I = 91, 93) {
-                S[I + "_path", string] = "generaluser-gs/StrLoop - F#5.wav"
+                S[I + "_path", string] = "generaluser-gs/strloop - f#5.wav"
                 S[I + "_root", number] = 90
             }
             for(I = 94, 96) {
-                S[I + "_path", string] = "generaluser-gs/StrLoop - A5.wav"
+                S[I + "_path", string] = "generaluser-gs/strloop - a5.wav"
                 S[I + "_root", number] = 93
             }
             for(I = 97, 110) {
-                S[I + "_path", string] = "generaluser-gs/StrLoop - C6.wav"
+                S[I + "_path", string] = "generaluser-gs/strloop - c6.wav"
                 S[I + "_root", number] = 96
             }
             T["samples", table] = S
@@ -384,27 +384,27 @@ function table midiProgramAddon(Program:number) {
         case 56, case 57, case 58, case 59, case 60, case 61, case 62, case 63,
             local S = table()
             for(I = 0, 64) {
-                S[I + "_path", string] = "generaluser-gs/Brass Section-C4.wav"
+                S[I + "_path", string] = "generaluser-gs/brass section-c4.wav"
                 S[I + "_root", number] = 60
             }
             for(I = 65, 70) {
-                S[I + "_path", string] = "generaluser-gs/Brass Section-G4.wav"
+                S[I + "_path", string] = "generaluser-gs/brass section-g4.wav"
                 S[I + "_root", number] = 67
             }
             for(I = 71, 73) {
-                S[I + "_path", string] = "generaluser-gs/Brass Section-C5.wav"
+                S[I + "_path", string] = "generaluser-gs/brass section-c5.wav"
                 S[I + "_root", number] = 72
             }
             for(I = 74, 77) {
-                S[I + "_path", string] = "generaluser-gs/Brass Section-E5.wav"
+                S[I + "_path", string] = "generaluser-gs/brass section-e5.wav"
                 S[I + "_root", number] = 76
             }
             for(I = 78, 82) {
-                S[I + "_path", string] = "generaluser-gs/Brass Section-G5.wav"
+                S[I + "_path", string] = "generaluser-gs/brass section-g5.wav"
                 S[I + "_root", number] = 79
             }
             for(I = 83, 108) {
-                S[I + "_path", string] = "generaluser-gs/Brass Section-C6.wav"
+                S[I + "_path", string] = "generaluser-gs/brass section-c6.wav"
                 S[I + "_root", number] = 84
             }
             T["samples", table] = S
@@ -413,31 +413,31 @@ function table midiProgramAddon(Program:number) {
         # --- MUSIC_BOX ---
             local S = table()
             for(I = 0, 56) {
-                S[I + "_path", string] = "generaluser-gs/Celeste-D#4.wav"
+                S[I + "_path", string] = "generaluser-gs/celeste-d#4.wav"
                 S[I + "_root", number] = 63
             }
             for(I = 57, 72) {
-                S[I + "_path", string] = "generaluser-gs/Celeste-F#5.wav"
+                S[I + "_path", string] = "generaluser-gs/celeste-f#5.wav"
                 S[I + "_root", number] = 78
             }
             for(I = 73, 80) {
-                S[I + "_path", string] = "generaluser-gs/Celeste-A4.wav"
+                S[I + "_path", string] = "generaluser-gs/celeste-a4.wav"
                 S[I + "_root", number] = 69
             }
             for(I = 81, 88) {
-                S[I + "_path", string] = "generaluser-gs/Celeste-F#5.wav"
+                S[I + "_path", string] = "generaluser-gs/celeste-f#5.wav"
                 S[I + "_root", number] = 78
             }
             for(I = 89, 90) {
-                S[I + "_path", string] = "generaluser-gs/Celeste-D#7.wav"
+                S[I + "_path", string] = "generaluser-gs/celeste-d#7.wav"
                 S[I + "_root", number] = 99
             }
             for(I = 91, 96) {
-                S[I + "_path", string] = "generaluser-gs/Celeste-D#6.wav"
+                S[I + "_path", string] = "generaluser-gs/celeste-d#6.wav"
                 S[I + "_root", number] = 87
             }
             for(I = 97, 125) {
-                S[I + "_path", string] = "generaluser-gs/Celeste-D#7.wav"
+                S[I + "_path", string] = "generaluser-gs/celeste-d#7.wav"
                 S[I + "_root", number] = 99
             }
             T["samples", table] = S
@@ -446,19 +446,19 @@ function table midiProgramAddon(Program:number) {
         # --- PIZZICATO ---
             local S = table()
             for(I = 0, 51) {
-                S[I + "_path", string] = "generaluser-gs/Pizz. Strings-A#2.wav"
+                S[I + "_path", string] = "generaluser-gs/pizz strings-a#2.wav"
                 S[I + "_root", number] = 46
             }
             for(I = 52, 61) {
-                S[I + "_path", string] = "generaluser-gs/Pizz. Strings-G#3.wav"
+                S[I + "_path", string] = "generaluser-gs/pizz strings-g#3.wav"
                 S[I + "_root", number] = 56
             }
             for(I = 62, 74) {
-                S[I + "_path", string] = "generaluser-gs/Pizz. Strings-F#4.wav"
+                S[I + "_path", string] = "generaluser-gs/pizz strings-f#4.wav"
                 S[I + "_root", number] = 66
             }
             for(I = 75, 112) {
-                S[I + "_path", string] = "generaluser-gs/Pizz. Strings-F5.wav"
+                S[I + "_path", string] = "generaluser-gs/pizz strings-f5.wav"
                 S[I + "_root", number] = 77
             }
             T["samples", table] = S
@@ -467,67 +467,67 @@ function table midiProgramAddon(Program:number) {
         # --- SYNTH_LEAD ---
             local S = table()
             for(I = 0, 36) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Pulse5000-033.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_pulse5000-033.wav"
                 S[I + "_root", number] = 33
             }
             for(I = 37, 42) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Pulse5000-039.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_pulse5000-039.wav"
                 S[I + "_root", number] = 39
             }
             for(I = 43, 48) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Pulse5000-045.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_pulse5000-045.wav"
                 S[I + "_root", number] = 45
             }
             for(I = 49, 54) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Pulse5000-051.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_pulse5000-051.wav"
                 S[I + "_root", number] = 51
             }
             for(I = 55, 60) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Pulse5000-057.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_pulse5000-057.wav"
                 S[I + "_root", number] = 57
             }
             for(I = 61, 66) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Pulse5000-063.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_pulse5000-063.wav"
                 S[I + "_root", number] = 63
             }
             for(I = 67, 72) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Pulse5000-069.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_pulse5000-069.wav"
                 S[I + "_root", number] = 69
             }
             for(I = 73, 78) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Pulse5000-075.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_pulse5000-075.wav"
                 S[I + "_root", number] = 75
             }
             for(I = 79, 84) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Pulse5000-081.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_pulse5000-081.wav"
                 S[I + "_root", number] = 81
             }
             for(I = 85, 90) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Pulse5000-087.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_pulse5000-087.wav"
                 S[I + "_root", number] = 87
             }
             for(I = 91, 96) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Pulse5000-093.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_pulse5000-093.wav"
                 S[I + "_root", number] = 93
             }
             for(I = 97, 102) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Pulse5000-099.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_pulse5000-099.wav"
                 S[I + "_root", number] = 99
             }
             for(I = 103, 108) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Pulse5000-105.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_pulse5000-105.wav"
                 S[I + "_root", number] = 105
             }
             for(I = 109, 114) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Pulse5000-111.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_pulse5000-111.wav"
                 S[I + "_root", number] = 111
             }
             for(I = 115, 120) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Pulse5000-117.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_pulse5000-117.wav"
                 S[I + "_root", number] = 117
             }
             for(I = 121, 127) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Pulse5000-123.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_pulse5000-123.wav"
                 S[I + "_root", number] = 123
             }
             T["samples", table] = S
@@ -536,67 +536,67 @@ function table midiProgramAddon(Program:number) {
         # --- SYNTH_BASS ---
             local S = table()
             for(I = 0, 36) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Ramp-033.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_ramp-033.wav"
                 S[I + "_root", number] = 33
             }
             for(I = 37, 42) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Ramp-039.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_ramp-039.wav"
                 S[I + "_root", number] = 39
             }
             for(I = 43, 48) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Ramp-045.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_ramp-045.wav"
                 S[I + "_root", number] = 45
             }
             for(I = 49, 54) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Ramp-051.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_ramp-051.wav"
                 S[I + "_root", number] = 51
             }
             for(I = 55, 60) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Ramp-057.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_ramp-057.wav"
                 S[I + "_root", number] = 57
             }
             for(I = 61, 66) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Ramp-063.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_ramp-063.wav"
                 S[I + "_root", number] = 63
             }
             for(I = 67, 72) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Ramp-069.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_ramp-069.wav"
                 S[I + "_root", number] = 69
             }
             for(I = 73, 78) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Ramp-075.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_ramp-075.wav"
                 S[I + "_root", number] = 75
             }
             for(I = 79, 84) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Ramp-081.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_ramp-081.wav"
                 S[I + "_root", number] = 81
             }
             for(I = 85, 90) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Ramp-087.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_ramp-087.wav"
                 S[I + "_root", number] = 87
             }
             for(I = 91, 96) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Ramp-093.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_ramp-093.wav"
                 S[I + "_root", number] = 93
             }
             for(I = 97, 102) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Ramp-099.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_ramp-099.wav"
                 S[I + "_root", number] = 99
             }
             for(I = 103, 108) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Ramp-105.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_ramp-105.wav"
                 S[I + "_root", number] = 105
             }
             for(I = 109, 114) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Ramp-111.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_ramp-111.wav"
                 S[I + "_root", number] = 111
             }
             for(I = 115, 120) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Ramp-117.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_ramp-117.wav"
                 S[I + "_root", number] = 117
             }
             for(I = 121, 127) {
-                S[I + "_path", string] = "generaluser-gs/Wave_Ramp-123.wav"
+                S[I + "_path", string] = "generaluser-gs/wave_ramp-123.wav"
                 S[I + "_root", number] = 123
             }
             T["samples", table] = S
@@ -605,233 +605,233 @@ function table midiProgramAddon(Program:number) {
         # --- STANDARD DRUM KIT ---
         case 128,
             local S = table()
-            S[57 + "_path", string] = "generaluser-gs/Crash Cymbal.wav"
+            S[57 + "_path", string] = "generaluser-gs/crash cymbal.wav"
             S[57 + "_root", number] = 57
-            S[51 + "_path", string] = "generaluser-gs/Ride Cymbal.wav"
+            S[51 + "_path", string] = "generaluser-gs/ride cymbal.wav"
             S[51 + "_root", number] = 51
-            S[59 + "_path", string] = "generaluser-gs/Ride Cymbal.wav"
+            S[59 + "_path", string] = "generaluser-gs/ride cymbal.wav"
             S[59 + "_root", number] = 59
-            S[53 + "_path", string] = "generaluser-gs/Ride Bell.wav"
+            S[53 + "_path", string] = "generaluser-gs/ride bell.wav"
             S[53 + "_root", number] = 53
-            S[55 + "_path", string] = "generaluser-gs/Splash Cymbal.wav"
+            S[55 + "_path", string] = "generaluser-gs/splash cymbal.wav"
             S[55 + "_root", number] = 55
-            S[37 + "_path", string] = "generaluser-gs/Standard Snare 1_v1.wav"
+            S[37 + "_path", string] = "generaluser-gs/standard snare 1_v1.wav"
             S[37 + "_root", number] = 37
-            S[67 + "_path", string] = "generaluser-gs/Agogo.wav"
+            S[67 + "_path", string] = "generaluser-gs/agogo.wav"
             S[67 + "_root", number] = 67
-            S[67 + "_path", string] = "generaluser-gs/Agogo.wav"
+            S[67 + "_path", string] = "generaluser-gs/agogo.wav"
             S[67 + "_root", number] = 67
-            S[67 + "_path", string] = "generaluser-gs/Agogo.wav"
+            S[67 + "_path", string] = "generaluser-gs/agogo.wav"
             S[67 + "_root", number] = 67
-            S[68 + "_path", string] = "generaluser-gs/Agogo.wav"
+            S[68 + "_path", string] = "generaluser-gs/agogo.wav"
             S[68 + "_root", number] = 68
-            S[68 + "_path", string] = "generaluser-gs/Agogo.wav"
+            S[68 + "_path", string] = "generaluser-gs/agogo.wav"
             S[68 + "_root", number] = 68
-            S[68 + "_path", string] = "generaluser-gs/Agogo.wav"
+            S[68 + "_path", string] = "generaluser-gs/agogo.wav"
             S[68 + "_root", number] = 68
-            S[76 + "_path", string] = "generaluser-gs/Wood Block Med.wav"
+            S[76 + "_path", string] = "generaluser-gs/wood block med.wav"
             S[76 + "_root", number] = 76
-            S[76 + "_path", string] = "generaluser-gs/Wood Block Med.wav"
+            S[76 + "_path", string] = "generaluser-gs/wood block med.wav"
             S[76 + "_root", number] = 76
-            S[76 + "_path", string] = "generaluser-gs/Wood Block Med.wav"
+            S[76 + "_path", string] = "generaluser-gs/wood block med.wav"
             S[76 + "_root", number] = 76
-            S[76 + "_path", string] = "generaluser-gs/Wood Block Med.wav"
+            S[76 + "_path", string] = "generaluser-gs/wood block med.wav"
             S[76 + "_root", number] = 76
-            S[76 + "_path", string] = "generaluser-gs/Wood Block Hard.wav"
+            S[76 + "_path", string] = "generaluser-gs/wood block hard.wav"
             S[76 + "_root", number] = 76
-            S[76 + "_path", string] = "generaluser-gs/Wood Block Hard.wav"
+            S[76 + "_path", string] = "generaluser-gs/wood block hard.wav"
             S[76 + "_root", number] = 76
-            S[77 + "_path", string] = "generaluser-gs/Wood Block Hard.wav"
+            S[77 + "_path", string] = "generaluser-gs/wood block hard.wav"
             S[77 + "_root", number] = 77
-            S[77 + "_path", string] = "generaluser-gs/Wood Block Med.wav"
+            S[77 + "_path", string] = "generaluser-gs/wood block med.wav"
             S[77 + "_root", number] = 77
-            S[77 + "_path", string] = "generaluser-gs/Wood Block Med.wav"
+            S[77 + "_path", string] = "generaluser-gs/wood block med.wav"
             S[77 + "_root", number] = 77
-            S[77 + "_path", string] = "generaluser-gs/Wood Block Med.wav"
+            S[77 + "_path", string] = "generaluser-gs/wood block med.wav"
             S[77 + "_root", number] = 77
-            S[77 + "_path", string] = "generaluser-gs/Wood Block Med.wav"
+            S[77 + "_path", string] = "generaluser-gs/wood block med.wav"
             S[77 + "_root", number] = 77
-            S[77 + "_path", string] = "generaluser-gs/Wood Block Hard.wav"
+            S[77 + "_path", string] = "generaluser-gs/wood block hard.wav"
             S[77 + "_root", number] = 77
-            S[77 + "_path", string] = "generaluser-gs/Wood Block Hard.wav"
+            S[77 + "_path", string] = "generaluser-gs/wood block hard.wav"
             S[77 + "_root", number] = 77
-            S[42 + "_path", string] = "generaluser-gs/Hi-Hat Closed Soft.wav"
+            S[42 + "_path", string] = "generaluser-gs/hi-hat closed soft.wav"
             S[42 + "_root", number] = 42
-            S[42 + "_path", string] = "generaluser-gs/Hi-Hat Closed Soft.wav"
+            S[42 + "_path", string] = "generaluser-gs/hi-hat closed soft.wav"
             S[42 + "_root", number] = 42
-            S[42 + "_path", string] = "generaluser-gs/Hi-Hat Closed Soft.wav"
+            S[42 + "_path", string] = "generaluser-gs/hi-hat closed soft.wav"
             S[42 + "_root", number] = 42
-            S[42 + "_path", string] = "generaluser-gs/Hi-Hat Closed Hard.wav"
+            S[42 + "_path", string] = "generaluser-gs/hi-hat closed hard.wav"
             S[42 + "_root", number] = 42
-            S[42 + "_path", string] = "generaluser-gs/Hi-Hat Closed Hard.wav"
+            S[42 + "_path", string] = "generaluser-gs/hi-hat closed hard.wav"
             S[42 + "_root", number] = 42
-            S[42 + "_path", string] = "generaluser-gs/Hi-Hat Closed Hard.wav"
+            S[42 + "_path", string] = "generaluser-gs/hi-hat closed hard.wav"
             S[42 + "_root", number] = 42
-            S[42 + "_path", string] = "generaluser-gs/Hi-Hat Closed Hard.wav"
+            S[42 + "_path", string] = "generaluser-gs/hi-hat closed hard.wav"
             S[42 + "_root", number] = 42
-            S[44 + "_path", string] = "generaluser-gs/Dead Air.wav"
+            S[44 + "_path", string] = "generaluser-gs/dead air.wav"
             S[44 + "_root", number] = 44
-            S[44 + "_path", string] = "generaluser-gs/Hi-Hat Pedal.wav"
+            S[44 + "_path", string] = "generaluser-gs/hi-hat pedal.wav"
             S[44 + "_root", number] = 44
-            S[44 + "_path", string] = "generaluser-gs/Hi-Hat Pedal.wav"
+            S[44 + "_path", string] = "generaluser-gs/hi-hat pedal.wav"
             S[44 + "_root", number] = 44
-            S[44 + "_path", string] = "generaluser-gs/Hi-Hat Pedal.wav"
+            S[44 + "_path", string] = "generaluser-gs/hi-hat pedal.wav"
             S[44 + "_root", number] = 44
-            S[44 + "_path", string] = "generaluser-gs/Hi-Hat Pedal.wav"
+            S[44 + "_path", string] = "generaluser-gs/hi-hat pedal.wav"
             S[44 + "_root", number] = 44
-            S[46 + "_path", string] = "generaluser-gs/Hi-Hat Open Attack.wav"
+            S[46 + "_path", string] = "generaluser-gs/hi-hat open attack.wav"
             S[46 + "_root", number] = 46
-            S[46 + "_path", string] = "generaluser-gs/Hi-Hat Open Attack.wav"
+            S[46 + "_path", string] = "generaluser-gs/hi-hat open attack.wav"
             S[46 + "_root", number] = 46
-            S[46 + "_path", string] = "generaluser-gs/Hi-Hat Open.wav"
+            S[46 + "_path", string] = "generaluser-gs/hi-hat open.wav"
             S[46 + "_root", number] = 46
-            S[27 + "_path", string] = "generaluser-gs/Filter Snap.wav"
+            S[27 + "_path", string] = "generaluser-gs/filter snap.wav"
             S[27 + "_root", number] = 27
-            S[28 + "_path", string] = "generaluser-gs/Slap.wav"
+            S[28 + "_path", string] = "generaluser-gs/slap.wav"
             S[28 + "_root", number] = 28
-            S[31 + "_path", string] = "generaluser-gs/Sticks.wav"
+            S[31 + "_path", string] = "generaluser-gs/sticks.wav"
             S[31 + "_root", number] = 31
-            S[33 + "_path", string] = "generaluser-gs/TR-808 Click.wav"
+            S[33 + "_path", string] = "generaluser-gs/tr-808 click.wav"
             S[33 + "_root", number] = 33
-            S[34 + "_path", string] = "generaluser-gs/Carillon-C6.wav"
+            S[34 + "_path", string] = "generaluser-gs/carillon-c6.wav"
             S[34 + "_root", number] = 34
-            S[34 + "_path", string] = "generaluser-gs/TR-808 Click.wav"
+            S[34 + "_path", string] = "generaluser-gs/tr-808 click.wav"
             S[34 + "_root", number] = 34
-            S[54 + "_path", string] = "generaluser-gs/Tambourine.wav"
+            S[54 + "_path", string] = "generaluser-gs/tambourine.wav"
             S[54 + "_root", number] = 54
-            S[58 + "_path", string] = "generaluser-gs/Vibra Slap.wav"
+            S[58 + "_path", string] = "generaluser-gs/vibra slap.wav"
             S[58 + "_root", number] = 58
-            S[60 + "_path", string] = "generaluser-gs/Bongo Rim.wav"
+            S[60 + "_path", string] = "generaluser-gs/bongo rim.wav"
             S[60 + "_root", number] = 60
-            S[61 + "_path", string] = "generaluser-gs/Bongo Tone.wav"
+            S[61 + "_path", string] = "generaluser-gs/bongo tone.wav"
             S[61 + "_root", number] = 61
-            S[62 + "_path", string] = "generaluser-gs/Conga High Muted.wav"
+            S[62 + "_path", string] = "generaluser-gs/conga high muted.wav"
             S[62 + "_root", number] = 62
-            S[63 + "_path", string] = "generaluser-gs/Conga High Open.wav"
+            S[63 + "_path", string] = "generaluser-gs/conga high open.wav"
             S[63 + "_root", number] = 63
-            S[64 + "_path", string] = "generaluser-gs/Tumba Low.wav"
+            S[64 + "_path", string] = "generaluser-gs/tumba low.wav"
             S[64 + "_root", number] = 64
-            S[65 + "_path", string] = "generaluser-gs/Timbale Rim.wav"
+            S[65 + "_path", string] = "generaluser-gs/timbale rim.wav"
             S[65 + "_root", number] = 65
-            S[66 + "_path", string] = "generaluser-gs/Timbale Low.wav"
+            S[66 + "_path", string] = "generaluser-gs/timbale low.wav"
             S[66 + "_root", number] = 66
-            S[69 + "_path", string] = "generaluser-gs/Cabasa.wav"
+            S[69 + "_path", string] = "generaluser-gs/cabasa.wav"
             S[69 + "_root", number] = 69
-            S[70 + "_path", string] = "generaluser-gs/Maracas.wav"
+            S[70 + "_path", string] = "generaluser-gs/maracas.wav"
             S[70 + "_root", number] = 70
-            S[71 + "_path", string] = "generaluser-gs/Whistle Short.wav"
+            S[71 + "_path", string] = "generaluser-gs/whistle short.wav"
             S[71 + "_root", number] = 71
-            S[72 + "_path", string] = "generaluser-gs/Whistle Long.wav"
+            S[72 + "_path", string] = "generaluser-gs/whistle long.wav"
             S[72 + "_root", number] = 72
-            S[73 + "_path", string] = "generaluser-gs/Guiro Short.wav"
+            S[73 + "_path", string] = "generaluser-gs/guiro short.wav"
             S[73 + "_root", number] = 73
-            S[74 + "_path", string] = "generaluser-gs/Guiro Long.wav"
+            S[74 + "_path", string] = "generaluser-gs/guiro long.wav"
             S[74 + "_root", number] = 74
-            S[75 + "_path", string] = "generaluser-gs/Claves.wav"
+            S[75 + "_path", string] = "generaluser-gs/claves.wav"
             S[75 + "_root", number] = 75
-            S[78 + "_path", string] = "generaluser-gs/Cuica Mute.wav"
+            S[78 + "_path", string] = "generaluser-gs/cuica mute.wav"
             S[78 + "_root", number] = 78
-            S[79 + "_path", string] = "generaluser-gs/Cuica Open.wav"
+            S[79 + "_path", string] = "generaluser-gs/cuica open.wav"
             S[79 + "_root", number] = 79
-            S[80 + "_path", string] = "generaluser-gs/Triangle (Perc).wav"
+            S[80 + "_path", string] = "generaluser-gs/triangle (perc).wav"
             S[80 + "_root", number] = 80
-            S[81 + "_path", string] = "generaluser-gs/Triangle (Perc).wav"
+            S[81 + "_path", string] = "generaluser-gs/triangle (perc).wav"
             S[81 + "_root", number] = 81
-            S[82 + "_path", string] = "generaluser-gs/Shaker.wav"
+            S[82 + "_path", string] = "generaluser-gs/shaker.wav"
             S[82 + "_root", number] = 82
-            S[83 + "_path", string] = "generaluser-gs/Jingle Bell.wav"
+            S[83 + "_path", string] = "generaluser-gs/jingle bell.wav"
             S[83 + "_root", number] = 83
-            S[85 + "_path", string] = "generaluser-gs/Castanets.wav"
+            S[85 + "_path", string] = "generaluser-gs/castanets.wav"
             S[85 + "_root", number] = 85
-            S[86 + "_path", string] = "generaluser-gs/Surdo Muted.wav"
+            S[86 + "_path", string] = "generaluser-gs/surdo muted.wav"
             S[86 + "_root", number] = 86
-            S[87 + "_path", string] = "generaluser-gs/Surdo Open.wav"
+            S[87 + "_path", string] = "generaluser-gs/surdo open.wav"
             S[87 + "_root", number] = 87
-            S[52 + "_path", string] = "generaluser-gs/Chinese Cymbal.wav"
+            S[52 + "_path", string] = "generaluser-gs/chinese cymbal.wav"
             S[52 + "_root", number] = 52
-            S[56 + "_path", string] = "generaluser-gs/Cowbell.wav"
+            S[56 + "_path", string] = "generaluser-gs/cowbell.wav"
             S[56 + "_root", number] = 56
-            S[39 + "_path", string] = "generaluser-gs/Hand Clap.wav"
+            S[39 + "_path", string] = "generaluser-gs/hand clap.wav"
             S[39 + "_root", number] = 39
-            S[29 + "_path", string] = "generaluser-gs/Scratch Push.wav"
+            S[29 + "_path", string] = "generaluser-gs/scratch push.wav"
             S[29 + "_root", number] = 29
-            S[30 + "_path", string] = "generaluser-gs/Scratch Pull.wav"
+            S[30 + "_path", string] = "generaluser-gs/scratch pull.wav"
             S[30 + "_root", number] = 30
-            S[84 + "_path", string] = "generaluser-gs/Chimes.wav"
+            S[84 + "_path", string] = "generaluser-gs/chimes.wav"
             S[84 + "_root", number] = 84
-            S[37 + "_path", string] = "generaluser-gs/Rim Shot.wav"
+            S[37 + "_path", string] = "generaluser-gs/rim shot.wav"
             S[37 + "_root", number] = 37
-            S[41 + "_path", string] = "generaluser-gs/Standard Tom 5.wav"
+            S[41 + "_path", string] = "generaluser-gs/standard tom 5.wav"
             S[41 + "_root", number] = 41
-            S[43 + "_path", string] = "generaluser-gs/Standard Tom 5.wav"
+            S[43 + "_path", string] = "generaluser-gs/standard tom 5.wav"
             S[43 + "_root", number] = 43
-            S[45 + "_path", string] = "generaluser-gs/Standard Tom 4.wav"
+            S[45 + "_path", string] = "generaluser-gs/standard tom 4.wav"
             S[45 + "_root", number] = 45
-            S[47 + "_path", string] = "generaluser-gs/Standard Tom 3.wav"
+            S[47 + "_path", string] = "generaluser-gs/standard tom 3.wav"
             S[47 + "_root", number] = 47
-            S[48 + "_path", string] = "generaluser-gs/Standard Tom 2.wav"
+            S[48 + "_path", string] = "generaluser-gs/standard tom 2.wav"
             S[48 + "_root", number] = 48
-            S[50 + "_path", string] = "generaluser-gs/Standard Tom 1.wav"
+            S[50 + "_path", string] = "generaluser-gs/standard tom 1.wav"
             S[50 + "_root", number] = 50
-            S[41 + "_path", string] = "generaluser-gs/Standard Tom 5.wav"
+            S[41 + "_path", string] = "generaluser-gs/standard tom 5.wav"
             S[41 + "_root", number] = 41
-            S[43 + "_path", string] = "generaluser-gs/Standard Tom 5.wav"
+            S[43 + "_path", string] = "generaluser-gs/standard tom 5.wav"
             S[43 + "_root", number] = 43
-            S[45 + "_path", string] = "generaluser-gs/Standard Tom 4.wav"
+            S[45 + "_path", string] = "generaluser-gs/standard tom 4.wav"
             S[45 + "_root", number] = 45
-            S[47 + "_path", string] = "generaluser-gs/Standard Tom 3.wav"
+            S[47 + "_path", string] = "generaluser-gs/standard tom 3.wav"
             S[47 + "_root", number] = 47
-            S[48 + "_path", string] = "generaluser-gs/Standard Tom 2.wav"
+            S[48 + "_path", string] = "generaluser-gs/standard tom 2.wav"
             S[48 + "_root", number] = 48
-            S[50 + "_path", string] = "generaluser-gs/Standard Tom 1.wav"
+            S[50 + "_path", string] = "generaluser-gs/standard tom 1.wav"
             S[50 + "_root", number] = 50
-            S[41 + "_path", string] = "generaluser-gs/Standard Tom 5.wav"
+            S[41 + "_path", string] = "generaluser-gs/standard tom 5.wav"
             S[41 + "_root", number] = 41
-            S[43 + "_path", string] = "generaluser-gs/Standard Tom 5.wav"
+            S[43 + "_path", string] = "generaluser-gs/standard tom 5.wav"
             S[43 + "_root", number] = 43
-            S[45 + "_path", string] = "generaluser-gs/Standard Tom 4.wav"
+            S[45 + "_path", string] = "generaluser-gs/standard tom 4.wav"
             S[45 + "_root", number] = 45
-            S[47 + "_path", string] = "generaluser-gs/Standard Tom 3.wav"
+            S[47 + "_path", string] = "generaluser-gs/standard tom 3.wav"
             S[47 + "_root", number] = 47
-            S[48 + "_path", string] = "generaluser-gs/Standard Tom 2.wav"
+            S[48 + "_path", string] = "generaluser-gs/standard tom 2.wav"
             S[48 + "_root", number] = 48
-            S[50 + "_path", string] = "generaluser-gs/Standard Tom 1.wav"
+            S[50 + "_path", string] = "generaluser-gs/standard tom 1.wav"
             S[50 + "_root", number] = 50
-            S[41 + "_path", string] = "generaluser-gs/Standard Tom 5.wav"
+            S[41 + "_path", string] = "generaluser-gs/standard tom 5.wav"
             S[41 + "_root", number] = 41
-            S[43 + "_path", string] = "generaluser-gs/Standard Tom 5.wav"
+            S[43 + "_path", string] = "generaluser-gs/standard tom 5.wav"
             S[43 + "_root", number] = 43
-            S[45 + "_path", string] = "generaluser-gs/Standard Tom 4.wav"
+            S[45 + "_path", string] = "generaluser-gs/standard tom 4.wav"
             S[45 + "_root", number] = 45
-            S[47 + "_path", string] = "generaluser-gs/Standard Tom 3.wav"
+            S[47 + "_path", string] = "generaluser-gs/standard tom 3.wav"
             S[47 + "_root", number] = 47
-            S[48 + "_path", string] = "generaluser-gs/Standard Tom 2.wav"
+            S[48 + "_path", string] = "generaluser-gs/standard tom 2.wav"
             S[48 + "_root", number] = 48
-            S[50 + "_path", string] = "generaluser-gs/Standard Tom 1.wav"
+            S[50 + "_path", string] = "generaluser-gs/standard tom 1.wav"
             S[50 + "_root", number] = 50
-            S[41 + "_path", string] = "generaluser-gs/Standard Tom 5.wav"
+            S[41 + "_path", string] = "generaluser-gs/standard tom 5.wav"
             S[41 + "_root", number] = 41
-            S[43 + "_path", string] = "generaluser-gs/Standard Tom 5.wav"
+            S[43 + "_path", string] = "generaluser-gs/standard tom 5.wav"
             S[43 + "_root", number] = 43
-            S[45 + "_path", string] = "generaluser-gs/Standard Tom 4.wav"
+            S[45 + "_path", string] = "generaluser-gs/standard tom 4.wav"
             S[45 + "_root", number] = 45
-            S[47 + "_path", string] = "generaluser-gs/Standard Tom 3.wav"
+            S[47 + "_path", string] = "generaluser-gs/standard tom 3.wav"
             S[47 + "_root", number] = 47
-            S[48 + "_path", string] = "generaluser-gs/Standard Tom 2.wav"
+            S[48 + "_path", string] = "generaluser-gs/standard tom 2.wav"
             S[48 + "_root", number] = 48
-            S[50 + "_path", string] = "generaluser-gs/Standard Tom 1.wav"
+            S[50 + "_path", string] = "generaluser-gs/standard tom 1.wav"
             S[50 + "_root", number] = 50
-            S[41 + "_path", string] = "generaluser-gs/Standard Tom 5.wav"
+            S[41 + "_path", string] = "generaluser-gs/standard tom 5.wav"
             S[41 + "_root", number] = 41
-            S[43 + "_path", string] = "generaluser-gs/Standard Tom 5.wav"
+            S[43 + "_path", string] = "generaluser-gs/standard tom 5.wav"
             S[43 + "_root", number] = 43
-            S[45 + "_path", string] = "generaluser-gs/Standard Tom 4.wav"
+            S[45 + "_path", string] = "generaluser-gs/standard tom 4.wav"
             S[45 + "_root", number] = 45
-            S[47 + "_path", string] = "generaluser-gs/Standard Tom 3.wav"
+            S[47 + "_path", string] = "generaluser-gs/standard tom 3.wav"
             S[47 + "_root", number] = 47
-            S[48 + "_path", string] = "generaluser-gs/Standard Tom 2.wav"
+            S[48 + "_path", string] = "generaluser-gs/standard tom 2.wav"
             S[48 + "_root", number] = 48
-            S[50 + "_path", string] = "generaluser-gs/Standard Tom 1.wav"
+            S[50 + "_path", string] = "generaluser-gs/standard tom 1.wav"
             S[50 + "_root", number] = 50
             T["samples", table] = S
             break
@@ -840,71 +840,71 @@ function table midiProgramAddon(Program:number) {
         default,
             local S = table()
             for(I = 0, 27) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-D1.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-d1.wav"
                 S[I + "_root", number] = 26
             }
             for(I = 28, 30) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-F1.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-f1.wav"
                 S[I + "_root", number] = 29
             }
             for(I = 31, 34) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-A#1.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-a#1.wav"
                 S[I + "_root", number] = 34
             }
             for(I = 35, 40) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-D2.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-d2.wav"
                 S[I + "_root", number] = 38
             }
             for(I = 41, 46) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-G#2.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-g#2.wav"
                 S[I + "_root", number] = 44
             }
             for(I = 47, 50) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-C3.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-c3.wav"
                 S[I + "_root", number] = 48
             }
             for(I = 51, 55) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-F3.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-f3.wav"
                 S[I + "_root", number] = 53
             }
             for(I = 56, 57) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-A#3.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-a#3.wav"
                 S[I + "_root", number] = 58
             }
             for(I = 58, 60) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-C4.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-c4.wav"
                 S[I + "_root", number] = 60
             }
             for(I = 61, 64) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-D#3.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-d#3.wav"
                 S[I + "_root", number] = 63
             }
             for(I = 65, 69) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-F#4.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-f#4.wav"
                 S[I + "_root", number] = 67
             }
             for(I = 70, 71) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-C5.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-c5.wav"
                 S[I + "_root", number] = 72
             }
             for(I = 72, 76) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-D#5.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-d#5.wav"
                 S[I + "_root", number] = 75
             }
             for(I = 77, 81) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-A5.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-a5.wav"
                 S[I + "_root", number] = 81
             }
             for(I = 82, 87) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-D6.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-d6.wav"
                 S[I + "_root", number] = 86
             }
             for(I = 88, 92) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-G6.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-g6.wav"
                 S[I + "_root", number] = 91
             }
             for(I = 93, 127) {
-                S[I + "_path", string] = "generaluser-gs/Grand Piano-C7.wav"
+                S[I + "_path", string] = "generaluser-gs/grand piano-c7.wav"
                 S[I + "_root", number] = 96
             }
             T["samples", table] = S
