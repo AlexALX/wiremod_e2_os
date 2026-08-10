@@ -395,7 +395,35 @@ function BMP.readPixel32()
     local b = file:readByte()
     local g = file:readByte()
     local r = file:readByte()
+    file:readByte()
+
+    return BMP.processPixel(r, g, b)
+end
+
+function BMP.readPixel32Alpha()
+    local file = BMP.file
+    
+    local b = file:readByte()
+    local g = file:readByte()
+    local r = file:readByte()
     local a = file:readByte()
 
-    return BMP.processPixel(r, g, b, a)
+    local AlphaFactor = a / 255
+    
+    r = math.floor(r * AlphaFactor)
+    g = math.floor(g * AlphaFactor)
+    b = math.floor(b * AlphaFactor)
+
+    return BMP.processPixel(r, g, b)
+end
+
+function BMP.readPixel32Inversed()
+    local file = BMP.file
+
+    file:readByte()
+    local b = file:readByte()
+    local g = file:readByte()
+    local r = file:readByte()
+
+    return BMP.processPixel(r, g, b)
 end

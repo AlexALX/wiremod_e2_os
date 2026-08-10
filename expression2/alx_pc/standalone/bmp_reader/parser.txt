@@ -39,6 +39,7 @@ function number bmpParseHeader() {
             ColorsB = 3    
         }           
         BmpData["headerSize",number] = HSize 
+        
         BmpData[5,number] = ColorsB
         BmpCurrentStep = ""
         BmpCurrentStepText = ""
@@ -69,7 +70,7 @@ function number bmpParseHeader() {
             return 0
         }
         
-        if (Compression!=0 & Compression!=1 & Compression!=2 & (Compression!=3 | Compression==3 & BitCount==32)) {
+        if (Compression!=0 & Compression!=1 & Compression!=2 & Compression!=3) {
             BmpError = "Unsupported BMP file.\nCompression: "+Compression+"\nBitCount: "+BitCount
             if (!BmpNoPrint) {
                 print(_HUD_PRINTTALK,BmpError)
@@ -116,11 +117,30 @@ function number bmpParseHeader() {
         }
         BmpData["screenWidth", number] = ResizedWidth
         BmpData["screenHeight", number] = ResizedHeight
-        BmpData["screenSize",number] = max(ResizedWidth,ResizedHeight)
         
         BmpStep = 1
 
-        if (BitCount==24 | BitCount==32) {
+        if (BitCount==32) {        
+            if (HSize == 56) {
+                BmpData[14,number] = 24
+                BmpData[15,number] = 16
+                BmpData[16,number] = 8
+                BmpData[33,number] = -1
+            } else {
+                BmpData[14,number] = 16
+                BmpData[15,number] = 8
+                BmpData[16,number] = 0
+                if (Compression==3) {
+                    BmpData[33,number] = 24
+                } else {
+                    BmpData[33,number] = -1   
+                } 
+            }
+            
+            BmpData[17,number] = 0xFF
+            BmpData[18,number] = 0xFF
+            BmpData[19,number] = 0xFF
+        } elseif (BitCount==24) {
             BmpData[14,number] = 16
             BmpData[15,number] = 8
             BmpData[16,number] = 0
@@ -174,16 +194,15 @@ function number bmpParseHeader() {
         #BmpData[5,number] = Size
         local FSize = BmpData["size",number]
         
-        local ResizedWidth = BmpData["screenWidth", number]
-        local ResizedHeight = BmpData["screenHeight", number]
-        
         if (!NoKeepAR) {            
             local SWH = (ResizedWidth>ResizedHeight ? ResizedWidth : ResizedHeight)
             BmpData[31,number] = (ResizedHeight>ResizedWidth ? floor((ResizedHeight-ResizedWidth)/2) : 0 )
             BmpData[32,number] = (ResizedWidth>ResizedHeight ? floor((ResizedWidth-ResizedHeight)/2) : 0 )
+            BmpData["screenSize",number] = max(ResizedWidth,ResizedHeight)
         } else {
             BmpData[31,number] = 0
             BmpData[32,number] = 0
+            BmpData["screenSize",number] = ResizedWidth
         }
 
         BmpData[6,number] = 0

@@ -10,7 +10,6 @@ dofile("alx_pc/bmp_reader/parser.txt")
 dofile("alx_pc/bmp_reader/decoder.txt")
 
 function BMP.bmpInit(StorageFile, Renderer, SizeLimit, NoKeepAR)
-
     BMP.file = StorageFile
     
     BMP.startTime = timer.curtime()

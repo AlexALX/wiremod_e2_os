@@ -26,7 +26,7 @@ function bmpInit(Body:string, Size, SizeLimit, NoKeepAR) {
     BmpData["data",string] = Body   
     BmpData["size",number] = Size
     BmpData["SizeLimit",number] = SizeLimit
-    BmpData["NoKeepAr",number] = NoKeepAR
+    BmpData["NoKeepAR",number] = NoKeepAR
 }
 
 function bmpRun() {

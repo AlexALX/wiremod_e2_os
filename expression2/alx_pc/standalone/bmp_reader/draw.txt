@@ -41,6 +41,7 @@ function bmpDraw() {
     local RS = BmpData[14,number]
     local GS = BmpData[15,number]
     local BS = BmpData[16,number]
+    local AS = BmpData[33,number]
     local RL = BmpData[17,number]
     local GL = BmpData[18,number]
     local BL = BmpData[19,number]
@@ -81,7 +82,6 @@ function bmpDraw() {
         
             Y--
             YY++
-        
             continue
         }
         
@@ -125,7 +125,9 @@ function bmpDraw() {
         }
 
         local Sub = 0
-        if (II==3 | II==4) {
+        if (II==4) {
+            Sub = Data:bmpRead_uint32(SI+1)
+        } elseif (II==3) {
             Sub = Data:bmpRead_uint24(SI+1)
         } elseif (II==2) {
             Sub = Data:bmpRead_uint16(SI+1)
@@ -133,7 +135,7 @@ function bmpDraw() {
             Sub = Data:bmpRead_uint8(SI+1)
         }
 
-        if (II<3) {
+        if (II<3 | II==4) {
             if (RCol==2) {
                 local RGB = CTbl[Sub,vector]
                 if (LastIndex!=Index) {
@@ -143,11 +145,20 @@ function bmpDraw() {
             } else {
                 local R = floor((Sub >> RS) && RL)
                 local G = floor((Sub >> GS) && GL)
-                local B = floor(Sub && BL)
+                local B = floor((Sub >> BS) && BL)
 
                 R *= floor(0xFF/RL)
                 G *= floor(0xFF/GL)
                 B *= floor(0xFF/BL)
+                
+                if (II == 4 & BmpData[33,number]>=0) {
+                    local A = floor((Sub >> AS) && 0xFF)
+                    
+                    local AlphaFactor = A / 255
+                    R = floor(R * AlphaFactor)
+                    G = floor(G * AlphaFactor)
+                    B = floor(B * AlphaFactor)
+                }
 
                 if (LastIndex!=Index) {
                     DS[Index] = R*65536 + G*256 + B
@@ -164,6 +175,10 @@ function bmpDraw() {
         BmpData["LastIndex",number] = LastIndex
         
         local NextX = ceil((floor(X / Scale) + 1) * Scale)
+        if (NextX > Width) {
+            NextX = Width
+        }
+        
         if (NextX <= X) { 
             NextX = X + 1 
         }

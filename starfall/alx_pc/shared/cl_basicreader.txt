@@ -14,6 +14,7 @@ Reader.onLoad = nil
 Reader.onError = nil
 Reader.onAbort = nil
 Reader.onCheck = nil
+Reader.File = nil
 
 function Reader.Init()
     hook.add("PlayerChat","reader_chat",Reader.onChat)
@@ -43,11 +44,16 @@ function Reader.onChat(Player, Said)
             return
         end
         
+        if Reader.File then
+            Reader.File:close()     
+        end
+        
         Storage.openHttp(Url, function(Success,File,Err) 
             if Success==false then
                 Reader.onError(Err,Url)
                 return    
             end
+            Reader.File = File
             Reader.onLoad(File,Url)    
         end)
     elseif Cmd == Command.."file" then

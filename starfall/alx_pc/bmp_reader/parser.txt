@@ -125,7 +125,15 @@ function BMP.bmpParseInfoHeader()
     elseif BMP.bitsPerPixel == 24 then
         BMP.readPixel = BMP.readPixel24
     elseif BMP.bitsPerPixel == 32 then
-        BMP.readPixel = BMP.readPixel32
+        if BMP.headerSize == 56 then
+            BMP.readPixel = BMP.readPixel32Inversed
+        else
+            if BMP.compression == 3 then  
+                BMP.readPixel = BMP.readPixel32Alpha
+            else   
+                BMP.readPixel = BMP.readPixel32
+            end
+        end
     elseif BMP.bitsPerPixel == 16 then
         BMP.readPixel = BMP.readPixel16
     elseif BMP.bitsPerPixel == 2 then
