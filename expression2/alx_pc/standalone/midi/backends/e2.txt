@@ -127,10 +127,13 @@ function table midiBackendE2(Mode:string) {
             if (!MidiNoPrint) {
                 print(MidiWarning)   
                 
-                print("\nRecommended e2 settings for better playback:")
-                print("wire_expression2_maxsounds 128")
-                print("wire_expression2_sound_burst_max 64")
-                print("wire_expression2_sound_burst_rate 0")                
+                print(
+                    "\nRecommended e2 settings for better playback:\n"+
+                    "wire_expression2_maxsounds 128\n"+
+                    "wire_expression2_sound_burst_max 64\n"+
+                    "wire_expression2_sound_burst_rate 0\n"+     
+                    "And then do wire_expression2_reload or reload map"
+                )        
             }
         } 
     }
