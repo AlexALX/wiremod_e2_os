@@ -50,6 +50,11 @@ function usb_init() {
     dsSendDirect("usbcontroller",USB_Device,table("imageacc",wirelink(),table()))
 }
 
+function number img_timeout() {
+    dsSendDirect("imageReaderError",E2_GPU,1)
+    return 0    
+}
+
 }
 
 if (dupefinished()) {
@@ -84,18 +89,21 @@ if (dsClk()) {
                 dsSendDirect("imageReaderError",E2_GPU,1)
             } else {        
                 dsSendDirect("drawImage", JPGReader:entity(), ImgInfo)
+                runCmd("img_timeout",1000)
             }
         } elseif (Type=="gif") {
             if (GIFReader == nowirelink()) {
                 dsSendDirect("imageReaderError",E2_GPU,1)
             } else {
                 dsSendDirect("drawImage", GIFReader:entity(), ImgInfo)
+                runCmd("img_timeout",1000)
             }
         } elseif (Type=="png") {
             if (PNGReader == nowirelink()) {
                 dsSendDirect("imageReaderError",E2_GPU,1)
             } else {
                 dsSendDirect("drawImage", PNGReader:entity(), ImgInfo)
+                runCmd("img_timeout",1000)
             }
         }
     } elseif (Name=="pci") {
@@ -107,6 +115,7 @@ if (dsClk()) {
     } elseif (DsHandler!="") {
         DsHandler(Name)
     } elseif (Name=="initImage") {
+        stopCmd()
         dsSendDirect("initImage", E2_GPU, dsGetTable())     
     }
 }
