@@ -25,9 +25,7 @@ This project pushes **Expression2** to its absolute limits, implementing complex
 * **Network & Router Simulation** — Multi-device routing stack featuring virtual switches, laser transceivers, and a real-world **HTTP gateway**.
 * **State Machine Architecture** — Execution splitting across server ticks using finite-state machines to safely handle heavy logic without exceeding E2 Tick Quota and Ops limits.
 
-### [Wiki](https://github.com/AlexALX/wiremod_e2_os/wiki)
-
-Main features:  
+### Main features
 * Virtual PC what made of parts.
 * Virtual motherboard with pcie/pci sockets and other sockets.
 * Virtual CD Drives, HDDs, USB devices, cables, pcie/pci cards, etc.
