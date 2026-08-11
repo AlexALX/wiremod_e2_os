@@ -7,7 +7,7 @@ More screenshots: https://imgur.com/a/eUHZQ
 
 **[Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=2075107429)**
 
-**Description and wiki is not yet fully updated.**
+**Documentation:** [ALX PC Wiki](https://github.com/AlexALX/wiremod_e2_os/wiki)
 
 This is an Wiremod Expression2 OS for Garry's Mod Game.  
 Written in in-game Expression2 Language (wiremod addon).  
