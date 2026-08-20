@@ -1,0 +1,61 @@
+@persist Deflate_BitBuffer Deflate_BitCount
+
+#include "alx_pc/standalone/deflate/_shared_"
+
+function deflateBitInit()
+{
+    Deflate_BitBuffer = 0
+    Deflate_BitCount = 0
+}
+
+function number deflateReadCompressedByte()
+{
+    if (Deflate_CompressedPos > Deflate_CompressedData:length()) {
+        return -1 
+    }
+    
+    local Byte = toByte(Deflate_CompressedData, Deflate_CompressedPos)
+    Deflate_CompressedPos++
+    return Byte
+}
+
+function number deflateBits(Bits:number)
+{
+    if (Bits == 0) { return 0 }
+
+    # Core bit refill loop using blazing fast persist registers
+    while (Deflate_BitCount < Bits) {
+        local Byte = deflateReadCompressedByte()
+        if (Byte < 0) {
+            return -1 
+        }
+        Deflate_BitBuffer = Deflate_BitBuffer || (Byte << Deflate_BitCount)
+        Deflate_BitCount += 8
+    }
+
+    local Value = Deflate_BitBuffer && ((1 << Bits) - 1)
+    
+    Deflate_BitBuffer = Deflate_BitBuffer >> Bits
+    Deflate_BitCount = Deflate_BitCount - Bits
+
+    return Value
+}
+
+function number deflateBit()
+{
+    if (Deflate_BitCount == 0) {
+        local Byte = deflateReadCompressedByte()
+        if (Byte < 0) { return -1 } # EOF safe guard
+        
+        Deflate_BitBuffer = Byte
+        Deflate_BitCount = 8
+    }
+
+    local Value = Deflate_BitBuffer && 1
+    
+    # Smooth step to the next bit
+    Deflate_BitBuffer = Deflate_BitBuffer >> 1
+    Deflate_BitCount--
+
+    return Value
+}

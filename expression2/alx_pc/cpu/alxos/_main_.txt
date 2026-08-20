@@ -19,7 +19,7 @@ function alxos_clear() {
     DsHandler = ""
 }
 
-function number alxos_openfile(FInfo:table) {
+function number alxos_openfile(FInfo:table) {    
     local Func = ALXOS_PROG_ASOC[FInfo["ext",string]:lower(),string]
     if (Func!="") {
         Func(FInfo)

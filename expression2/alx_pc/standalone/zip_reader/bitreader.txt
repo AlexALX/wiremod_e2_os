@@ -1,0 +1,62 @@
+#include "alx_pc/standalone/zip_reader/reader"
+
+function zipBitInit()
+{
+    Zip_BitBuffer = 0
+    Zip_BitCount = 0
+}
+
+function number zipReadCompressedByte()
+{
+    if (Zip_CompressedPos > Zip_CompressedData:length()) {
+        return -1
+    }
+
+    local Byte = toByte(Zip_CompressedData, Zip_CompressedPos)
+
+    Zip_CompressedPos++
+
+    return Byte
+}
+
+function number zipBits(Bits:number)
+{
+    if (Bits == 0) { return 0 }
+
+    while (Zip_BitCount < Bits) {
+        local Byte = zipReadCompressedByte()
+
+        if (Byte < 0) {
+            return -1
+        }
+
+        Zip_BitBuffer = Zip_BitBuffer || (Byte << Zip_BitCount)
+        Zip_BitCount += 8
+    }
+
+    local Value = Zip_BitBuffer && ((1 << Bits) - 1)
+
+    Zip_BitBuffer = Zip_BitBuffer >> Bits
+    Zip_BitCount = Zip_BitCount - Bits
+
+    return Value
+}
+
+function number zipBit()
+{
+    if (Zip_BitCount == 0) {
+        local Byte = zipReadCompressedByte()
+
+        if (Byte < 0) { return -1 }
+
+        Zip_BitBuffer = Byte
+        Zip_BitCount = 8
+    }
+
+    local Value = Zip_BitBuffer && 1
+
+    Zip_BitBuffer = Zip_BitBuffer >> 1
+    Zip_BitCount--
+
+    return Value
+}

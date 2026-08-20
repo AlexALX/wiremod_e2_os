@@ -147,18 +147,15 @@ function number bmpStep() {
         local Result = bmpParseHeader()
         if (Result==1) {
             return bmpStep()
-        }
+        }        
     } elseif (BmpData["drawInit",number]==0) {
         local Result = bmpParsePallete()
         
-        if (Result==0) {
-            timer("bmp",1)
-            return 0
-        } elseif (Result==2) {
+        if (Result==0 | Result==2) {
             timer("bmp",1)
             return 0
         }
-        
+
         bmpPostParse()
     } else {
         # multi thread init

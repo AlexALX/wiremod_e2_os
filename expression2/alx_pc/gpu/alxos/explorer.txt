@@ -56,10 +56,15 @@ function alxos_explorer_ft(Opts:array) {
             EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
             LAST_X += 50
         }
-    }      
+    }    
     
-    if (ReDraw) { return }     
-    
+    if (ReDraw) { 
+        local Index = GpuData["explorerFile",number]
+        EGP:egpSetText(Index, ExplorerPath:concat("/")+"/"+ExplorerFile)
+        return 
+    }     
+
+    GpuData["explorerFile",number] = LAST_I
     EGP:egpText(LAST_I,ExplorerPath:concat("/")+"/"+ExplorerFile,vec2(5,472))
     EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
 }
@@ -252,6 +257,7 @@ function alxos_explorer_listdir(FS:table,Dir,Sd) {
     local Err = GpuData[100,string]
     ExplorerDsH = ""
     ExplorerCurTask = ""
+    
     egpClear()
     alxos_explorer_bg()
     ExplorerDir[1,number] = Dir
@@ -317,6 +323,11 @@ function alxos_explorer_handlers() {
 }
 
 function alxos_explorer_listcurdir() {
+    if (GpuData["zipAdded",number]==1) {
+        ExplorerPath:pop()   
+        GpuData["zipAdded",number] = 0
+    }
+    
     alxos_explorer_listdir(ExplorerFS,ExplorerDir[1,number],ExplorerDir[2,number])     
 }
 
@@ -2557,9 +2568,50 @@ function alxos_explorer_key(Key:string,Pressed) {
     }
 }
 
+function alxos_explorer_read_mem(FInfo:table, Start:number) {
+    local FullStr = FInfo["content",string]
+    local TotalLength = FullStr:length()
+        
+    if (Start >= TotalLength) {
+        "alxos_explorer_reader"("")
+        return
+    }
+
+    local CurrentLines = GpuData[10,number]
+
+    local LinesNeeded = 24 - CurrentLines
+    if (LinesNeeded <= 0) { LinesNeeded = 1 }
+
+    local CurrentPos = Start + 1 
+    local LinesFound = 0
+    local EndPos = CurrentPos
+ 
+    while (CurrentPos <= TotalLength & LinesFound <= LinesNeeded) {
+        local NextNL = FullStr:find(NL, CurrentPos)
+        if (NextNL > 0) {
+            LinesFound++
+            CurrentPos = NextNL + 1
+            EndPos = NextNL
+        } else {
+            EndPos = TotalLength
+            break
+        }
+    }
+    local Chunk = FullStr:sub(Start + 1, EndPos)
+    GpuData[16,number] = EndPos
+
+    "alxos_explorer_reader"(Chunk)
+}
+
+
 function alxos_explorer_reader_init(FInfo:table) {
+    local ZipAdded = GpuData["zipAdded",number]
+    
     egpClear()
     alxos_explorer_bg()
+    alxos_explorer_handlers()
+    
+    GpuData["zipAdded",number] = ZipAdded
     
     ExplorerFile = FInfo["name",string]+(FInfo["ext",string]!="" ? "."+FInfo["ext",string] : "")
     alxos_explorer_ft(array("Quit")) #"Edit"
@@ -2588,6 +2640,12 @@ function alxos_explorer_reader_init(FInfo:table) {
     GpuData[13,number] = 1
     GpuData[14,table] = table()
     GpuData[15,number] = 1
+    
+    if (FInfo["content",string] != "") {
+        alxos_explorer_read_mem(FInfo, 0)
+        return    
+    }
+    
     dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(ExplorerFS,FInfo,0,End)))        
 }
 
@@ -2651,6 +2709,12 @@ function alxos_explorer_reader_move(Key:string) {
     #GpuData[13,number] = 1
     GpuData[14,table] = PosTbl
     GpuData[15,number] = CurPos
+    
+    if (FInfo["content",string] != "") {
+        alxos_explorer_read_mem(FInfo, Start)
+        return
+    }
+    
     dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(ExplorerFS,FInfo,Start,End)))     
 }
 
@@ -2716,6 +2780,12 @@ function alxos_explorer_reader(Data:string) {
             EGP:egpSetText(PercID,CalcP+"%")
         }
         GpuData[10,number] = Count
+        
+        if (FInfo["content",string] != "") {
+            alxos_explorer_read_mem(FInfo, GpuData[16,number])
+            return
+        }
+        
         #print(Start+Offset+" | "+End)
         dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(ExplorerFS,FInfo,Start+Offset+1,End)))      
     } else {
@@ -3012,6 +3082,10 @@ function alxos_explorer_unplug() {
     } 
 }
 
+function table alxos_explorer_getpath() {
+    return ExplorerPath    
+}
+
 function alxos_explorer_onplug(Name:string) {
     if (Name=="sata_onplug") {
         local Info = dsGetTable()
@@ -3042,4 +3116,5 @@ function alxos_explorer_onplug(Name:string) {
         }
     }
 }
+
 

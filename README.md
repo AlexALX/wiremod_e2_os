@@ -37,6 +37,7 @@ This project pushes **Expression2** to its absolute limits, implementing complex
 * Expression2 **GIF Reader** with animations support for Digital Screen.
 * Expression2 **PNG Reader** for Digital Screen.
 * **Midi player** with 3 play modes (synth, instrumental, addon).
+* Expression2 **ZIP Reader** for ALX PC.
 * Few programs: Console, Burning software, file manager, network chat, partitions manager. 
 * Simple directory listing/file managing interface (DOS style).
 * Simple text viewer.  

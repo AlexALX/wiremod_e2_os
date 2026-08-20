@@ -1,0 +1,73 @@
+#include "alx_pc/standalone/zip_reader/_shared_"
+
+function number zipU8()
+{
+    local Pos = Zip["pos",number]
+    local Data = Zip["data",string]
+    
+    local Value = toByte(Data, Pos)
+    
+    Zip["pos",number] = Pos + 1
+    
+    return Value
+}
+
+function number zipU16()
+{
+    local Pos = Zip["pos",number]
+    local Data = Zip["data",string]
+    
+    local B1 = toByte(Data, Pos)
+    local B2 = toByte(Data, Pos + 1)
+    
+    Zip["pos",number] = Pos + 2
+    
+    return B1 || (B2 << 8)
+}
+
+function number zipU32()
+{
+    local Pos = Zip["pos",number]
+    local Data = Zip["data",string]
+    
+    local B1 = toByte(Data, Pos)
+    local B2 = toByte(Data, Pos + 1)
+    local B3 = toByte(Data, Pos + 2)
+    local B4 = toByte(Data, Pos + 3)
+    
+    Zip["pos",number] = Pos + 4
+    
+    return (B1) || (B2 << 8) || (B3 << 16) || (B4 << 24)
+}
+
+function string zipRead(Bytes:number)
+{
+    local Pos = Zip["pos",number]
+    local Data = Zip["data",string]
+    
+    local Value = Data:sub(Pos, Pos + Bytes - 1)
+    
+    Zip["pos",number] = Pos + Bytes
+    
+    return Value
+}
+
+function number zipTell()
+{
+    return Zip["pos",number]
+}
+
+function zipSeek(Pos:number)
+{
+    Zip["pos",number] = Pos
+}
+
+function zipSkip(Bytes:number)
+{
+    Zip["pos",number] = Zip["pos",number] + Bytes
+}
+
+function number zipEOF()
+{
+    return Zip["pos",number] > Zip["size",number]
+}

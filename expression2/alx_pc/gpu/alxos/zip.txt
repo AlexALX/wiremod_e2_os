@@ -1,0 +1,503 @@
+@name ZIP Reader (GPU)
+
+#[
+    ALX Wiremod E2 OS
+    Created by AlexALX
+]#
+
+#include "alx_pc/gpu/alxos/_main_"
+#include "alx_pc/standalone/zip_reader/_init_"
+
+function alxos_prog_zip_unplug() {
+    stopAllTimers()
+    ExplorerDsH = ""
+    "alxos_explorer_handlers"()
+    "alxos_explorer_msg"("Disk was unplugged.",200,"Information")
+}
+
+function alxos_zip_init(Args:table) {
+
+    KeyHandler = "alxos_zip_key"
+    DsHandler = "alxos_zip_ds"
+    
+    local FInfo = Args[1,table]
+    local ExplorerFS = Args[2,table]
+    
+    GpuData[1,table] = ExplorerFS
+    GpuData[2,table] = FInfo
+    
+    ExplorerFile = FInfo["name",string]+(FInfo["ext",string]!="" ? "."+FInfo["ext",string] : "")
+
+    ExplorerCurTask = "alxos_prog_zip"
+    
+    local ExplorerFS = GpuData[1,table]
+    local FInfo = GpuData[2,table]
+    
+    local FileSize = FInfo["size",number]
+    GpuData["searchChunkSize",number] = 512
+    
+    local StartPos = FileSize - GpuData["searchChunkSize",number]
+    if (StartPos < 0) { StartPos = 0 }
+    
+    GpuData["currentSearchPos",number] = StartPos
+    GpuData["searchLimit",number] = max(0, FileSize - 65557)
+    GpuData["buffer",string] = ""
+    
+    GpuData["chunk_read", number] = 0
+    
+    local BytesToRead = FileSize - StartPos
+    dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(
+        ExplorerFS,FInfo,StartPos,BytesToRead
+    )))
+
+    local Parent = "alxos_explorer_dialog"("Opening file",400,80,"progress","alxos_zip_clear")[number]
+
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    DialogData[1,number] = 1
+    DialogData[3,number] = 1
+    DialogData[4,number] = 1
+    runCmd("alxos_zipread_progress",1)
+}
+
+function alxos_zipread_progress() {
+    local ExplorerFS = GpuData[1,table]
+    
+    local FS = ExplorerFS["hdd_io",wirelink]
+    local Step = DialogData[4,number]
+
+    local CurTask = FS["CurTask",table]
+    local I = CurTask[2,number]
+    local Max = CurTask[1,number]
+    local Last = DialogData[3,number]
+    
+    if (!Step) { return }
+
+    if (Max>0) {
+        local PercID = DialogData[-4,number]
+        local BoxID = DialogData[-5,number]
+        local BoxW = DialogData[-6,number]
+        local CalcP = round(I/Max*100)
+        BoxW = ceil(BoxW/100*CalcP)
+        if (BoxW<1) { BoxW = 1 }
+        EGP:egpSize(BoxID,vec2(BoxW,20))
+        EGP:egpSetText(PercID,CalcP+"%")
+    }
+    
+    runCmd("alxos_zipread_progress",1) 
+}
+
+function alxos_zip_files() {
+    local MenuTree = table()
+    local Files = Zip["files",table]
+
+    foreach (Index:number, Entry:table = Files) {
+        
+        if (Entry["size",number]==0) { continue }
+        
+        local Info = table(
+            Index,
+            Entry
+        )
+
+        MenuTree:pushTable(
+            table(
+                0,
+                Entry["name",string] + " - " + alxos_nicesize(Entry["size",number]),
+                "alxos_zip_open",
+                Info
+            )
+        )
+    }
+
+    alxos_menu("ZIP Content",MenuTree,380)
+    "alxos_explorer_ft"(array("Quit"))  
+}
+
+function alxos_zipopen_progress_init() {
+
+    local Parent = "alxos_explorer_dialog"("Opening file",400,80,"progress","alxos_zip_clear")[number]
+
+    DialogData["textPos",number] = LAST_I
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    DialogData[1,number] = 1
+    DialogData[3,number] = 1
+    DialogData[4,number] = 1
+    
+    DialogData["openProgress",number] = 1
+}
+
+function alxos_zip_open(Info:table) {
+    local Entry = Info[6,table][2,table]
+    
+    local NameArr = Entry["name",string]:explode(".")
+    local Last = NameArr:count()
+    
+    if (Last==1) {
+        ZipError = "No file extension detected, can't open file."
+        "alxos_zip_finish"(ZipError)
+        return    
+    }
+    
+    GpuData["currentEntry", table] = Entry
+    
+    if (Zip["chunkMode", number]) {
+        local ExplorerFS = GpuData[1, table]
+        local FInfo = GpuData[2, table]
+
+        local Entry = GpuData["currentEntry", table]
+        local LocalHeaderOffset = Entry["localOffset", number] + 1
+        
+        GpuData["buffer", string] = ""
+        Zip["last_chunk_state", string] = "open_local_header"
+        
+        dsSendDirect("fs_readfile", ExplorerFS["hdd_io", wirelink]:entity(), table(entity(), ExplorerFS["fs_str_id", string], table(
+            ExplorerFS, FInfo, LocalHeaderOffset, 30
+        )))
+        
+        alxos_zipopen_progress_init()
+        Zip["state", string] = ""
+
+    } else {
+        zipOpenFile(Entry)  
+    }
+    
+    runCmd("alxos_zip_progress", 1)      
+}
+
+function alxos_zip_postinit(Data:string) {
+    
+    if (GpuData["chunk_read", number]==1) {        
+        local NewChunkLength = Data:length()
+        
+        if (Zip["last_chunk_state",string]!="find_eocd") {
+            
+            if (Zip["last_chunk_state", string] == "open_local_header") {
+                Zip["data", string] = Data
+                Zip["size", number] = Data:length()
+                
+                local Entry = GpuData["currentEntry", table]
+                zipOpenFile(Entry)
+                
+                if (Zip["chunkMode", number]) {
+                    local ExplorerFS = GpuData[1, table]
+                    local FInfo = GpuData[2, table]
+                    
+                    local Entry = GpuData["currentEntry", table]
+                    local BaseOffset = Entry["localOffset", number] + 1
+                    
+                    local HeaderLength = Zip["localHeaderTotalLength", number]
+                    
+                    local PayloadOffset = BaseOffset + HeaderLength
+                    local PayloadSize = Entry["compressedSize", number]
+                    
+                    GpuData["buffer", string] = ""
+                    Zip["last_chunk_state", string] = "open_file_payload"
+                    
+                    dsSendDirect("fs_readfile", ExplorerFS["hdd_io", wirelink]:entity(), table(entity(), ExplorerFS["fs_str_id", string], table(
+                        ExplorerFS, FInfo, PayloadOffset, PayloadSize
+                    )))
+                }
+                
+                return
+            }
+
+            if (Zip["last_chunk_state", string] == "open_file_payload") {
+                if (Zip["fileMethod", number] == 0) {
+                    Zip["fileData", string] = Data
+                    Zip["state", string] = "done"
+                    
+                    runCmd("alxos_zip_progress",1,1)
+                } else {
+                    Zip["state", string] = "decompress"
+                    zipStartDecompress(Data)
+                    
+                    Zip["waiting_next_chunk",string] = ""
+                    runCmd("alxos_zip_progress",1,1)
+                    
+                    local TextPos = DialogData["textPos",number]
+                    EGP:egpSetText(TextPos, "Decompressing file...")
+                }
+                return
+            }
+            
+            Zip["data", string] = Data
+            Zip["size", number] = Data:length()
+            Zip["state", string] = Zip["last_chunk_state",string]
+            if (Zip["last_chunk_state",string]=="parse_central") {
+                Zip["centralPos", number] = 1
+            } else {
+                Zip["eocdPos", number] = 1
+            }
+        } else {
+            GpuData["buffer", string] = Data + GpuData["buffer", string]
+            
+            Zip["eocdSearchPos", number] = NewChunkLength
+            Zip["data", string] = GpuData["buffer", string]
+            Zip["size", number] = GpuData["buffer", string]:length()
+            Zip["state",string] = "find_eocd"
+        }
+    } else {        
+        zipInit(Data, 1)
+        GpuData["chunk_read", number] = 1
+    }
+    runCmd("alxos_zip_progress",1,1)
+}
+
+function number alxos_zip_cmd() {
+    #alxos_bmp_draw(GpuData[11,string])
+    return 0
+}
+
+function number alxos_zip_clear() {
+    if (!checkPerf(7000)) {
+        runCmd("alxos_zip_clear",1)
+        return 0
+    }
+    
+    local ExplorerFS = GpuData[1,table]
+    dsSendDirect("clear",ExplorerFS["hdd_io",wirelink]:entity(),1)
+
+    Zip = table()
+
+    "alxos_explorer_handlers"()
+    "alxos_explorer_listcurdir"()
+    return 0
+}
+
+function number alxos_zip_close() {
+    Zip = table()
+    
+    "alxos_explorer_handlers"()
+    "alxos_explorer_listcurdir"()
+    return 0
+}
+
+function number alxos_zip_finish(Err:string) {
+    local Height = 60
+    local Pos = vec2(225,18)
+    local NewLines = Err:explode("\n") 
+    
+    if (NewLines:count()>1) {
+        Height += (NewLines:count()-1) * 20
+    }
+    
+    if (Err) {
+        Pos = vec2(20,18)    
+    }
+        
+    local Parent = "alxos_explorer_dialog"("ZIP Reader"+(Err!="" ? " Error" : ""),450,Height,"ok","alxos_zip_clear")[number]
+
+    if (Err) {
+        for(I=1,NewLines:count()) {
+            DialogData[-10,table]:pushNumber(LAST_I)
+            EGP:egpText(LAST_I,NewLines[I,string],Pos)
+            EGP:egpParent(LAST_I,Parent)
+            EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+            
+            Pos[2] = Pos[2] + 20
+        }
+    } else {
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Opening ZIP file success finished.",Pos)
+        EGP:egpParent(LAST_I,Parent)
+        if (!Err) {
+            EGP:egpAlign(LAST_I,1)
+        }
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    }
+
+    "alxos_explorer_handlers"()
+    return 0
+}
+
+function number alxos_zip_finish() {
+    if (!checkPerf(7000)) {
+        runCmd("alxos_zip_finish",1)
+        return 0
+    }
+    return alxos_zip_finish("")
+}
+
+function alxos_zip_openfile() {
+    GpuData["zipAdded",number] = 1
+    local FileData = table()        
+    local NameArr = Zip["fileName",string]:explode(".")
+    local Last = NameArr:count()
+    
+    FileData["ext",string] = NameArr[Last,string]
+    NameArr:remove(Last)
+    FileData["name",string] = NameArr:concat(".")
+     
+    FileData["content",string] = Zip["fileData",string]
+    
+    # add zip to path
+    local Path = "alxos_explorer_getpath"()[table]
+    Path:pushString(ExplorerFile)
+    
+    dsSendDirect("alxos_openfile",E2_CPU,table(entity(),FileData))    
+}
+
+function alxos_zip_nextchunk() {
+    local State = Zip["waiting_next_chunk", string]
+    
+    local ExplorerFS = GpuData[1, table]
+    local FInfo = GpuData[2, table]
+    
+    Zip["last_chunk_state", string] = State
+    Zip["waiting_next_chunk", string] = ""
+     
+    if (State=="find_eocd") {
+        local NextStart = GpuData["currentSearchPos", number] - GpuData["searchChunkSize", number]
+        
+        if (NextStart >= 0) {
+            
+            GpuData["currentSearchPos", number] = NextStart
+            
+            local BytesToRead = GpuData["searchChunkSize", number]
+            
+            dsSendDirect("fs_readfile", ExplorerFS["hdd_io", wirelink]:entity(), table(entity(), ExplorerFS["fs_str_id", string], table(
+                ExplorerFS, FInfo, NextStart, BytesToRead
+            )))
+        }     
+    } elseif (State=="parse_eocd") {
+        local NextStart = Zip["eocdPos", number] - 22
+
+        local AbsEocdOffset = GpuData["currentSearchPos", number] + Zip["eocdPos", number] - 1
+        local BytesToRead = FInfo["size", number] - AbsEocdOffset
+        
+        dsSendDirect("fs_readfile", ExplorerFS["hdd_io", wirelink]:entity(), table(entity(), ExplorerFS["fs_str_id", string], table(
+            ExplorerFS, FInfo, AbsEocdOffset, BytesToRead
+        )))
+    } elseif (State=="parse_central") {
+        local DirOffset = Zip["centralOffset", number]+1
+        local DirSize = Zip["centralSize", number]
+        
+        GpuData["buffer", string] = ""
+        
+        dsSendDirect("fs_readfile", ExplorerFS["hdd_io", wirelink]:entity(), table(entity(), ExplorerFS["fs_str_id", string], table(
+            ExplorerFS, FInfo, DirOffset, DirSize
+        )))
+    }
+}
+
+function alxos_zip_progress() {    
+    if (CMDLast!="alxos_zip_progress") {
+        runCmd("alxos_zip_progress",1,1)
+        return 
+    }
+
+    if (ZipError) {
+        alxos_zip_finish(ZipError)
+        return
+    }
+    
+    if (Zip["waiting_next_chunk", string]!="") {
+        alxos_zip_nextchunk()
+    }
+    
+    if (Zip["state", string]=="ready") {
+        alxos_zip_files()
+        GpuData["zipInit",number] = 1
+        return
+    }
+    
+    if (Zip["state", string]=="done") {
+        alxos_zip_openfile()
+        return
+    }
+    
+    if (DialogData["openProgress",number]) {           
+        local CalcP = 0
+        
+        local ExplorerFS = GpuData[1, table]
+        local FS = ExplorerFS["hdd_io",wirelink]
+        
+        local CurTask = FS["CurTask",table]
+        
+        if (CurTask:count()==2) {
+            local I = CurTask[2,number]
+            local Max = CurTask[1,number]
+
+            CalcP = I/Max*100 
+        } elseif (Zip["state", string]=="decompress") {
+            local CompPos = Deflate_CompressedPos
+            local CompMax = Deflate_CompressedData:length()
+            if (CompMax == 0) { CompMax = 1 }
+            
+            CalcP = CompPos/CompMax*100
+        } elseif (Zip["state", string]=="build_string") {
+            local I = Zip["currentBuildStep", number]
+            local Max = Zip["totalBuildSteps", number]
+            
+            CalcP = I/Max*100
+            
+            local TextPos = DialogData["textPos",number]
+            EGP:egpSetText(TextPos, "Building final file...")
+             
+        }
+
+        CalcP = round(CalcP,2)
+        
+        local PercID = DialogData[-4,number]
+        local BoxID = DialogData[-5,number]
+        local BoxW = DialogData[-6,number]
+    
+        BoxW = ceil(BoxW/100*CalcP)
+        if (BoxW<1) { BoxW = 1 }
+        EGP:egpSize(BoxID,vec2(BoxW,20))
+        EGP:egpSetText(PercID,CalcP+"%")    
+    }
+    
+    runCmd("alxos_zip_progress",1)     
+}
+
+function alxos_zip_ds(Name:string) {
+    if (Name=="fs_readfile") {
+        alxos_zip_postinit(dsGetString())
+    } elseif (Name=="clear") {
+        if (!checkPerf(7000)) {
+            runCmd("alxos_zip_clear",1)
+            return
+        }
+        alxos_zip_clear()
+    } elseif (Name=="alxos_runprog") {
+        "alxos_explorer_ds"(Name)
+    }
+}
+
+function number alxos_zip_key(Key:string,Pressed) {
+    if (!Pressed) { return 0 }
+    
+    local Index = DialogData[-5,number]
+    local Type = DialogData[-2,string]
+    
+    local Title = DialogData["title",string]
+    
+    if (Title=="ZIP Content") {
+        alxos_menu_key(Key,"alxos_zip_clear")
+        return 0
+    }    
+    
+    if (Key=="f8") {
+        stoptimer("cmd")
+        dsSendDirect("clear",GpuData[1,table]["hdd_io",wirelink]:entity(),entity())
+
+        alxos_zip_close()
+        return 1
+    } elseif (Key=="enter" & Title!="Opening file") {
+        alxos_zip_key("f8",1)
+        return 1
+    }
+    
+    return 0
+}

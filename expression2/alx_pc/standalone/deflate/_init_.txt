@@ -1,0 +1,16 @@
+@name Deflate Lib
+#include "alx_pc/standalone/deflate/inflate"
+
+#[
+    Created By AlexALX (c) 2026
+]#
+
+#[
+event tick()
+{
+    if (DeflateInitState != "ready") {
+        deflateInitTablesStep()
+        exit() 
+    }
+}
+]#

@@ -28,7 +28,7 @@ function alxos_jpg_init(Args:table) {
     
     local IMGAccelerator = alxos_jpg_findAccelerator()
     if (!IMGAccelerator:count()) {
-        "alxos_explorer_error"("Image Accelerator not found, please insert PCI card and reboot.",490)
+        "alxos_explorer_error"("Image Accelerator not found, please insert PCI card and reboot.",500)
         return
     }
     
@@ -37,6 +37,8 @@ function alxos_jpg_init(Args:table) {
     
     local FInfo = Args[1,table]
     local ExplorerFS = Args[2,table]
+    
+    ExplorerFile = FInfo["name",string]+(FInfo["ext",string]!="" ? "."+FInfo["ext",string] : "")
     
     GpuData[1,table] = ExplorerFS
     GpuData[2,table] = FInfo
@@ -240,6 +242,15 @@ function alxos_jpg_postinit() {
     
     local ExplorerFS = GpuData[1,table]
     local FInfo = GpuData[2,table]
+    
+    DS[1048574] = 0
+    DS[1048569] = 2
+    DS[1048575] = 1
+    
+    if (FInfo["content",string]) {
+        "alxos_jpg_draw"(FInfo["content",string])
+        return   
+    }
 
     dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(
         ExplorerFS,FInfo,0,FInfo["size",number]
@@ -252,10 +263,6 @@ function alxos_jpg_postinit() {
     EGP:egpParent(LAST_I,Parent)
     EGP:egpAlign(LAST_I,1)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
-
-    DS[1048574] = 0
-    DS[1048569] = 2
-    DS[1048575] = 1
     
     DialogData[1,number] = 1
     DialogData[3,number] = 1
@@ -374,7 +381,7 @@ function alxos_jpg_draw(Data:string) {
     local IMGAccelerator = alxos_jpg_findAccelerator()
     
     if (!IMGAccelerator:count()) {
-        "alxos_explorer_error"("Image Accelerator not found, please insert PCI card and reboot.",490)
+        "alxos_explorer_error"("Image Accelerator not found, please insert PCI card and reboot.",500)
         return
     }
     

@@ -1,4 +1,5 @@
 #include "alx_pc/standalone/png_reader/_shared_"
+#include "alx_pc/standalone/deflate/inflate"
 
 function pngProgress(Task:string, Current:number, Max:number)
 {
@@ -31,8 +32,8 @@ function pngUpdateProgress()
         case "decompress",
             Progress["step",number] = 2
 
-            local CompPos = Png_CompressedPos
-            local CompMax = Png_CompressedData:length()
+            local CompPos = Deflate_CompressedPos
+            local CompMax = Deflate_CompressedData:length()
             if (CompMax == 0) { CompMax = 1 }
         
             pngProgress("Decompressing Image", CompPos, CompMax)

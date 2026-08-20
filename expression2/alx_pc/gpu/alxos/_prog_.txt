@@ -85,3 +85,10 @@ function alxos_midi_player(Args:table) {
     #include "alx_pc/gpu/alxos/midi"
     alxos_midi_init(Args)
 }
+
+
+ALXOS_PROGS["alxos_zip_reader",number] = 1
+function alxos_zip_reader(Args:table) {
+    #include "alx_pc/gpu/alxos/zip"
+    alxos_zip_init(Args)
+}

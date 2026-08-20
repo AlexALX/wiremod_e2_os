@@ -2,9 +2,7 @@
 @outputs CurrentState:string Progress:table ProgressText:string Processing:number Error:string Warning:string
 @inputs DS:wirelink
 
-@persist PngFixedLiteralTable:table PngFixedDistanceTable:table
-@persist InitState:string InitIndex:number 
-@persist Png_CompressedData:string Png_CompressedPos
+@persist Png_CompressedData:string
 
 if (first() | duped()) {
 
@@ -13,11 +11,7 @@ if (first() | duped()) {
     
     dsSetScope(2)
     
-    PngFixedLiteralTable = table()
-    PngFixedDistanceTable = table()
-    
-    InitState = "lit_7"
-    InitIndex = 0
+    Png_CompressedData = ""
 }
 
 function pngError(Msg:string) {

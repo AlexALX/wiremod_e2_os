@@ -1,5 +1,6 @@
 @name BMP Reader (GPU)
 @persist BmpPercent:number
+@persist BmpStep:number BmpRenderTime
 
 #[
     ALX Wiremod E2 OS
@@ -30,6 +31,8 @@ function alxos_bmp_init(Args:table) {
     GpuData[1,table] = ExplorerFS
     GpuData[2,table] = FInfo
     GpuData[5,number] = 0
+    
+    ExplorerFile = FInfo["name",string]+(FInfo["ext",string]!="" ? "."+FInfo["ext",string] : "")
     
     local Width = 450
     local Height = 110
@@ -149,14 +152,15 @@ function alxos_bmp_postinit() {
     DsHandler = "alxos_bmp_ds"
     #KeyHandler = "alxos_bmp_key"
     ExplorerCurTask = "bmp"
-    dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(
-        ExplorerFS,FInfo,0,66
-    )))
     
-    DSEvent = function() {
-        bmpSetDS(DS)    
+    if (!FInfo["content",string]) {        
+        dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(
+            ExplorerFS,FInfo,0,66
+        )))
+        
+        GpuData["bmpFull",number] = 0
     }
-    
+        
     local Width = 400
     local Height = 80
 
@@ -172,6 +176,10 @@ function alxos_bmp_postinit() {
     EGP:egpParent(LAST_I,Parent)
     EGP:egpAlign(LAST_I,1)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    DSEvent = function() {
+        bmpSetDS(DS)    
+    }
 
     DS[1048574] = 0
     DS[1048569] = 2
@@ -181,9 +189,26 @@ function alxos_bmp_postinit() {
     
     BmpNoPrint = 1
     
+    local Body = ""
     local Size = GpuData[2, table]["size", number]
-    bmpInit("", Size, GpuPersistData["bmpMaxSize",number], GpuPersistData["bmpNoKeepAR",number])
+    
+    if (FInfo["content",string]) {
+        Body = FInfo["content",string]
+        GpuData["bmpState", string] = ""
+        Size = Body:length()
+    }
+    
+    bmpInit(Body, Size, GpuPersistData["bmpMaxSize",number], GpuPersistData["bmpNoKeepAR",number])
     bmpSetDS(DS)
+    
+    if (Body) {        
+        GpuData["bmpFull",number] = 1
+        
+        registerTimers("bmp","bmpStep")
+        bmpRun()
+        
+        runCmd("alxos_bmp_progress_full",10)
+    }
 }
 
 function alxos_bmp_warning(Warning:string) {
@@ -202,13 +227,16 @@ function alxos_bmp_warning(Warning:string) {
 }
 
 function number alxos_bmp_finish(Err:string) {
-    local Parent = "alxos_explorer_dialog"("BMP Reader"+(Err!="" ? " Error" : ""),440,60,"ok","alxos_bmp_clear")[number]
+    local Parent = "alxos_explorer_dialog"("BMP Reader"+(Err!="" ? " Error" : ""),450,60,"ok","alxos_bmp_clear")[number]
 
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,(Err!="" ? Err : "Opening BMP file success finished."),alxos_dlgPos(0,-12))
+    EGP:egpText(LAST_I,(Err!="" ? Err : "Opening BMP file success finished, render time: "+round(BmpRenderTime,2)+"s."),alxos_dlgPos(0,-12))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpAlign(LAST_I,1)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    BmpStep = 0
+    BmpData = table()
 
     return 0
 }
@@ -219,6 +247,35 @@ function number alxos_bmp_finish() {
         return 0
     }
     return alxos_bmp_finish("")
+}
+
+function alxos_bmp_progress_full() {
+    local CalcP = BmpPercent
+    
+    CalcP = round(CalcP,2)
+
+    if (CalcP > 100) {
+        CalcP = 100
+    }
+
+    local PercID = DialogData[-4,number]
+    local BoxID = DialogData[-5,number]
+    local BoxW = DialogData[-6,number]
+
+    BoxW = ceil(BoxW / 100 * CalcP)
+
+    if (BoxW < 1) {
+        BoxW = 1
+    }
+
+    EGP:egpSize(BoxID,vec2(BoxW,20))
+    EGP:egpSetText(PercID,CalcP+"%")
+
+    if (CalcP<100) {
+        runCmd("alxos_bmp_progress_full",10)
+    } else {
+        alxos_bmp_finish()    
+    }
 }
 
 function alxos_bmp_progress() {
@@ -366,7 +423,7 @@ function number alxos_bmp_step() {
             
             local PaletteOffset = BmpData[8, number]
             BmpData[8, number] = 1
-            
+                    
             dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(
                 entity(),ExplorerFS["fs_str_id",string],table(ExplorerFS,FInfo,PaletteOffset,TotalPaletteBytes)
             ))

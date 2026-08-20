@@ -1,0 +1,569 @@
+#include "alx_pc/standalone/deflate/_shared_"
+#include "alx_pc/standalone/deflate/bitreader"
+
+function deflateStart(Ctx:table, Data:string, CompressedPos:number)
+{
+    deflateInit()
+    
+    Ctx["decSubState", string] = "read_block_header"
+    
+    # Bit Reader
+    deflateBitInit()
+    Deflate_CompressedPos = CompressedPos
+    Deflate_CompressedData = Data
+    
+    Ctx["outputData", table] = table()
+    Ctx["outputLength", number] = 0
+    
+    Ctx["DynLiteralTable", table] = table()
+    Ctx["DynDistanceTable", table] = table()
+    
+    Ctx["CL_Table", table] = table()
+}
+
+function number deflateDecompressStep(Ctx:table)
+{
+    local SubState = Ctx["decSubState", string]
+    
+    # 1.   Deflate
+    if (SubState == "read_block_header") {
+        local BFinal = deflateBit()
+        local BType  = deflateBits(2)
+        if (BFinal < 0 | BType < 0) { DeflateError = "Deflate: EOF in header" return -1 }
+        
+        Ctx["blockFinal", number] = BFinal
+        Ctx["blockType", number] = BType
+        
+        if (BType == 0) { Ctx["decSubState", string] = "raw_block_init" }
+        elseif (BType == 1) { 
+            Ctx["decSubState", string] = "decode_huffman"
+            Deflate_HuffBitsRead = 0
+            Deflate_HuffCurrentCode = 0
+        } elseif (BType == 2) { 
+            Ctx["decSubState", string] = "dyn_read_counts" 
+        } else {
+            DeflateError = "Deflate: BTYPE " + BType + " not supported yet" return -1 
+        }
+        return 0
+    }
+    
+    # 2.    (RAW)
+    if (SubState == "raw_block_init") {
+        deflateBitInit()
+
+        local Len  = deflateBits(8) || (deflateBits(8) << 8)
+        local NLen = deflateBits(8) || (deflateBits(8) << 8)
+        if ((Len || NLen) != 65535) { DeflateError = "Deflate: Raw LEN mismatch" return -1 }
+        Ctx["rawLen", number] = Len
+        Ctx["decSubState", string] = "raw_block_copy"
+        return 0
+    }
+    if (SubState == "raw_block_copy") {
+        local Len = Ctx["rawLen", number]
+        while (Len > 0 & perf(90)) {
+            local Byte = deflateReadCompressedByte()
+            if (Byte < 0) { DeflateError = "Deflate: EOF in RAW copy" return -1 }
+            local OutLen = Ctx["outputLength", number] + 1
+            Ctx["outputData", table][OutLen, number] = Byte
+            Ctx["outputLength", number] = OutLen
+            Len--
+        }
+        Ctx["rawLen", number] = Len
+        if (Len == 0) {
+            if (Ctx["blockFinal", number] == 1) { return 1 } 
+            else { Ctx["decSubState", string] = "read_block_header" }
+        }
+        return 0
+    }
+    
+    # 3 
+    if (SubState == "dyn_read_counts") {
+        local HLit  = deflateBits(5) 
+        local HDist = deflateBits(5) 
+        local HCLen = deflateBits(4) 
+        
+        if (HLit < 0 | HDist < 0 | HCLen < 0) { DeflateError = "Deflate: EOF in dynamic tree counts" return -1 }
+        
+        Ctx["dynHLit", number]  = HLit + 257
+        Ctx["dynHDist", number] = HDist + 1
+        Ctx["dynHCLen", number] = HCLen + 4
+        
+        Ctx["CL_Table", table] = table()
+        Ctx["dynIdx", number] = 1 
+        
+        if (DeflateDebug) {
+            print("------")
+            print("HLit:", Ctx["dynHLit", number])
+            print("HDist:", Ctx["dynHDist", number])
+            print("HCLen:", Ctx["dynHCLen", number])
+        }
+        
+        Ctx["decSubState", string] = "dyn_read_code_lengths"
+        return 0
+    }
+    
+    # 4
+    if (SubState == "dyn_read_code_lengths") {
+        local HCLen = Ctx["dynHCLen", number]
+        local Idx = Ctx["dynIdx", number]
+        local CL_Table = Ctx["CL_Table", table]
+        
+        while (Idx <= HCLen & perf(95)) {
+            local Bits = deflateBits(3)
+            if (Bits < 0) { DeflateError = "Deflate: EOF in code lengths" return -1 }
+            
+            local TargetPos = DeflateCodeOrder[Idx, number]
+            CL_Table[TargetPos, number] = Bits
+            Idx++
+        }
+        
+        Ctx["dynIdx", number] = Idx
+        Ctx["CL_Table", table] = CL_Table
+        
+        if (Idx > HCLen) {
+            for (I = HCLen + 1, 19) {
+                local TargetPos = DeflateCodeOrder[I, number]
+                if (CL_Table[TargetPos, number] == 0) {
+                    CL_Table[TargetPos, number] = 0
+                }
+            }
+            Ctx["CL_Table", table] = CL_Table
+            Ctx["decSubState", string] = "dyn_build_code_tree"
+        }
+        return 0
+    }
+    
+    # 5    
+    if (SubState == "dyn_build_code_tree") {
+        local CL_Table = Ctx["CL_Table", table]
+        
+        local BlCount = table()
+        for (I = 0, 18) {
+            local Len = CL_Table[I, number]
+            if (Len > 0) { BlCount[Len, number] = BlCount[Len, number] + 1 }
+        }
+        
+        local Code = 0
+        local NextCode = table()
+        for (Bits = 1, 7) {
+            Code = (Code + BlCount[Bits - 1, number]) << 1
+            NextCode[Bits, number] = Code
+        }
+        
+        local CodeTree = table()
+        for (I = 0, 18) {
+            local Len = CL_Table[I, number]
+            if (Len > 0) {
+                local CurCode = NextCode[Len, number]
+                NextCode[Len, number] = NextCode[Len, number] + 1
+                
+                local Rev = 0
+                local Tmp = CurCode
+                for (B = 0, Len - 1) {
+                    Rev = (Rev << 1) || (Tmp && 1)
+                    Tmp = Tmp >> 1
+                }
+                CodeTree[Len + "_" + Rev, number] = I
+            }
+        }
+        
+        Ctx["CodeTree", table] = CodeTree
+        Ctx["treeTotalExpected", number] = Ctx["dynHLit", number] + Ctx["dynHDist", number]
+        Ctx["treeLengthsRead", number] = 0
+        Ctx["FullLengthsTable", table] = table()
+        Ctx["treeBitsRead", number] = 0
+        Ctx["treeCurrentCode", number] = 0
+        
+        Ctx["decSubState", string] = "dyn_decode_tables"
+        return 0
+    }
+    
+    # 6 
+    if (SubState == "dyn_decode_tables") {
+        local TotalExpected = Ctx["treeTotalExpected", number]
+        local ReadCount = Ctx["treeLengthsRead", number]
+        local FullTable = Ctx["FullLengthsTable", table]
+        local CodeTree = Ctx["CodeTree", table]
+        
+        local BitsRead = Ctx["treeBitsRead", number]
+        local CurrentCode = Ctx["treeCurrentCode", number]
+        
+        while (ReadCount < TotalExpected & perf(90)) {
+            local Bit = deflateBit()
+            if (Bit < 0) { DeflateError = "Deflate: EOF in dynamic table stream" return -1 }
+            
+            CurrentCode = CurrentCode || (Bit << BitsRead)
+            BitsRead++
+            
+            local Key = BitsRead + "_" + CurrentCode
+            
+            if (CodeTree:exists(Key)) {
+                local Value = CodeTree[Key, number]
+                
+                BitsRead = 0
+                CurrentCode = 0
+                
+                if (Value <= 15) {
+                    FullTable[ReadCount, number] = Value
+                    ReadCount++
+                }
+                elseif (Value == 16) {
+                    if (ReadCount == 0) { DeflateError = "Deflate: Repeat code 16 at index 0" return -1 }
+                    local Extra = deflateBits(2)
+                    if (Extra < 0) { DeflateError = "Deflate: EOF in repeat 16 extra bits" return -1 }
+                    local RepeatTimes = 3 + Extra
+                    local PrevValue = FullTable[ReadCount - 1, number]
+                    
+                    for (I = 1, RepeatTimes) {
+                        FullTable[ReadCount, number] = PrevValue
+                        ReadCount++
+                    }
+                }
+                elseif (Value == 17) {
+                    local Extra = deflateBits(3)
+                    if (Extra < 0) { DeflateError = "Deflate: EOF in repeat 17 extra bits" return -1 }
+                    local RepeatTimes = 3 + Extra
+                    
+                    for (I = 1, RepeatTimes) {
+                        FullTable[ReadCount, number] = 0
+                        ReadCount++
+                    }
+                }
+                elseif (Value == 18) {
+                    local Extra = deflateBits(7)
+                    if (Extra < 0) { DeflateError = "Deflate: EOF in repeat 18 extra bits" return -1 }
+                    local RepeatTimes = 11 + Extra
+                    
+                    for (I = 1, RepeatTimes) {
+                        FullTable[ReadCount, number] = 0
+                        ReadCount++
+                    }
+                }
+            }
+        }
+        
+        Ctx["treeBitsRead", number] = BitsRead
+        Ctx["treeCurrentCode", number] = CurrentCode
+        Ctx["treeLengthsRead", number] = ReadCount
+        Ctx["FullLengthsTable", table] = FullTable
+        
+        if (ReadCount >= TotalExpected) {
+            Ctx["decSubState", string] = "dyn_compile_final_trees"
+            Ctx["dynCompileState", string] = "lit"
+        }
+        return 0
+    }
+    
+    # 7    
+    if (SubState == "dyn_compile_final_trees") {
+        local FullTable = Ctx["FullLengthsTable", table]
+        local HLit = Ctx["dynHLit", number]
+        local HDist = Ctx["dynHDist", number]
+        local CState = Ctx["dynCompileState", string]
+        
+        if (CState == "lit") {   
+            if (!Ctx["litCompiledTable", number]) {
+                local BlCount = table()
+                for (I = 0, HLit - 1) {
+                    local Len = FullTable[I, number]
+                    if (Len > 0) { BlCount[Len, number] = BlCount[Len, number] + 1 }
+                }
+                local Code = 0
+                local NextCode = table()
+                for (Bits = 1, 15) {
+                    Code = (Code + BlCount[Bits - 1, number]) << 1
+                    NextCode[Bits, number] = Code
+                }
+                
+                Ctx["litNextCode", table] = NextCode
+                Ctx["litDynLiteralTable", table] = table()
+                Ctx["litCompileIdx", number] = 0 
+                Ctx["litCompiledTable", number] = 1 
+            }
+            
+            local NextCode = Ctx["litNextCode", table]
+            local DynLiteralTable = Ctx["litDynLiteralTable", table]
+            local StartI = Ctx["litCompileIdx", number]
+            
+            local I = StartI
+            while (I <= HLit - 1 & perf(90)) {
+                local Len = FullTable[I, number]
+                if (Len > 0) {
+                    local CurCode = NextCode[Len, number]
+                    NextCode[Len, number] = NextCode[Len, number] + 1
+                    
+                    local Rev = 0
+                    local Tmp = CurCode
+                    for (B = 0, Len - 1) { 
+                        Rev = (Rev << 1) || (Tmp && 1)
+                        Tmp = Tmp >> 1 
+                    }
+                    local NumericKey = (Len << 16) || Rev
+                    DynLiteralTable[NumericKey, number] = I + 1
+                }
+                I++
+            }
+            
+            Ctx["litCompileIdx", number] = I
+            Ctx["litNextCode", table] = NextCode
+            Ctx["litDynLiteralTable", table] = DynLiteralTable
+                 
+            if (I <= HLit - 1) { return 0 }
+            
+            Ctx["DynLiteralTable", table] = DynLiteralTable
+            Ctx["litCompiledTable", number] = 0
+            
+            Ctx["dynCompileState", string] = "dist"
+            return 0
+        }
+        
+        if (CState == "dist") {
+            if (!Ctx["distCompiledTable", number]) {
+                local BlCount = table()
+                for (I = 0, HDist - 1) {
+                    local Len = FullTable[HLit + I, number]
+                    if (Len > 0) { BlCount[Len, number] = BlCount[Len, number] + 1 }
+                }
+                local Code = 0
+                local NextCode = table()
+                for (Bits = 1, 15) {
+                    Code = (Code + BlCount[Bits - 1, number]) << 1
+                    NextCode[Bits, number] = Code
+                }
+                
+                Ctx["distNextCode", table] = NextCode
+                Ctx["distDynDistanceTable", table] = table()
+                Ctx["distCompileIdx", number] = 0
+                Ctx["distCompiledTable", number] = 1
+            }
+            
+            local NextCode = Ctx["distNextCode", table]
+            local DynDistanceTable = Ctx["distDynDistanceTable", table]
+            local StartI = Ctx["distCompileIdx", number]
+            
+            local I = StartI
+            while (I <= HDist - 1 & perf(90)) {
+                local Len = FullTable[HLit + I, number]
+                if (Len > 0) {
+                    local CurCode = NextCode[Len, number]
+                    NextCode[Len, number] = NextCode[Len, number] + 1
+                    
+                    local Rev = 0
+                    local Tmp = CurCode
+                    for (B = 0, Len - 1) { 
+                        Rev = (Rev << 1) || (Tmp && 1)
+                        Tmp = Tmp >> 1 
+                    }
+                    DynDistanceTable[Len + "_" + Rev, number] = I
+                }
+                I++
+            }
+            
+            Ctx["distCompileIdx", number] = I
+            Ctx["distNextCode", table] = NextCode
+            Ctx["distDynDistanceTable", table] = DynDistanceTable
+            
+            if (I <= HDist - 1) { return 0 }
+            
+            Ctx["DynDistanceTable", table] = DynDistanceTable
+            Ctx["distCompiledTable", number] = 0
+            
+            Ctx["dynCompileState", string] = ""
+            Deflate_HuffBitsRead = 0
+            Deflate_HuffCurrentCode = 0
+            Ctx["decSubState", string] = "decode_huffman"
+        }
+        return 0
+    }
+    
+    # 8  
+    if (SubState == "decode_huffman") {
+        local BitsRead = Deflate_HuffBitsRead
+        local CurrentCode = Deflate_HuffCurrentCode
+        
+        local OutData = Ctx["outputData", table]
+        local LocalOutLen = Ctx["outputLength", number]
+        
+        local TargetTable = DeflateFixedLiteralTable
+        if (Ctx["blockType", number] == 2) { 
+            TargetTable = Ctx["DynLiteralTable", table] 
+        }
+                 
+        while (perf(90)) {
+            
+            local Bit = deflateBit()
+            if (Bit < 0) { 
+                Ctx["outputLength", number] = LocalOutLen
+                DeflateError = "Deflate: EOF in Huffman" 
+                return -1 
+            }
+            
+            CurrentCode = CurrentCode || (Bit << BitsRead)
+            BitsRead++
+            
+            local Key = (BitsRead << 16) || CurrentCode
+            
+            if (TargetTable[Key,number]>0) {
+                local Value = TargetTable[Key, number]-1
+                
+                BitsRead = 0
+                CurrentCode = 0
+                
+                if (Value < 256) {
+                    LocalOutLen++
+                    OutData[LocalOutLen, number] = Value
+                }
+                elseif (Value == 256) {
+                    Deflate_HuffBitsRead = 0
+                    Deflate_HuffCurrentCode = 0
+                    
+                    Ctx["outputLength", number] = LocalOutLen
+
+                    if (Ctx["blockFinal", number] == 1) { 
+                        return 1
+                    } else { 
+                        Ctx["decSubState", string] = "read_block_header" 
+                        Ctx["DynLiteralTable", table] = table()
+                        Ctx["DynDistanceTable", table] = table()
+                        Ctx["CodeTree", table] = table()
+                        Ctx["distBitsRead", number] = 0
+                        Ctx["distCurrentCode", number] = 0
+                        return 0
+                    }
+                } else {
+                    local LIdx = Value - 257
+                    Ctx["lzLenBase", number] = DeflateLengthBase[LIdx + 1, number]
+                    Ctx["lzLenExtraBits", number] = DeflateLengthExtra[LIdx + 1, number]
+                    Ctx["decSubState", string] = "lz_read_length_extra"
+                    
+                    Deflate_HuffBitsRead = 0
+                    Deflate_HuffCurrentCode = 0   
+                    
+                    Ctx["outputLength", number] = LocalOutLen
+                    return 0
+                }
+            }
+        }
+
+        Deflate_HuffBitsRead = BitsRead
+        Deflate_HuffCurrentCode = CurrentCode
+        Ctx["outputLength", number] = LocalOutLen
+        return 0
+    }
+    
+    # 9 LZ77
+    if (SubState == "lz_read_length_extra") {
+        local ExtraBits = Ctx["lzLenExtraBits", number]
+        local ExtraVal = 0
+        if (ExtraBits > 0) {
+            ExtraVal = deflateBits(ExtraBits)
+            if (ExtraVal < 0) { DeflateError = "Deflate: EOF in Length Extra" return -1 }
+        }
+        
+        Ctx["lzTotalLen", number] = Ctx["lzLenBase", number] + ExtraVal
+        Ctx["decSubState", string] = "lz_decode_dist"
+        
+        Ctx["distBitsRead", number] = 0
+        Ctx["distCurrentCode", number] = 0
+        return 0
+    }
+    
+    # 10 LZ77
+    if (SubState == "lz_decode_dist") {
+        if (Ctx["blockType", number] == 1) {
+            local DistCode = deflateBits(5)
+            if (DistCode < 0) { DeflateError = "Deflate: EOF in Dist Code" return -1 }
+            
+            local Rev = 0
+            local Tmp = DistCode
+            for(B = 0, 4) { Rev = (Rev << 1) || (Tmp && 1) Tmp = Tmp >> 1 }
+            
+            local NumericKey = (5 << 16) || Rev
+            local DIdx = DeflateFixedDistanceTable[NumericKey, number]
+            Ctx["lzDistBase", number] = DeflateDistBase[DIdx + 1, number]
+            Ctx["lzDistExtraBits", number] = DeflateDistExtra[DIdx + 1, number]
+            Ctx["decSubState", string] = "lz_read_dist_extra"
+            return 0
+        } 
+        else {
+            if (Ctx["dynHDist", number] == 1) {
+                Ctx["lzDistBase", number] = DeflateDistBase[1, number]
+                Ctx["lzDistExtraBits", number] = DeflateDistExtra[1, number]
+                Ctx["decSubState", string] = "lz_read_dist_extra"
+                return 0
+            }
+
+            local BitsRead = Ctx["distBitsRead", number]
+            local CurrentCode = Ctx["distCurrentCode", number]
+            
+            local Bit = deflateBit()
+            if (Bit < 0) { DeflateError = "Deflate: EOF in Huffman Dist" return -1 }
+            
+            CurrentCode = CurrentCode || (Bit << BitsRead)
+            BitsRead++
+            
+            local Key = BitsRead + "_" + CurrentCode
+            local DistTable = Ctx["DynDistanceTable", table]
+            
+            if (DistTable:exists(Key)) {
+                local DIdx = DistTable[Key, number]
+                
+                Ctx["lzDistBase", number] = DeflateDistBase[DIdx + 1, number]
+                Ctx["lzDistExtraBits", number] = DeflateDistExtra[DIdx + 1, number]
+                Ctx["decSubState", string] = "lz_read_dist_extra"
+                  
+                Ctx["distBitsRead", number] = 0
+                Ctx["distCurrentCode", number] = 0
+                return 0
+            }
+             
+            Ctx["distBitsRead", number] = BitsRead
+            Ctx["distCurrentCode", number] = CurrentCode
+        }
+        return 0
+    }
+    
+    # 11 LZ77
+    if (SubState == "lz_read_dist_extra") {
+        
+        if (!Ctx["lzInCopyActive", number]) {
+            local ExtraBits = Ctx["lzDistExtraBits", number]
+            local ExtraVal = 0
+            if (ExtraBits > 0) {
+                ExtraVal = deflateBits(ExtraBits)
+                if (ExtraVal < 0) { DeflateError = "Deflate: EOF in Dist Extra" return -1 }
+            }
+                 
+            Ctx["lzCalculatedDist", number] = Ctx["lzDistBase", number] + ExtraVal
+            Ctx["lzCopyRemains", number] = Ctx["lzTotalLen", number]
+            Ctx["lzInCopyActive", number] = 1
+        }
+        
+        local TotalDist = Ctx["lzCalculatedDist", number]
+        local Remains   = Ctx["lzCopyRemains", number]
+        local OutLen    = Ctx["outputLength", number]
+        local OutData   = Ctx["outputData", table]
+        
+        while (Remains > 0 & perf(90)) {
+            local Byte = OutData[OutLen - TotalDist + 1, number]
+            OutLen++
+            OutData[OutLen, number] = Byte
+            Remains--
+        }
+        
+        Ctx["outputLength", number] = OutLen
+        Ctx["outputData", table] = OutData
+        Ctx["lzCopyRemains", number] = Remains
+        
+        if (Remains == 0) {
+            Ctx["lzInCopyActive", number] = 0 
+            Ctx["decSubState", string] = "decode_huffman" 
+        }
+        
+        return 0
+    }        
+    
+    return 0
+}
+
+

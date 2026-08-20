@@ -333,6 +333,8 @@ function alxos_menu(Title:string,MenuTree:table,Width,Keys:table) {
     local Parent = DialogData[-1,number]
     local LAST_Y = 20 #-Height/2
     local LeftPos = 20 #-Width/2
+    
+    DialogData["title",string] = Title
 
     if (ReDraw) {
         local Tbl = DialogData[-3,table]
@@ -558,6 +560,8 @@ function alxos_dialog_warning(Title:string, Width, Height, Pos:vector2, Warning:
     local Col = table()
     Col[1, vector4] = vec4(200, 130, 10, 255) 
     Col[2, vector4] = vec4(255, 255, 255, 255)  
+    
+    DialogData["title",string] = Title
 
     DialogData[-10,table]:pushNumber(LAST_I)
     EGP:egpBox(LAST_I, vec2(PosX, PosY), vec2(Width, Height))

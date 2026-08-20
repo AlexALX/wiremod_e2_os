@@ -43,18 +43,25 @@ function alxos_midi_postinit() {
 
     local FInfo = GpuData[1,table]
     local ExplorerFS = GpuData[2,table]
+    
+    ExplorerFile = FInfo["name",string]+(FInfo["ext",string]!="" ? "."+FInfo["ext",string] : "")
 
     ExplorerCurTask = "alxos_prog_midi"
+    
+    GpuData[1,table] = ExplorerFS
+    GpuData[2,table] = FInfo
+    GpuData[5,number] = 0
+    
+    if (FInfo["content",string]) {
+        "alxos_midi_play"(FInfo["content",string])
+        return   
+    }
 
     dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(
         ExplorerFS,FInfo,0,FInfo["size",number]
     )))
 
     local Parent = "alxos_explorer_dialog"("Opening file",400,80,"progress","alxos_midi_clear")[number]
-    
-    GpuData[1,table] = ExplorerFS
-    GpuData[2,table] = FInfo
-    GpuData[5,number] = 0
 
     DialogData[-10,table]:pushNumber(LAST_I)
     EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
@@ -763,8 +770,7 @@ function alxos_midi_key(Key:string,Pressed) {
         
         alxos_midi_setmode(Mode,DialogData[-5,number])
     } elseif (Key=="f8") {
-        stoptimer("cmd")
-        dsSendDirect("clear",GpuData[1,table]["hdd_io",wirelink]:entity(),entity())
+        alxos_midi_clear()
     } elseif (GpuData["midiKeyH",string]=="dialog") {
         if (Key=="left" | Key=="right" | Key=="tab" | Key=="up" | Key=="down") {
             local Index = DialogData[-5,number]

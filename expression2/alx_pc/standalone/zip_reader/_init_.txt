@@ -1,0 +1,149 @@
+@name ZIP Reader Main Chip
+
+#include "alx_pc/standalone/zip_reader/_shared_"
+#include "alx_pc/standalone/zip_reader/parser"
+#include "alx_pc/standalone/zip_reader/bitreader"
+#include "alx_pc/standalone/zip_reader/inflate"
+
+function zipInit(Data:string, ChunkMode:number)
+{
+    Zip = table()
+
+    Zip["start",number] = curtime()
+    Zip["chunkMode",number] = ChunkMode   
+
+    ZipError = ""
+    ZipProcessing = 0
+    
+    local Size = Data:length()
+
+    Zip["data",string] = Data
+    Zip["size",number] = Size
+    Zip["pos",number] = 1
+    Zip["state",string] = ""
+
+    Zip_BitBuffer = 0
+    Zip_BitCount = 0
+
+    # ZIP parser state
+    Zip["entryCount",number] = 0
+    Zip["entryIndex",number] = 0
+    Zip["centralOffset",number] = 0
+    Zip["centralSize",number] = 0
+    Zip["centralPos",number] = 0
+    Zip["eocdPos",number] = 0
+
+    # Find EOCD first
+    Zip["state",string] = "find_eocd"
+    
+
+    Zip["eocdSearchStart", number] = max(1, Size - 65557 + 1)
+    Zip["eocdSearchPos", number] = Size - 3
+    
+    Zip["files", table] = table()
+
+    ZipProcessing = 1
+}
+
+function zipOpenFile(Entry:table) {    
+    if (Zip["chunkMode", number]) {
+        zipSeek(1)
+    } else {
+        zipSeek(Entry["localOffset",number] + 1)
+    }
+    
+    if (zipU32() != 0x04034B50) {
+        Error = "Invalid local file header"
+        return
+    }
+    
+    local Version = zipU16()
+    local Flags = zipU16()
+    local Method = zipU16()
+    local ModTime = zipU16()
+    local ModDate = zipU16()
+    local CRC = zipU32()
+    local CompressedSize = zipU32()
+    local Size = zipU32()
+    
+    local FilenameLength = zipU16()
+    local ExtraLength = zipU16()
+    
+    zipSkip(FilenameLength)
+    zipSkip(ExtraLength)
+    
+    Zip["fileMethod",number] = Method
+    Zip["fileCompressedSize",number] = Entry["compressedSize",number]
+    Zip["fileSize",number] = Entry["size",number]
+    Zip["fileRead",number] = 0
+    Zip["fileData",string] = ""
+    Zip["fileName",string] = Entry["name",string]
+    
+    Zip["localHeaderTotalLength", number] = 30 + FilenameLength + ExtraLength
+    
+    if (Method != 0 & Method != 8) { 
+        ZipError = "Unsupported ZIP compression method: " + Method
+        return
+    }
+    
+    if (Zip["chunkMode", number]) {
+        Zip["waiting_next_chunk", string] = "open_file_payload"
+        Zip["state", string] = ""
+        return
+    }
+
+    if (Method == 0) {    
+        Zip["fileData",string] = zipRead(Entry["compressedSize",number])
+        Zip["state",string] = "done"
+    } elseif (Method == 8) {        
+        local CompressedChunk = zipRead(Entry["compressedSize",number])        
+        zipStartDecompress(CompressedChunk)
+    }
+}
+
+event tick()
+{
+    if (Zip["state",string] == "" | Zip["state",string] == "done" | Zip["state",string] == "ready" | ZipError) {
+        exit()
+    }
+    
+    #print(Zip["state",string],Zip["decSubState", string])
+
+    while (perf(95)) {
+
+        if (Zip["state",string] == "find_eocd") {
+            local Result = zipFindEOCDStep()
+            if (Result == 2) {
+                Zip["waiting_next_chunk", string] = Zip["state", string]
+                Zip["state", string] = ""                
+                break
+            }
+        } elseif (Zip["state",string] == "parse_eocd") {
+            local Result = zipParseEOCDStep()
+            if (Result == 2) {
+                Zip["waiting_next_chunk", string] = Zip["state", string]
+                Zip["state", string] = ""
+                break    
+            }
+        } elseif (Zip["state",string] == "parse_central") {
+            zipParseCentralEntryStep()
+        } elseif (Zip["state",string] == "decompress") {
+            
+            if (DeflateInitState != "ready") {
+                deflateInitTablesStep()
+                exit()
+            }
+            
+            local Result = deflateDecompressStep(Zip)
+            if (Result==1) {
+                zipInflateStepFinish()    
+            } elseif (Result==-1 | DeflateError) {
+                ZipError = DeflateError
+            }
+        } elseif (Zip["state", string] == "build_string") {
+            zipBuildStringStep()
+        } elseif (Zip["state",string] == "done") {
+            break
+        }
+    }
+}

@@ -1,0 +1,144 @@
+#include "alx_pc/standalone/zip_reader/_shared_"
+#include "alx_pc/standalone/zip_reader/reader"
+
+function number zipFindEOCDStep()
+{
+    local Pos = Zip["eocdSearchPos", number]
+    local Start = Zip["eocdSearchStart", number]
+
+    if (Pos < Start) {   
+        ZipError = "End of central directory not found"
+        return 1
+    }
+
+    if (
+        toByte(Zip["data", string], Pos) == 0x50 &
+        toByte(Zip["data", string], Pos + 1) == 0x4B &
+        toByte(Zip["data", string], Pos + 2) == 0x05 &
+        toByte(Zip["data", string], Pos + 3) == 0x06
+    ) {        
+        Zip["eocdPos", number] = Pos
+        Zip["state", string] = "parse_eocd"
+        
+        local AvailableBytes = Zip["data", string]:length() - Pos + 1
+        if (Zip["chunkMode", number] & AvailableBytes < 22) {
+            return 2   
+        }
+        
+        return 1
+    }
+
+    Zip["eocdSearchPos", number] = Pos - 1
+
+    if (Zip["chunkMode",number] & Zip["eocdSearchPos", number] <= 0) {
+        return 2
+    }
+
+    return 0
+}
+
+function number zipParseEOCDStep()
+{
+    zipSeek(Zip["eocdPos", number])
+
+    if (zipU32() != 0x06054B50) {
+        ZipError = "Invalid EOCD signature"
+        return 1
+    }
+
+    local DiskNumber = zipU16()
+    local CentralDisk = zipU16()
+    local EntriesDisk = zipU16()
+    local Entries = zipU16()
+    local CentralSize = zipU32()
+    local CentralOffset = zipU32()
+    local CommentLength = zipU16()
+
+    # We currently support only single-disk archives.
+    if (DiskNumber != 0 | CentralDisk != 0 | EntriesDisk != Entries) {
+        ZipError = "Multi-disk ZIP archives are not supported"
+        return 1
+    }
+
+    # ZIP64 is not supported yet.
+    if (Entries == 0xFFFF | CentralSize == 0xFFFFFFFF | CentralOffset == 0xFFFFFFFF) {
+        ZipError = "ZIP64 archives are not supported"
+        return 1
+    }
+
+    Zip["entryCount", number] = Entries
+    Zip["centralSize", number] = CentralSize
+    Zip["centralOffset", number] = CentralOffset
+    Zip["entryIndex", number] = 0
+    Zip["centralPos", number] = CentralOffset + 1
+
+    Zip["state", string] = "parse_central"
+
+    if (Zip["chunkMode",number]) {
+        return 2
+    }
+
+    return 1
+}
+
+
+function number zipParseCentralEntryStep()
+{
+    local Pos = Zip["centralPos", number]
+
+    zipSeek(Pos)
+
+    local Signature = zipU32()
+
+    if (Signature != 0x02014B50) {
+        ZipError = "Invalid central directory entry"
+        return 1
+    }
+
+    local VersionMade = zipU16()
+    local VersionNeeded = zipU16()
+    local Flags = zipU16()
+    local Method = zipU16()
+    local ModTime = zipU16()
+    local ModDate = zipU16()
+    local CRC = zipU32()
+    local CompressedSize = zipU32()
+    local UncompressedSize = zipU32()
+
+    local FilenameLength = zipU16()
+    local ExtraLength = zipU16()
+    local CommentLength = zipU16()
+
+    local DiskNumber = zipU16()
+    local InternalAttributes = zipU16()
+    local ExternalAttributes = zipU32()
+    local LocalOffset = zipU32()
+
+    local Name = zipRead(FilenameLength)
+
+    zipSkip(ExtraLength)
+    zipSkip(CommentLength)
+
+    local File = table()
+
+    File["name", string] = Name
+    File["method", number] = Method
+    File["flags", number] = Flags
+    File["crc", number] = CRC
+    File["compressedSize", number] = CompressedSize
+    File["size", number] = UncompressedSize
+    File["localOffset", number] = LocalOffset
+    File["version", number] = VersionNeeded
+
+    Zip["files", table][Zip["entryIndex", number], table] = File
+
+    Zip["entryIndex", number] = Zip["entryIndex", number]+1
+    Zip["centralPos", number] = zipTell()
+
+    if (Zip["entryIndex", number] >= Zip["entryCount", number]) {
+        Zip["state", string] = "ready"
+        return 1
+    }
+
+    return 0
+}

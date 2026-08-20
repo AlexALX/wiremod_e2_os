@@ -1,0 +1,77 @@
+#include "alx_pc/standalone/zip_reader/_shared_"
+#include "alx_pc/standalone/deflate/_init_"
+
+function zipStartDecompress(CompressedChunk:string)
+{
+    deflateStart(Zip,CompressedChunk,1)
+    Zip["state", string] = "decompress"
+}
+
+function zipInflateStepFinish() {
+    Zip["state", string] = "build_string"
+    Zip["charArray", array] = array()
+    Zip["tempArray", array] = array()
+    Zip["treeIdx", number]  = 1
+    Zip["totalProcessed", number] = 0
+    
+    Zip["totalBuildSteps", number] = max(1, Zip["outputLength", number] - 1)
+    Zip["currentBuildStep", number] = 0
+}
+
+function number zipBuildStringStep() {
+    local StringArray = Zip["charArray", array]
+    local TempArray   = Zip["tempArray", array]
+    local Idx         = Zip["treeIdx", number]
+    local TotalProcessed = Zip["totalProcessed", number]
+    
+    local OutTable    = Zip["outputData", table]
+    local OutLen      = Zip["outputLength", number]
+
+    local IsFirstLevel = (TotalProcessed == 0)
+    local Count = IsFirstLevel ? OutLen : StringArray:count()
+    
+    if (!IsFirstLevel & Count <= 1) {
+        Zip["fileData", string] = (Count == 1) ? StringArray[1, string] : ""
+        
+        Zip["outputData", table] = table()
+        Zip["charArray", array]  = array()
+        Zip["tempArray", array]  = array()
+        
+        Zip["state", string] = "done"
+        
+        Zip["currentBuildStep", number] = Zip["totalBuildSteps", number]
+        return 0
+    }
+
+    while (Idx <= Count) {
+        if (!perf(90)) {
+            Zip["charArray", array] = StringArray
+            Zip["tempArray", array] = TempArray
+            Zip["treeIdx", number]  = Idx
+            Zip["totalProcessed", number] = TotalProcessed
+            return 1 
+        }
+        
+        if (Idx == Count) {
+            local LastStr = IsFirstLevel ? toChar(OutTable[Idx, number]) : StringArray[Idx, string]
+            TempArray:pushString(LastStr)
+        } else {
+            if (IsFirstLevel) {    
+                TempArray:pushString(toChar(OutTable[Idx, number]) + toChar(OutTable[Idx + 1, number]))
+            } else { 
+                TempArray:pushString(StringArray[Idx, string] + StringArray[Idx + 1, string])
+            }
+            
+            Zip["currentBuildStep", number] = Zip["currentBuildStep", number] + 1
+        }
+        
+        Idx += 2
+    }
+    
+    Zip["charArray", array] = TempArray
+    Zip["tempArray", array] = array()
+    Zip["treeIdx", number]  = 1
+    Zip["totalProcessed", number] = TotalProcessed + 1  
+    return 0
+}
+
