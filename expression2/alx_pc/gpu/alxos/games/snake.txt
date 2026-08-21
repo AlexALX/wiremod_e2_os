@@ -321,15 +321,25 @@ function alxos_snake_render(Head:vector2, OldHead:vector2, Tail:vector2, AteAppl
         return
     }
 
-    if (LAST_I > egpMaxObjects() - 5) {
-        "alxos_snake_stop_game"("HIT EGP OBJECTS LIMIT")
-        return
-    }
+    local HeadEgpID = 0
     
     if (!AteApple & BodyIDs:count() > 0) {
-        local TailEgpID = BodyIDs[BodyIDs:count(), number]
-        EGP:egpRemove(TailEgpID)
+        HeadEgpID = BodyIDs[BodyIDs:count(), number]
         BodyIDs:pop()
+        
+        EGP:egpPos(HeadEgpID, FieldOrigin + Head * 16)
+        EGP:egpColor(HeadEgpID, 50, 255, 50, 255)
+    } else {
+        if (LAST_I > egpMaxObjects() - 5) {
+            "alxos_snake_stop_game"("HIT EGP OBJECTS LIMIT")
+            return
+        }
+        HeadEgpID = LAST_I
+        DialogData[-10, table]:pushNumber(LAST_I)
+        EGP:egpBox(LAST_I, FieldOrigin + Head * 16, vec2(16, 16))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpColor(LAST_I, 50, 255, 50, 255)
+        LAST_I++
     }
     
     if (BodyIDs:count() > 0) {
@@ -337,19 +347,17 @@ function alxos_snake_render(Head:vector2, OldHead:vector2, Tail:vector2, AteAppl
         EGP:egpColor(OldHeadEgpID, 34, 180, 34, 255)
     }
     
-    local HeadEgpID = LAST_I
-    DialogData[-10, table]:pushNumber(LAST_I)
-    EGP:egpBox(LAST_I, FieldOrigin + Head * 16, vec2(16, 16))
-    EGP:egpParent(LAST_I, Parent)
-    EGP:egpColor(LAST_I, 50, 255, 50, 255)
-    LAST_I++
-    
     BodyIDs:unshiftNumber(HeadEgpID)
     GpuData["Snake_EgpBody", array] = BodyIDs
     
     local AppleEgpID = GpuData["Snake_AppleEgpID", number]
     if (AppleEgpID == 0 | AteApple) {
         if (AppleEgpID > 0) { EGP:egpRemove(AppleEgpID) }
+        
+        if (LAST_I > egpMaxObjects() - 5) {
+            "alxos_snake_stop_game"("HIT EGP OBJECTS LIMIT")
+            return
+        }
         
         AppleEgpID = LAST_I
         DialogData[-10, table]:pushNumber(LAST_I)
