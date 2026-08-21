@@ -8,6 +8,19 @@
  
 #include "alx_pc/cpu/alxos/_main_"
 
+# program associations, for now hardcoded...
+ALXOS_PROG_ASOC["bmp",string] = "alxos_bmp_reader"
+ALXOS_PROG_ASOC["jpg",string] = "alxos_jpg_reader"
+ALXOS_PROG_ASOC["gif",string] = "alxos_gif_reader"
+ALXOS_PROG_ASOC["png",string] = "alxos_png_reader"
+ALXOS_PROG_ASOC["txt",string] = "alxos_txt_reader"
+ALXOS_PROG_ASOC["ini",string] = "alxos_txt_reader"
+ALXOS_PROG_ASOC["e2e",string] = "alxos_txt_reader"
+ALXOS_PROG_ASOC["e2s",string] = "alxos_txt_reader"
+ALXOS_PROG_ASOC["gms",string] = "alxos_soundplay"
+ALXOS_PROG_ASOC["mid",string] = "alxos_midi_player"
+ALXOS_PROG_ASOC["zip",string] = "alxos_zip_reader"
+
 # Add custom executables here
 
 ALXOS_PROGS["alxos_explorer",number] = 1
@@ -76,15 +89,17 @@ function alxos_zip_reader(FInfo:table) {
     dsSendDirect("alxos_runprog",E2_GPU,table("alxos_zip_reader",FInfo))
 }
 
-# program associations, for now hardcoded...
-ALXOS_PROG_ASOC["bmp",string] = "alxos_bmp_reader"
-ALXOS_PROG_ASOC["jpg",string] = "alxos_jpg_reader"
-ALXOS_PROG_ASOC["gif",string] = "alxos_gif_reader"
-ALXOS_PROG_ASOC["png",string] = "alxos_png_reader"
-ALXOS_PROG_ASOC["txt",string] = "alxos_txt_reader"
-ALXOS_PROG_ASOC["ini",string] = "alxos_txt_reader"
-ALXOS_PROG_ASOC["e2e",string] = "alxos_txt_reader"
-ALXOS_PROG_ASOC["e2s",string] = "alxos_txt_reader"
-ALXOS_PROG_ASOC["gms",string] = "alxos_soundplay"
-ALXOS_PROG_ASOC["mid",string] = "alxos_midi_player"
-ALXOS_PROG_ASOC["zip",string] = "alxos_zip_reader"
+ALXOS_PROGS["alxos_game_snake",number] = 1
+function alxos_game_snake(FInfo:table) {
+    dsSendDirect("alxos_runprog",E2_GPU,table("alxos_game_snake"))
+}
+
+ALXOS_PROGS["alxos_game_pong",number] = 1
+function alxos_game_pong(FInfo:table) {
+    dsSendDirect("alxos_runprog",E2_GPU,table("alxos_game_pong"))
+}
+
+ALXOS_PROGS["alxos_game_bird",number] = 1
+function alxos_game_bird(FInfo:table) {
+    dsSendDirect("alxos_runprog",E2_GPU,table("alxos_game_bird"))
+}

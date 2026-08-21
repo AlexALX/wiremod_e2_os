@@ -1,0 +1,384 @@
+@name Pong Game (GPU)
+
+#include "alx_pc/gpu/alxos/_main_"
+#include "alx_pc/standalone/ds_gfx/_init_"
+#include "alx_pc/standalone/ds_gfx/font_5x7"
+
+#[
+    ALX Wiremod E2 PC
+    Created by AlexALX
+]#
+
+function alxos_pong_init(Args:table) {    
+    KeyHandler = "alxos_pong_menu_key"
+    DsHandler = ""
+    ExplorerCurTask = "alxos_prog_pong"
+    
+    local MenuTree = table()
+    
+    MenuTree:pushTable(table(0, "Play in Window (EGP)", "alxos_pong_launch_window", table()))
+    MenuTree:pushTable(table(0, "External Digital Screen (Pixels)", "alxos_pong_launch_external", table()))
+    
+    alxos_menu("Launch Pong", MenuTree, 300)
+    "alxos_explorer_ft"(array("Quit"))
+}
+
+function number alxos_pong_menu_key(Key:string, Pressed) {
+    if (!Pressed) { return 0 }
+    
+    if (Key == "f8") {
+        "alxos_pong_close"()
+        return 1
+    }
+    
+    alxos_menu_key(Key, "alxos_pong_close")
+    return 0
+}
+
+function alxos_pong_launch_window(Args:table) {
+    "alxos_explorer_closedialog"()
+    "alxos_pong_start_game"(0)
+}
+
+function alxos_pong_launch_external(Args:table) {
+    if (!DS:entity():isValid()) {
+        timerRemove("alxos_pong_tick")
+        "alxos_explorer_handlers"()        
+        "alxos_explorer_error"("Digital screen not connected!", 420)
+        return
+    }
+    "alxos_explorer_closedialog"()
+    "alxos_pong_start_game"(1)
+}
+
+function alxos_pong_start_game(IsExternal:number) {
+    KeyHandler = "alxos_pong_key"
+    GpuData["Pong_IsExt", number] = IsExternal
+    
+    local Width = 360
+    local Height = (IsExternal ? 125 : 400)
+    
+    local Parent = "alxos_explorer_dialog"("Pong Game", Width, Height, "", "alxos_pong_close")[number]
+    DialogData[7, number] = LAST_I
+    GpuData["Pong_ParentID", number] = Parent
+    
+    if (!IsExternal) {
+        DialogData[-10, table]:pushNumber(LAST_I)
+        EGP:egpBox(LAST_I, vec2(20, 30), vec2(320, 320))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpColor(LAST_I, 10, 10, 10, 255)
+        GpuData["Pong_FieldID", number] = LAST_I
+        LAST_I++
+        
+        DialogData[-10, table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I, "Score: 0   [F8 - Exit | Enter - Restart]", vec2(180, 360))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpAlign(LAST_I, 1)
+        EGP:egpColor(LAST_I, 0, 0, 0, 255)
+        GpuData["Pong_ScoreID", number] = LAST_I
+        LAST_I++
+
+        DialogData[-10, table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I, "GAME OVER", vec2(180, 180))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpAlign(LAST_I, 1)
+        EGP:egpSize(LAST_I, 26)
+        EGP:egpColor(LAST_I, 255, 0, 0, 0)
+        GpuData["Pong_GameOverID", number] = LAST_I
+        LAST_I++
+        
+        GpuData["Pong_PoolStartID", number] = LAST_I
+        
+        DialogData[-10, table]:pushNumber(LAST_I)
+        EGP:egpBox(LAST_I, vec2(-50, -50), vec2(16, 80))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpAlign(LAST_I, 0, 0)
+        EGP:egpColor(LAST_I, 255, 255, 255, 0)
+        LAST_I++
+        
+        DialogData[-10, table]:pushNumber(LAST_I)
+        EGP:egpBox(LAST_I, vec2(-50, -50), vec2(16, 80))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpAlign(LAST_I, 0, 0)
+        EGP:egpColor(LAST_I, 255, 255, 255, 0)
+        LAST_I++
+        
+        DialogData[-10, table]:pushNumber(LAST_I)
+        EGP:egpBox(LAST_I, vec2(-50, -50), vec2(16, 16))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpAlign(LAST_I, 0, 0)
+        EGP:egpColor(LAST_I, 255, 50, 50, 0)
+        LAST_I++
+    } else {
+        GpuData["Pong_ScrSize", number] = 20
+        
+        dsInit(DS, 20, 20)
+        dsSetFont(dsFont5x7())
+        
+        DialogData[-10, table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I, "Score: 0", vec2(180, 25))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpAlign(LAST_I, 1)
+        EGP:egpColor(LAST_I, 0, 0, 0, 255)
+        GpuData["Pong_ScoreID", number] = LAST_I
+        LAST_I++
+
+        DialogData[-10, table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I, "Playing on External Screen", vec2(180, 55))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpAlign(LAST_I, 1)
+        EGP:egpColor(LAST_I, 0, 0, 0, 255)
+        GpuData["Pong_InfoTextID", number] = LAST_I
+        LAST_I++
+        
+        DialogData[-10, table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I, "[F8 - Exit | Enter - Restart]", vec2(180, 85))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpAlign(LAST_I, 1)
+        EGP:egpColor(LAST_I, 0, 0, 0, 255)
+        LAST_I++
+    }
+
+    "alxos_pong_reset"()
+}
+
+function alxos_pong_reset() {
+    timerRemove("alxos_pong_tick")
+    
+    GpuData["Pong_PadL", number] = 8
+    GpuData["Pong_PadR", number] = 8
+    GpuData["Pong_BallPos", vector2] = vec2(10, 10)
+    
+    GpuData["Pong_KeyDown_Up", number] = 0
+    GpuData["Pong_KeyDown_Down", number] = 0
+    GpuData["Pong_KeyHit_Up", number] = 0
+    GpuData["Pong_KeyHit_Down", number] = 0
+    
+    local VX = (randint(0, 1) == 1 ? 1 : -1)
+    local VY = (randint(0, 1) == 1 ? 1 : -1)
+    GpuData["Pong_BallVel", vector2] = vec2(VX, VY)
+    
+    GpuData["Pong_Score", number] = 0
+    GpuData["Pong_Dead", number] = 0
+    
+    if (!GpuData["Pong_IsExt", number]) {
+        EGP:egpColor(GpuData["Pong_GameOverID", number], 255, 0, 0, 0)
+        local PoolStart = GpuData["Pong_PoolStartID", number]
+        EGP:egpColor(PoolStart, 255, 255, 255, 0)
+        EGP:egpColor(PoolStart + 1, 255, 255, 255, 0)
+        EGP:egpColor(PoolStart + 2, 255, 50, 50, 0)
+    } else {
+        dsInit(DS, 20, 20)
+        EGP:egpSetText(GpuData["Pong_ScoreID", number], "Score: 0")
+        EGP:egpSetText(GpuData["Pong_InfoTextID", number], "Playing on External Screen")
+        EGP:egpColor(GpuData["Pong_InfoTextID", number], 0, 0, 0, 255)
+    }
+    
+    if (GpuData["Pong_IsExt", number]) {
+        "alxos_pong_render_all_pixels"()
+    }
+    
+    timer("alxos_pong_tick", 0.13, 0, function() {
+        "alxos_pong_logic"()
+    })
+}
+
+function alxos_pong_logic() {
+    if (GpuData["Pong_Dead", number]) { return }
+    
+    local PadL = GpuData["Pong_PadL", number]
+    
+    if ((GpuData["Pong_KeyDown_Up", number] | GpuData["Pong_KeyHit_Up", number]) & PadL > 0) {
+        PadL--
+    } elseif ((GpuData["Pong_KeyDown_Down", number] | GpuData["Pong_KeyHit_Down", number]) & PadL < 15) {
+        PadL++
+    }
+    GpuData["Pong_PadL", number] = PadL
+    
+    GpuData["Pong_KeyHit_Up", number] = 0
+    GpuData["Pong_KeyHit_Down", number] = 0
+    
+    local BallPos = GpuData["Pong_BallPos", vector2]
+    local BallVel = GpuData["Pong_BallVel", vector2]
+    local PadR = GpuData["Pong_PadR", number]
+    
+    local OldBallPos = BallPos
+    local OldPadR = PadR
+    
+    local PadRCenter = PadR + 2
+    if (BallPos:y() > PadRCenter & PadR < 15) {
+        PadR++
+    } elseif (BallPos:y() < PadRCenter & PadR > 0) {
+        PadR--
+    }
+    GpuData["Pong_PadR", number] = PadR
+    
+    if (BallPos:x() == 2 & BallVel:x() == -1) {
+        local NextY = BallPos:y() + BallVel:y()
+        if (NextY >= PadL & NextY <= PadL + 4) {
+            BallVel = vec2(-BallVel:x(), BallVel:y())
+            GpuData["Pong_Score", number] = GpuData["Pong_Score", number] + 1
+            if (!GpuData["Pong_IsExt", number]) {
+                EGP:egpSetText(GpuData["Pong_ScoreID", number], "Score: " + GpuData["Pong_Score", number] + "   [F8 - Exit | Enter - Restart]")
+            } else {
+                EGP:egpSetText(GpuData["Pong_ScoreID", number], "Score: " + GpuData["Pong_Score", number])
+            }
+        }
+    }
+    
+    if (BallPos:x() == 17 & BallVel:x() == 1) {
+        local NextY = BallPos:y() + BallVel:y()
+        if (NextY >= PadR & NextY <= PadR + 4) {
+            BallVel = vec2(-BallVel:x(), BallVel:y())
+        }
+    }
+    
+    BallPos = BallPos + BallVel
+       
+    if (BallPos:y() <= 0 | BallPos:y() >= 19) {
+        BallVel = vec2(BallVel:x(), -BallVel:y())
+        BallPos = vec2(BallPos:x(), (BallPos:y() <= 0 ? 0 : 19))
+    }
+    
+    if (BallPos:x() < 0) {
+        "alxos_pong_stop_game"("GAME OVER")
+        return
+    }
+    
+    if (BallPos:x() > 19) {
+        BallVel = vec2(-BallVel:x(), BallVel:y())
+        BallPos = vec2(19, BallPos:y())
+    }
+    
+    GpuData["Pong_BallPos", vector2] = BallPos
+    GpuData["Pong_BallVel", vector2] = BallVel
+    
+    if (GpuData["Pong_IsExt", number]) {
+        "alxos_pong_pixel_update"(BallPos, OldBallPos, PadL, PadR, OldPadR)
+    } else {
+        "alxos_pong_render"()
+    }
+}
+
+function alxos_pong_stop_game(Reason:string) {
+    GpuData["Pong_Dead", number] = 1
+    timerRemove("alxos_pong_tick")
+    
+    if (!GpuData["Pong_IsExt", number]) {
+        local GameOverID = GpuData["Pong_GameOverID", number]
+        local PoolStart = GpuData["Pong_PoolStartID", number]
+        EGP:egpOrder(GameOverID, PoolStart + 3)
+        EGP:egpSetText(GameOverID, Reason)
+        EGP:egpColor(GameOverID, 255, 0, 0, 255)
+    } else {
+        dsInit(DS, 40, 40)
+        dsDrawText(8, 2, "GAME\nOVER", vec(255, 0, 0))
+        dsDrawText(5, 20, "Score", vec(255, 255, 255))
+        
+        local ScoreStr = GpuData["Pong_Score", number]:toString()
+        local ScoreLen = ScoreStr:length()
+        local ScoreWidth = (ScoreLen * 6) - 1
+        local ScoreX = floor((40 - ScoreWidth) / 2)
+        
+        dsDrawText(ScoreX, 28, ScoreStr, vec(255, 255, 255))    
+    
+        EGP:egpSetText(GpuData["Pong_InfoTextID", number], "GAME OVER!")
+        EGP:egpColor(GpuData["Pong_InfoTextID", number], 255, 0, 0, 255)
+    }
+}
+
+function alxos_pong_pixel_update(BallPos:vector2, OldBallPos:vector2, PadL:number, PadR:number, OldPadR:number) {
+    local PosMul = GpuData["Pong_ScrSize", number]
+    
+    local OldBallIdx = floor(OldBallPos:x()) + floor(OldBallPos:y()) * PosMul
+    DS[OldBallIdx] = 0
+    
+    for(I = 0, 19) {
+        DS[18 + I * PosMul] = 0
+    }
+    
+    for(I = 0, 19) {
+        DS[1 + I * PosMul] = 0
+    }
+    
+    for(I = 0, 4) {
+        DS[1 + (PadL + I) * PosMul] = 255*65536 + 255*256 + 255
+    }
+    
+    for(I = 0, 4) {
+        DS[18 + (PadR + I) * PosMul] = 255*65536 + 255*256 + 255
+    }
+    
+    local BallIdx = floor(BallPos:x()) + floor(BallPos:y()) * PosMul
+    DS[BallIdx] = 255*65536 + 50*256 + 50
+}
+
+function alxos_pong_render_all_pixels() {
+    local PosMul = GpuData["Pong_ScrSize", number]
+    DS[1048574] = 1
+    
+    local PadL = GpuData["Pong_PadL", number]
+    local PadR = GpuData["Pong_PadR", number]
+    local BallPos = GpuData["Pong_BallPos", vector2]
+    
+    for(I = 0, 4) {
+        DS[1 + (PadL + I) * PosMul] = 255*65536 + 255*256 + 255
+        DS[18 + (PadR + I) * PosMul] = 255*65536 + 255*256 + 255
+    }
+    
+    local BallIdx = floor(BallPos:x()) + floor(BallPos:y()) * PosMul
+    DS[BallIdx] = 255*65536 + 50*256 + 50
+}
+
+function alxos_pong_render() {
+    local Parent = GpuData["Pong_ParentID", number]
+    local FieldOrigin = vec2(20, 30)
+    local PadL = GpuData["Pong_PadL", number]
+    local PadR = GpuData["Pong_PadR", number]
+    local BallPos = GpuData["Pong_BallPos", vector2]
+    local PoolStart = GpuData["Pong_PoolStartID", number]
+    
+    EGP:egpPos(PoolStart, FieldOrigin + vec2(16, PadL * 16))
+    EGP:egpColor(PoolStart, 255, 255, 255, 255)
+    
+    EGP:egpPos(PoolStart + 1, FieldOrigin + vec2(18 * 16, PadR * 16))
+    EGP:egpColor(PoolStart + 1, 255, 255, 255, 255)
+    
+    EGP:egpPos(PoolStart + 2, FieldOrigin + (BallPos * 16))
+    EGP:egpColor(PoolStart + 2, 255, 50, 50, 255)
+}
+
+function number alxos_pong_key(Key:string, Pressed) {
+    if (Key == "f8" & Pressed) {
+        "alxos_pong_close"()
+        return 1
+    }
+    
+    if (Key == "enter" & GpuData["Pong_Dead", number] & Pressed) {
+        "alxos_pong_reset"()
+        return 1
+    }
+    
+    if (Key == "up") {
+        GpuData["Pong_KeyDown_Up", number] = (Pressed ? 1 : 0)
+        if (Pressed) {
+            GpuData["Pong_KeyHit_Up", number] = 1
+        }
+        return 1
+    } elseif (Key == "down") {
+        GpuData["Pong_KeyDown_Down", number] = (Pressed ? 1 : 0)
+        if (Pressed) {
+            GpuData["Pong_KeyHit_Down", number] = 1
+        }
+        return 1
+    }
+    
+    return 0
+}
+
+function number alxos_pong_close() {
+    timerRemove("alxos_pong_tick")
+    "alxos_explorer_handlers"()
+    "alxos_explorer_listcurdir"()
+    return 0
+}

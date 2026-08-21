@@ -1,5 +1,3 @@
-@strict
-
 #include "alx_pc/standalone/ds_gfx/_shared_"
 
 function dsDrawChar(X:number, Y:number, Char:string, Color:vector)

@@ -1,0 +1,334 @@
+@name Flappy Bird Game (GPU)
+
+#include "alx_pc/gpu/alxos/_main_"
+#include "alx_pc/standalone/ds_gfx/_init_"
+#include "alx_pc/standalone/ds_gfx/font_5x7"
+
+#[
+    ALX Wiremod E2 PC
+    Created by AlexALX
+]#
+
+function alxos_bird_init(Args:table) {    
+    KeyHandler = "alxos_bird_menu_key"
+    DsHandler = ""
+    ExplorerCurTask = "alxos_prog_bird"
+    
+    local MenuTree = table()
+    
+    MenuTree:pushTable(table(0, "Play in Window (EGP)", "alxos_bird_launch_window", table()))
+    MenuTree:pushTable(table(0, "External Digital Screen (Pixels)", "alxos_bird_launch_external", table()))
+    
+    alxos_menu("Launch Bird", MenuTree, 300)
+    "alxos_explorer_ft"(array("Quit"))
+}
+
+function number alxos_bird_menu_key(Key:string, Pressed) {
+    if (!Pressed) { return 0 }
+    
+    if (Key == "f8") {
+        "alxos_bird_close"()
+        return 1
+    }
+    
+    alxos_menu_key(Key, "alxos_bird_close")
+    return 0
+}
+
+function alxos_bird_launch_window(Args:table) {
+    "alxos_explorer_closedialog"()
+    "alxos_bird_start_game"(0)
+}
+
+function alxos_bird_launch_external(Args:table) {
+    if (!DS:entity():isValid()) {
+        timerRemove("alxos_bird_tick")
+        "alxos_explorer_handlers"()        
+        "alxos_explorer_error"("Digital screen not connected!", 420)
+        return
+    }
+    "alxos_explorer_closedialog"()
+    "alxos_bird_start_game"(1)
+}
+
+function alxos_bird_start_game(IsExternal:number) {
+    KeyHandler = "alxos_bird_key"
+    GpuData["Bird_IsExt", number] = IsExternal
+    
+    local Width = 360
+    local Height = (IsExternal ? 125 : 400)
+    
+    local Parent = "alxos_explorer_dialog"("Flappy Bird", Width, Height, "", "alxos_bird_close")[number]
+    DialogData[7, number] = LAST_I
+    GpuData["Bird_ParentID", number] = Parent
+    
+    if (!IsExternal) {
+        DialogData[-10, table]:pushNumber(LAST_I)
+        EGP:egpBox(LAST_I, vec2(20, 30), vec2(320, 320))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpColor(LAST_I, 10, 10, 10, 255)
+        GpuData["Bird_FieldID", number] = LAST_I
+        LAST_I++
+        
+        DialogData[-10, table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I, "Score: 0   [Space/Up - Jump | F8 - Exit]", vec2(180, 360))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpAlign(LAST_I, 1)
+        EGP:egpColor(LAST_I, 0, 0, 0, 255)
+        GpuData["Bird_ScoreID", number] = LAST_I
+        LAST_I++
+
+        DialogData[-10, table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I, "GAME OVER", vec2(180, 180))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpAlign(LAST_I, 1)
+        EGP:egpSize(LAST_I, 26)
+        EGP:egpColor(LAST_I, 255, 0, 0, 0)
+        GpuData["Bird_GameOverID", number] = LAST_I
+        LAST_I++
+        
+        GpuData["Bird_PoolStartID", number] = LAST_I
+        for(I = 0, 19) {
+            DialogData[-10, table]:pushNumber(LAST_I)
+            EGP:egpBox(LAST_I, vec2(-50, -50), vec2(16, 16))
+            EGP:egpParent(LAST_I, Parent)
+            EGP:egpAlign(LAST_I, 0, 0)
+            EGP:egpColor(LAST_I, 34, 180, 34, 0)
+            LAST_I++
+        }
+        
+        DialogData[-10, table]:pushNumber(LAST_I)
+        EGP:egpBox(LAST_I, vec2(-50, -50), vec2(16, 16))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpAlign(LAST_I, 0, 0)
+        EGP:egpColor(LAST_I, 255, 200, 0, 0)
+        GpuData["Bird_EgpPlayerID", number] = LAST_I
+        LAST_I++
+    } else {
+        GpuData["Bird_ScrSize", number] = 20
+        
+        dsInit(DS, 20, 20)
+        dsSetFont(dsFont5x7())
+        
+        DialogData[-10, table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I, "Score: 0", vec2(180, 25))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpAlign(LAST_I, 1)
+        EGP:egpColor(LAST_I, 0, 0, 0, 255)
+        GpuData["Bird_ScoreID", number] = LAST_I
+        LAST_I++
+
+        DialogData[-10, table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I, "Playing on External Screen", vec2(180, 55))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpAlign(LAST_I, 1)
+        EGP:egpColor(LAST_I, 0, 0, 0, 255)
+        GpuData["Bird_InfoTextID", number] = LAST_I
+        LAST_I++
+        
+        DialogData[-10, table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I, "[F8 - Exit | Enter - Restart]", vec2(180, 85))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpAlign(LAST_I, 1)
+        EGP:egpColor(LAST_I, 0, 0, 0, 255)
+        LAST_I++
+    }
+
+    "alxos_bird_reset"()
+}
+
+function alxos_bird_reset() {
+    timerRemove("alxos_bird_tick")
+    
+    GpuData["Bird_Y", number] = 10
+    GpuData["Bird_VelY", number] = 0
+    
+    GpuData["Bird_PipeX", number] = 19
+    GpuData["Bird_PipeGapY", number] = randint(3, 12)
+    GpuData["Bird_PipeGapSize", number] = 5
+    
+    GpuData["Bird_Score", number] = 0
+    GpuData["Bird_Dead", number] = 0
+    
+    if (!GpuData["Bird_IsExt", number]) {
+        EGP:egpColor(GpuData["Bird_GameOverID", number], 255, 0, 0, 0)
+        local PoolStart = GpuData["Bird_PoolStartID", number]
+        for(I = 0, 19) {
+            EGP:egpPos(PoolStart + I, vec2(-50, -50))
+            EGP:egpColor(PoolStart + I, 34, 180, 34, 0)
+        }
+        EGP:egpPos(GpuData["Bird_EgpPlayerID", number], vec2(-50, -50))
+        EGP:egpColor(GpuData["Bird_EgpPlayerID", number], 255, 200, 0, 0)
+    } else {
+        dsInit(DS, 20, 20)
+        EGP:egpSetText(GpuData["Bird_ScoreID", number], "Score: 0")
+        EGP:egpSetText(GpuData["Bird_InfoTextID", number], "Playing on External Screen")
+        EGP:egpColor(GpuData["Bird_InfoTextID", number], 0, 0, 0, 255)
+    }
+    
+    timer("alxos_bird_tick", 0.10, 0, function() {
+        "alxos_bird_logic"()
+    })
+}
+
+function alxos_bird_logic() {
+    if (GpuData["Bird_Dead", number]) { return }
+    
+    local BirdY = GpuData["Bird_Y", number]
+    local VelY = GpuData["Bird_VelY", number]
+    local PipeX = GpuData["Bird_PipeX", number]
+    local GapY = GpuData["Bird_PipeGapY", number]
+    local GapSize = GpuData["Bird_PipeGapSize", number]
+    
+    local OldBirdY = floor(BirdY)
+    local OldPipeX = PipeX
+    
+    VelY = VelY + 0.4
+    if (VelY > 1.5) { VelY = 1.5 }
+    BirdY = BirdY + VelY
+    GpuData["Bird_Y", number] = BirdY
+    GpuData["Bird_VelY", number] = VelY
+    
+    if (BirdY < 0 | BirdY >= 20) {
+        "alxos_bird_stop_game"("GAME OVER")
+        return
+    }
+    
+    PipeX--
+    if (PipeX < 0) {
+        PipeX = 19
+        GapY = randint(3, 12)
+        GpuData["Bird_PipeGapY", number] = GapY
+        
+        GpuData["Bird_Score", number] = GpuData["Bird_Score", number] + 1
+        if (!GpuData["Bird_IsExt", number]) {
+            EGP:egpSetText(GpuData["Bird_ScoreID", number], "Score: " + GpuData["Bird_Score", number] + "   [Space/Up - Jump | F8 - Exit]")
+        } else {
+            EGP:egpSetText(GpuData["Bird_ScoreID", number], "Score: " + GpuData["Bird_Score", number])
+        }
+    }
+    GpuData["Bird_PipeX", number] = PipeX
+    
+    if (PipeX == 4) {
+        local RoundedY = floor(BirdY)
+        if (RoundedY < GapY | RoundedY >= (GapY + GapSize)) {
+            "alxos_bird_stop_game"("GAME OVER")
+            return
+        }
+    }
+    
+    if (GpuData["Bird_IsExt", number]) {
+        "alxos_bird_render_pixels"(OldBirdY, OldPipeX)
+    } else {
+        "alxos_bird_render_egp"()
+    }
+}
+
+function alxos_bird_stop_game(Reason:string) {
+    GpuData["Bird_Dead", number] = 1
+    timerRemove("alxos_bird_tick")
+    
+    if (!GpuData["Bird_IsExt", number]) {
+        local GameOverID = GpuData["Bird_GameOverID", number]
+        EGP:egpOrder(GameOverID, GpuData["Bird_EgpPlayerID", number] + 1)
+        EGP:egpSetText(GameOverID, Reason)
+        EGP:egpColor(GameOverID, 255, 0, 0, 255)
+    } else {
+        dsInit(DS, 40, 40)
+        dsDrawText(8, 2, "GAME\nOVER", vec(255, 0, 0))
+        dsDrawText(5, 20, "Score", vec(255, 255, 255))
+        
+        local ScoreStr = GpuData["Bird_Score", number]:toString()
+        local ScoreLen = ScoreStr:length()
+        local ScoreWidth = (ScoreLen * 6) - 1
+        local ScoreX = floor((40 - ScoreWidth) / 2)
+        
+        dsDrawText(ScoreX, 28, ScoreStr, vec(255, 255, 255))    
+    
+        EGP:egpSetText(GpuData["Bird_InfoTextID", number], "GAME OVER!")
+        EGP:egpColor(GpuData["Bird_InfoTextID", number], 255, 0, 0, 255)
+    }
+}
+
+function alxos_bird_render_pixels(OldBirdY:number, OldPipeX:number) {
+    local PosMul = GpuData["Bird_ScrSize", number]
+      
+    DS[4 + OldBirdY * PosMul] = 0
+    
+    local ClearX = OldPipeX
+    if (ClearX != GpuData["Bird_PipeX", number]) {
+        for(Y = 0, 19) {
+            DS[ClearX + Y * PosMul] = 0
+        }
+    }
+
+    local PipeX = GpuData["Bird_PipeX", number]
+    local GapY = GpuData["Bird_PipeGapY", number]
+    local GapSize = GpuData["Bird_PipeGapSize", number]
+    local PipeColor = 34 * 65536 + 180 * 256 + 34
+    
+    for(Y = 0, 19) {
+        if (Y < GapY | Y >= (GapY + GapSize)) {
+            DS[PipeX + Y * PosMul] = PipeColor
+        }
+    }
+    
+    local BirdY = floor(GpuData["Bird_Y", number])
+    DS[4 + BirdY * PosMul] = 255 * 65536 + 200 * 256 + 0
+}
+
+function alxos_bird_render_egp() {
+    local Parent = GpuData["Bird_ParentID", number]
+    local FieldOrigin = vec2(20, 30)
+    
+    local PipeX = GpuData["Bird_PipeX", number]
+    local GapY = GpuData["Bird_PipeGapY", number]
+    local GapSize = GpuData["Bird_PipeGapSize", number]
+    local PoolStart = GpuData["Bird_PoolStartID", number]
+    
+    for(Y = 0, 19) {
+        local ObjectID = PoolStart + Y
+        local BlockPos = FieldOrigin + vec2(PipeX * 16, Y * 16)
+        EGP:egpPos(ObjectID, BlockPos)
+        
+        if (Y < GapY | Y >= (GapY + GapSize)) {
+            EGP:egpColor(ObjectID, 34, 180, 34, 255)
+        } else {
+            EGP:egpColor(ObjectID, 34, 180, 34, 0)
+        }
+    }
+    
+    local BirdY = floor(GpuData["Bird_Y", number])
+    local BirdPos = FieldOrigin + vec2(4 * 16, BirdY * 16)
+    local PlayerID = GpuData["Bird_EgpPlayerID", number]
+    EGP:egpPos(PlayerID, BirdPos)
+    EGP:egpColor(PlayerID, 255, 200, 0, 255)
+}
+
+function number alxos_bird_key(Key:string, Pressed) {
+    if (!Pressed) { return 0 }
+    
+    if (Key == "f8") {
+        "alxos_bird_close"()
+        return 1
+    }
+    
+    if (Key == "enter" & GpuData["Bird_Dead", number]) {
+        "alxos_bird_reset"()
+        return 1
+    }
+    
+    if ((Key == "space" | Key == "up") & !GpuData["Bird_Dead", number]) {
+        GpuData["Bird_VelY", number] = -1.2
+        return 1
+    }
+    
+    return 0
+}
+
+function number alxos_bird_close() {
+    timerRemove("alxos_bird_tick")
+    "alxos_explorer_handlers"()
+    "alxos_explorer_listcurdir"()
+    return 0
+}

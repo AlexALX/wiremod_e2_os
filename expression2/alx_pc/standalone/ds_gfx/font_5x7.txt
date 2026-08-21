@@ -1,5 +1,4 @@
 @name DS Font 5x7
-@strict
 
 #include "alx_pc/standalone/ds_gfx/_shared_"
 

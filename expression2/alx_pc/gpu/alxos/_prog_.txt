@@ -92,3 +92,21 @@ function alxos_zip_reader(Args:table) {
     #include "alx_pc/gpu/alxos/zip"
     alxos_zip_init(Args)
 }
+
+ALXOS_PROGS["alxos_game_snake",number] = 1
+function alxos_game_snake(Args:table) {
+    #include "alx_pc/gpu/alxos/games/snake"
+    alxos_snake_init(Args)
+}
+
+ALXOS_PROGS["alxos_game_pong",number] = 1
+function alxos_game_pong(Args:table) {
+    #include "alx_pc/gpu/alxos/games/pong"
+    alxos_pong_init(Args)
+}
+
+ALXOS_PROGS["alxos_game_bird",number] = 1
+function alxos_game_bird(Args:table) {
+    #include "alx_pc/gpu/alxos/games/bird"
+    alxos_bird_init(Args)
+}

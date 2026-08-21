@@ -1,7 +1,6 @@
 @persist DsFont:table DsFontWidth:number DsFontHeight:number DsFontSpacing:number
 @persist DsWidth:number DsHeight:number
-@persist DsText:table DSWL:wirelink 
-@strict 
+@persist DsText:table DSWL:wirelink
 
 function dsDrawPixel(X:number, Y:number, Color:vector)
 {

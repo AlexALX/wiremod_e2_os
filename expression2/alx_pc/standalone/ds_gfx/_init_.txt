@@ -1,5 +1,3 @@
-@strict
-
 #include "alx_pc/standalone/ds_gfx/_shared_"
 #include "alx_pc/standalone/ds_gfx/text"
 #include "alx_pc/standalone/ds_gfx/textqueue"

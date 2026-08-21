@@ -31,7 +31,7 @@ This project pushes **Expression2** to its absolute limits, implementing complex
 * Virtual CD Drives, HDDs, USB devices, cables, pcie/pci cards, etc.
 * Virtual BIOS, boot sequence.
 * **Low-level WM1 File System** what works with wire dupable HDDs/EEPROM. 
-* **WCD File System** what used for wiremod CD Discs. 
+* **WCD File System** what used for wiremod CD Discs.
 * Expression2 **BMP Reader**, draw on wire Digital Screen (up to 512x512, 1024x1024 Quad Digital Screen). 
 * Expression2 Baseline (8/12bits) and Progressive **JPG Reader** for Digital Screen.
 * Expression2 **GIF Reader** with animations support for Digital Screen.
@@ -39,6 +39,7 @@ This project pushes **Expression2** to its absolute limits, implementing complex
 * **Midi player** with 3 play modes (synth, instrumental, addon).
 * Expression2 **ZIP Reader** for ALX PC.
 * Few programs: Console, Burning software, file manager, network chat, partitions manager. 
+* Few **Mini-Games**: Flappy Bird, Pong and Snake.
 * Simple directory listing/file managing interface (DOS style).
 * Simple text viewer.  
 * Simple networking between PC's.

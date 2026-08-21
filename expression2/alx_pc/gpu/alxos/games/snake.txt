@@ -1,0 +1,404 @@
+@name Snake Game (GPU)
+
+#include "alx_pc/gpu/alxos/_main_"
+#include "alx_pc/standalone/ds_gfx/_init_"
+#include "alx_pc/standalone/ds_gfx/font_5x7"
+
+#[
+    ALX Wiremod E2 PC
+    Created by AlexALX
+]#
+
+function alxos_snake_init(Args:table) {    
+    KeyHandler = "alxos_snake_menu_key"
+    DsHandler = ""
+    ExplorerCurTask = "alxos_prog_snake"
+    
+    local MenuTree = table()
+    
+    MenuTree:pushTable(table(0, "Play in Window (EGP)", "alxos_snake_launch_window", table()))
+    MenuTree:pushTable(table(0, "External Digital Screen (Pixels)", "alxos_snake_launch_external", table()))
+    
+    alxos_menu("Launch Snake", MenuTree, 300)
+    "alxos_explorer_ft"(array("Quit"))
+}
+
+function number alxos_snake_menu_key(Key:string, Pressed) {
+    if (!Pressed) { return 0 }
+    
+    if (Key == "f8") {
+        "alxos_snake_close"()
+        return 1
+    }
+    
+    alxos_menu_key(Key, "alxos_snake_close")
+    return 0
+}
+
+function alxos_snake_launch_window(Args:table) {
+    "alxos_explorer_closedialog"()
+    "alxos_snake_start_game"(0)
+}
+
+function alxos_snake_launch_external(Args:table) {
+    if (!DS:entity():isValid()) {
+        timerRemove("alxos_snake_tick")
+        "alxos_explorer_handlers"()        
+        "alxos_explorer_error"("Digital screen not connected!", 420)
+        return
+    }
+    "alxos_explorer_closedialog"()
+    "alxos_snake_start_game"(1)
+}
+
+function alxos_snake_start_game(IsExternal:number) {
+    KeyHandler = "alxos_snake_key"
+    GpuData["Snake_IsExt", number] = IsExternal
+    
+    local Width = 360
+    local Height = (IsExternal ? 125 : 400)
+    
+    local Parent = "alxos_explorer_dialog"("Snake Game", Width, Height, "", "alxos_snake_close")[number]
+    DialogData[7, number] = LAST_I
+    GpuData["Snake_ParentID", number] = Parent
+    
+    if (!IsExternal) {
+        DialogData[-10, table]:pushNumber(LAST_I)
+        EGP:egpBox(LAST_I, vec2(20, 30), vec2(320, 320))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpColor(LAST_I, 10, 10, 10, 255)
+        GpuData["Snake_FieldID", number] = LAST_I
+        LAST_I++
+        
+        DialogData[-10, table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I, "Score: 0   [F8 - Exit | Enter - Restart]", vec2(180, 360))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpAlign(LAST_I, 1)
+        EGP:egpColor(LAST_I, 0, 0, 0, 255)
+        GpuData["Snake_ScoreID", number] = LAST_I
+        LAST_I++
+
+        DialogData[-10, table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I, "GAME OVER", vec2(180, 180))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpAlign(LAST_I, 1)
+        EGP:egpSize(LAST_I, 26)
+        EGP:egpColor(LAST_I, 255, 0, 0, 0)
+        GpuData["Snake_GameOverID", number] = LAST_I
+        LAST_I++
+    } else {
+        GpuData["Snake_ScrSize", number] = 20
+        
+        dsInit(DS, 20, 20)
+        dsSetFont(dsFont5x7())
+        
+        DialogData[-10, table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I, "Score: 0", vec2(180, 25))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpAlign(LAST_I, 1)
+        EGP:egpColor(LAST_I, 0, 0, 0, 255)
+        GpuData["Snake_ScoreID", number] = LAST_I
+        LAST_I++
+
+        DialogData[-10, table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I, "Playing on External Screen", vec2(180, 55))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpAlign(LAST_I, 1)
+        EGP:egpColor(LAST_I, 0, 0, 0, 255)
+        GpuData["Snake_InfoTextID", number] = LAST_I
+        LAST_I++
+        
+        DialogData[-10, table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I, "[F8 - Exit | Enter - Restart]", vec2(180, 85))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpAlign(LAST_I, 1)
+        EGP:egpColor(LAST_I, 0, 0, 0, 255)
+        LAST_I++
+    }
+
+    "alxos_snake_reset"()
+}
+
+function alxos_snake_reset() {
+    timerRemove("alxos_snake_tick")
+    
+    local Body = array(vec2(10, 10), vec2(10, 11), vec2(10, 12))
+    GpuData["Snake_Body", array] = Body
+    GpuData["Snake_Dir", vector2] = vec2(0, -1)
+    GpuData["Snake_Score", number] = 0
+    GpuData["Snake_Dead", number] = 0
+    
+    if (!GpuData["Snake_IsExt", number]) {
+        local OldBodyIDs = GpuData["Snake_EgpBody", array]
+        foreach(K:number, V:number = OldBodyIDs) {
+            EGP:egpRemove(V)
+        }
+        EGP:egpRemove(GpuData["Snake_AppleEgpID", number])
+        GpuData["Snake_AppleEgpID", number] = 0
+        GpuData["Snake_EgpBody", array] = array()
+        
+        EGP:egpColor(GpuData["Snake_GameOverID", number], 255, 0, 0, 0)
+    } else {
+        dsInit(DS, 20, 20)
+        EGP:egpSetText(GpuData["Snake_ScoreID", number], "Score: 0")
+        EGP:egpSetText(GpuData["Snake_InfoTextID", number], "Playing on External Screen")
+        EGP:egpColor(GpuData["Snake_InfoTextID", number], 0, 0, 0, 255)
+    }
+    
+    "alxos_snake_spawn_apple"()
+    
+    if (GpuData["Snake_IsExt", number]) {
+        "alxos_snake_render_all_pixels"()
+    }
+    
+    timer("alxos_snake_tick", 0.15, 0, function() {
+        "alxos_snake_logic"()
+    })
+}
+
+function alxos_snake_spawn_apple() {
+    local Body = GpuData["Snake_Body", array]
+    local Valid = 0
+    local Ap = vec2(0,0)
+    
+    while(!Valid) {
+        Ap = vec2(randint(0, 19), randint(0, 19))
+        Valid = 1
+        foreach(K:number, V:vector2 = Body) {
+            if (V == Ap) { 
+                Valid = 0
+                break 
+            }
+        }
+    }
+    GpuData["Snake_Apple", vector2] = Ap
+}
+
+function alxos_snake_logic() {
+    if (GpuData["Snake_Dead", number]) { return }
+    
+    local Body = GpuData["Snake_Body", array]
+    local Dir = GpuData["Snake_Dir", vector2]
+    local Head = Body[1, vector2] + Dir
+    
+    if (Head:x() < 0 | Head:x() > 19 | Head:y() < 0 | Head:y() > 19) {
+        "alxos_snake_stop_game"("GAME OVER")
+        return
+    }
+    
+    foreach(K:number, V:vector2 = Body) {
+        if (V == Head) {
+            "alxos_snake_stop_game"("GAME OVER")
+            return
+        }
+    }
+    
+    local Tail = Body[Body:count(), vector2]
+    local OldHead = Body[1, vector2]
+    Body:unshiftVector2(Head)
+    
+    local AteApple = (Head == GpuData["Snake_Apple", vector2] ? 1 : 0)
+    
+    if (AteApple) {
+        GpuData["Snake_Score", number] = GpuData["Snake_Score", number] + 1
+        if (!GpuData["Snake_IsExt", number]) {
+            EGP:egpSetText(GpuData["Snake_ScoreID", number], "Score: " + GpuData["Snake_Score", number] + "   [F8 - Exit | Enter - Restart]")
+        } else {
+            EGP:egpSetText(GpuData["Snake_ScoreID", number], "Score: " + GpuData["Snake_Score", number])
+        }
+        "alxos_snake_spawn_apple"()
+    } else {
+        Body:pop()
+    }
+    
+    GpuData["Snake_Body", array] = Body
+    
+    if (GpuData["Snake_IsExt", number]) {
+        "alxos_snake_pixel_update"(Head, OldHead, Tail, AteApple)
+    } else {
+        "alxos_snake_render"(Head, OldHead, Tail, AteApple)
+    }
+}
+
+function alxos_snake_stop_game(Reason:string) {
+    GpuData["Snake_Dead", number] = 1
+    timerRemove("alxos_snake_tick")
+    
+    if (!GpuData["Snake_IsExt", number]) {
+        local GameOverID = GpuData["Snake_GameOverID", number]
+        local MaxID = GpuData["Snake_MaxRenderID", number]
+        if (MaxID > 0) { EGP:egpOrder(GameOverID, MaxID + 1) }
+        EGP:egpSetText(GameOverID, Reason)
+        EGP:egpColor(GameOverID, 255, 0, 0, 255)
+    } else {
+        dsInit(DS, 40, 40)
+        dsDrawText(8, 2, "GAME\nOVER", vec(255, 0, 0))
+        
+        dsDrawText(5, 20, "Score", vec(255, 255, 255))
+        
+        local ScoreStr = GpuData["Snake_Score", number]:toString()
+        local ScoreLen = ScoreStr:length()
+        local ScoreWidth = (ScoreLen * 6) - 1
+        local ScoreX = floor((40 - ScoreWidth) / 2)
+        
+        dsDrawText(ScoreX, 28, ScoreStr, vec(255, 255, 255))    
+    
+        EGP:egpSetText(GpuData["Snake_InfoTextID", number], "GAME OVER!")
+        EGP:egpColor(GpuData["Snake_InfoTextID", number], 255,0,0,255)
+    }
+}
+
+function alxos_snake_pixel_update(Head:vector2, OldHead:vector2, Tail:vector2, AteApple:number) {
+    local PosMul = GpuData["Snake_ScrSize", number]
+    
+    if (!AteApple) {
+        local TailIdx = floor(Tail:x()) + floor(Tail:y()) * PosMul
+        DS[TailIdx] = 0
+    }
+    
+    local OldHeadIdx = floor(OldHead:x()) + floor(OldHead:y()) * PosMul
+    DS[OldHeadIdx] = 34*65536 + 180*256 + 34
+    
+    local Apple = GpuData["Snake_Apple", vector2]
+    local AppleIdx = floor(Apple:x()) + floor(Apple:y()) * PosMul
+    DS[AppleIdx] = 255*65536 + 50*256 + 50
+    
+    local HeadIdx = floor(Head:x()) + floor(Head:y()) * PosMul
+    DS[HeadIdx] = 50*65536 + 255*256 + 50
+}
+
+function alxos_snake_render_all_pixels() {
+    local PosMul = GpuData["Snake_ScrSize", number]
+    
+    local Ap = GpuData["Snake_Apple", vector2]
+    local ApIdx = floor(Ap:x()) + floor(Ap:y()) * PosMul
+    DS[ApIdx] = 255*65536 + 50*256 + 50
+    
+    local Body = GpuData["Snake_Body", array]
+    foreach(K:number, V:vector2 = Body) {
+        local Index = floor(V:x()) + floor(V:y()) * PosMul
+        if (K == 1) {
+            DS[Index] = 50*65536 + 255*256 + 50
+        } else {
+            DS[Index] = 34*65536 + 180*256 + 34
+        }
+    }
+}
+
+function alxos_snake_render(Head:vector2, OldHead:vector2, Tail:vector2, AteApple:number) {
+    local Parent = GpuData["Snake_ParentID", number]
+    local FieldOrigin = vec2(20, 30)
+    local BodyIDs = GpuData["Snake_EgpBody", array]
+     
+    if (BodyIDs:count() == 0) {
+        if (LAST_I > egpMaxObjects() - 10) {
+            "alxos_snake_stop_game"("HIT EGP OBJECTS LIMIT")
+            return
+        }
+        
+        local Body = GpuData["Snake_Body", array]
+        foreach(K:number, V:vector2 = Body) {
+            DialogData[-10, table]:pushNumber(LAST_I)
+            EGP:egpBox(LAST_I, FieldOrigin + V * 16, vec2(16, 16))
+            EGP:egpParent(LAST_I, Parent)
+            if (K == 1) {
+                EGP:egpColor(LAST_I, 50, 255, 50, 255)
+            } else {
+                EGP:egpColor(LAST_I, 34, 180, 34, 255)
+            }
+            BodyIDs:pushNumber(LAST_I)
+            LAST_I++
+        }
+        GpuData["Snake_EgpBody", array] = BodyIDs
+        
+        DialogData[-10, table]:pushNumber(LAST_I)
+        local Ap = GpuData["Snake_Apple", vector2]
+        EGP:egpBox(LAST_I, FieldOrigin + Ap * 16, vec2(16, 16))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpColor(LAST_I, 255, 50, 50, 255)
+        GpuData["Snake_AppleEgpID", number] = LAST_I
+        LAST_I++
+        return
+    }
+
+    if (LAST_I > egpMaxObjects() - 5) {
+        "alxos_snake_stop_game"("HIT EGP OBJECTS LIMIT")
+        return
+    }
+    
+    if (!AteApple & BodyIDs:count() > 0) {
+        local TailEgpID = BodyIDs[BodyIDs:count(), number]
+        EGP:egpRemove(TailEgpID)
+        BodyIDs:pop()
+    }
+    
+    if (BodyIDs:count() > 0) {
+        local OldHeadEgpID = BodyIDs[1, number]
+        EGP:egpColor(OldHeadEgpID, 34, 180, 34, 255)
+    }
+    
+    local HeadEgpID = LAST_I
+    DialogData[-10, table]:pushNumber(LAST_I)
+    EGP:egpBox(LAST_I, FieldOrigin + Head * 16, vec2(16, 16))
+    EGP:egpParent(LAST_I, Parent)
+    EGP:egpColor(LAST_I, 50, 255, 50, 255)
+    LAST_I++
+    
+    BodyIDs:unshiftNumber(HeadEgpID)
+    GpuData["Snake_EgpBody", array] = BodyIDs
+    
+    local AppleEgpID = GpuData["Snake_AppleEgpID", number]
+    if (AppleEgpID == 0 | AteApple) {
+        if (AppleEgpID > 0) { EGP:egpRemove(AppleEgpID) }
+        
+        AppleEgpID = LAST_I
+        DialogData[-10, table]:pushNumber(LAST_I)
+        local Ap = GpuData["Snake_Apple", vector2]
+        EGP:egpBox(LAST_I, FieldOrigin + Ap * 16, vec2(16, 16))
+        EGP:egpParent(LAST_I, Parent)
+        EGP:egpColor(LAST_I, 255, 50, 50, 255)
+        LAST_I++
+        GpuData["Snake_AppleEgpID", number] = AppleEgpID
+    }
+}
+
+function number alxos_snake_key(Key:string, Pressed) {
+    if (!Pressed) { return 0 }
+    
+    local Dir = GpuData["Snake_Dir", vector2]
+    local DX = Dir:x()
+    local DY = Dir:y()
+    
+    if (Key == "f8") {
+        "alxos_snake_close"()
+        return 1
+    }
+    
+    if (Key == "enter" & GpuData["Snake_Dead", number]) {
+        "alxos_snake_reset"()
+        return 1
+    }
+    
+    if (Key == "up" & DY == 0) {
+        GpuData["Snake_Dir", vector2] = vec2(0, -1)
+        return 1
+    } elseif (Key == "down" & DY == 0) {
+        GpuData["Snake_Dir", vector2] = vec2(0, 1)
+        return 1
+    } elseif (Key == "left" & DX == 0) {
+        GpuData["Snake_Dir", vector2] = vec2(-1, 0)
+        return 1
+    } elseif (Key == "right" & DX == 0) {
+        GpuData["Snake_Dir", vector2] = vec2(1, 0)
+        return 1
+    }
+    
+    return 0
+}
+
+function number alxos_snake_close() {
+    timerRemove("alxos_snake_tick")
+    "alxos_explorer_handlers"()
+    "alxos_explorer_listcurdir"()
+    return 0
+}
