@@ -1,0 +1,144 @@
+@name Remote Executor
+@inputs InA Board:wirelink ExecutorID:number
+@persist BIOS:entity Device_Name:string
+@persist Devices:table Init Caller:entity CodePrepend:string CodeAppend:string CodeExecute:string
+
+#[
+    ALX Wiremod E2 PC
+    Created by AlexALX
+    -------------------
+    This device allow to execute e2 code via remoteupload extension from raw code
+    Currently support are limited to just code with no includes
+    And is totally isolated - no way to call gui directly.
+]#
+
+if (first()|duped()) {
+    
+#include "alx_pc/shared/_main_"
+#include "alx_pc/shared/cmd"
+
+dsSetScope(2)
+
+BIOS = getentity(InA)
+Board["A",number] = entity():id()
+if (!duped()) {
+    dsSendDirect("reload",BIOS,"rmtexec")
+}
+
+Init = 0
+Device_Name = "Remote Executor"
+Caller = noentity()
+
+# This code needs always be added to executor chip so will be proper sync
+CodePrepend = "@outputs RemoteEntID:number\r\n@persist ExecutorID:number\r\n"
+CodeAppend = "
+if (first()|duped()) {
+    dsSetScope(2)
+    RemoteEntID = entity():id()
+    ExecutorID = "+entity():id()+"
+}
+"
+
+# this code needs to run on program to properly init
+CodeExecute = "
+function dsInitProg() {
+    dsSendDirect(\"initExecutor\", entity(ExecutorID), table(wirelink()))        
+}
+
+if (first()) {
+    dsInitProg()
+} 
+"
+
+function setNoCode() {
+    getentity(ExecutorID):remoteSetCode(CodePrepend + CodeAppend)
+}
+
+function shutdown() {
+    if (!Init) { return }
+
+    stopAllTimers()
+
+    setNoCode()
+    DsHandler = ""
+    Init = 0
+    Caller = noentity()
+}
+
+function pci_init() {    
+    dsSendDirect("pci",BIOS,table("rmtexec",entity(),Device_Name))
+}
+
+function usb_init() {
+    local Info = dsGetTable()
+    local USB_Device = Info[2,entity]
+    dsSendDirect("usbcontroller",USB_Device,table("rmtexec",wirelink(),table()))
+}
+
+function number exec_timeout() {
+    dsSendDirect("execError",Caller,1)
+    setNoCode()
+    return 0    
+}
+
+}
+
+#ifndef entity:remoteSetCode(string)
+    error("This device cannot work without e2 remoteupload extension. Please enable via wire_expression2_extension_enable remoteupload.")
+    exit()
+#else
+
+if (dupefinished()) {
+    Board["A",number] = entity():id()
+    BIOS = getentity(InA)
+}
+
+if (~InA) {
+    local New_BIOS = entity(InA)
+    if (BIOS!=New_BIOS & Init) {
+        shutdown()
+    }
+    BIOS = New_BIOS
+}
+
+if (!BIOS:isValid()) { exit() }
+
+if (dsClk()) {
+    local Name = dsClkName()
+    
+    if (Name=="executeCode") {
+        local Info = dsGetTable()
+        Devices = Info[1,table]
+        TickQuota = Info[2,number]
+        local Code = Info[3,string]
+        Init = 1
+        Caller = dsGetSender()
+        
+        local Executor = getentity(ExecutorID)
+
+        Executor:remoteSetCode(CodePrepend + Code + CodeAppend + CodeExecute)
+        
+        runCmd("exec_timeout",1000)
+    } elseif (Name=="pci") {
+        pci_init()
+    } elseif (Name=="usbcontroller") {
+        usb_init()
+    } elseif (Name=="SHUTDOWN") {
+        shutdown()
+    } elseif (DsHandler!="") {
+        DsHandler(Name)
+    } elseif (Name=="initExecutor") {
+        stopCmd()
+        dsSendDirect("initExecutor", Caller, dsGetTable())  
+
+        local Executor = getentity(ExecutorID)
+        Executor:sendRemoteEvent(table(Devices, TickQuota))
+    } elseif (Name=="executorKey") {
+        local Executor = getentity(ExecutorID)
+        dsSendDirect("executorKey", Executor, dsGetTable())    
+    }
+}
+
+if (clk("cmd")) {
+    cmdClk()
+}

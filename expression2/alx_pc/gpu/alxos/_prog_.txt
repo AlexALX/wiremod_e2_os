@@ -26,6 +26,12 @@ function alxos_execute(Name:string,Args:table) {
     }
 }
 
+ALXOS_PROGS["alxos_executor",number] = 1
+function alxos_executor(Args:table) {
+    #include "alx_pc/gpu/alxos/executor"
+    alxos_executor_init(Args)
+}
+
 ALXOS_PROGS["alxos_explorer",number] = 1
 function alxos_explorer(Args:table) {
     #include "alx_pc/gpu/alxos/explorer"

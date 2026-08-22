@@ -1,0 +1,9 @@
+@outputs RemoteEntID:number
+
+# This code needs always be added to executor chip so will be proper sync
+# This is NOT needed to include in your e2 code, its for upload initial e2 chip with no program!
+
+if (first()|duped()) {
+    dsSetScope(2)
+    RemoteEntID = entity():id()  
+}

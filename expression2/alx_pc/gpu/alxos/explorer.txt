@@ -526,12 +526,28 @@ function alxos_explorer_msg(Msg:string,Width,Title:string,Callback:string) {
             Callback = "alxos_explorer_closedialog"
         }
     }
-    local Parent = alxos_explorer_dialog(Title,Width,60,"ok",Callback)
-    DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,Msg,alxos_dlgPos(0,-12))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpAlign(LAST_I,1)
-    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    local Height = 60
+    local NewLines = Msg:explode("\n") 
+    
+    if (NewLines:count()>1) {
+        Height += (NewLines:count()-1) * 20
+    }
+    
+    local Parent = alxos_explorer_dialog(Title,Width,Height,"ok",Callback)
+    
+    local Pos = vec2(Width / 2,20)
+    
+    for(I=1,NewLines:count()) {
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,NewLines[I,string],Pos)
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpAlign(LAST_I,1)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+        
+        Pos[2] = Pos[2] + 20
+    }
+    
     DsHandler = "alxos_explorer_ds"
 }
 

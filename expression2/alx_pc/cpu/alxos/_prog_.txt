@@ -17,11 +17,17 @@ ALXOS_PROG_ASOC["txt",string] = "alxos_txt_reader"
 ALXOS_PROG_ASOC["ini",string] = "alxos_txt_reader"
 ALXOS_PROG_ASOC["e2e",string] = "alxos_txt_reader"
 ALXOS_PROG_ASOC["e2s",string] = "alxos_txt_reader"
+ALXOS_PROG_ASOC["e2r",string] = "alxos_executor"
 ALXOS_PROG_ASOC["gms",string] = "alxos_soundplay"
 ALXOS_PROG_ASOC["mid",string] = "alxos_midi_player"
 ALXOS_PROG_ASOC["zip",string] = "alxos_zip_reader"
 
 # Add custom executables here
+
+ALXOS_PROGS["alxos_executor",number] = 1
+function alxos_executor(FInfo:table) {
+    dsSendDirect("alxos_runprog",E2_GPU,table("alxos_executor",FInfo))
+}
 
 ALXOS_PROGS["alxos_explorer",number] = 1
 function alxos_explorer(FInfo:table) {

@@ -1,0 +1,33 @@
+@name Test Remote Prog
+@persist Devices:table TickQuota:number 
+@strict
+
+#[
+    How to execute this program via Remote Executor:
+    1. You need to enable e2 remoteupload extension: wire_expression2_extension_enable remoteupload
+    2. You need copy this file from "garrysmod/data/expression2/alx_pc/gpu/remote" to "garrysmod/data/e2files"
+    3. Create file in ALX OS with name "testprog.e2r" and content "file://testprog.txt"
+    4. Spawn "remote executor" part from advdupe2, install to PCI slot.
+    5. Run file, you should see test print in chat.
+]#
+
+if (first()|duped()) {
+    print("TEST EXECUTE INIT")    
+}
+
+event remote(Sender:entity, Player:entity, Payload:table) {
+    Devices = Payload[1,table]
+    TickQuota = Payload[2,number] 
+}
+
+function dsKeyPressed(Key:string, Pressed) {
+    # handle keys here
+}
+
+if (dsClk()) {
+    local Name = dsClkName()
+    if (Name=="executorKey") {
+        local Info = dsGetTable()
+        dsKeyPressed(Info[1,string], Info[2,number])
+    } 
+}
