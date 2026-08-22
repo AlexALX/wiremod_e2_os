@@ -51,7 +51,9 @@ if (first()) {
 "
 
 function setNoCode() {
+    #ifdef entity:remoteSetCode(string)
     getentity(ExecutorID):remoteSetCode(CodePrepend + CodeAppend)
+    #endif
 }
 
 function shutdown() {
@@ -115,8 +117,10 @@ if (dsClk()) {
         Caller = dsGetSender()
         
         local Executor = getentity(ExecutorID)
-
+        
+        #ifdef entity:remoteSetCode(string)
         Executor:remoteSetCode(CodePrepend + Code + CodeAppend + CodeExecute)
+        #endif
         
         runCmd("exec_timeout",1000)
     } elseif (Name=="pci") {
