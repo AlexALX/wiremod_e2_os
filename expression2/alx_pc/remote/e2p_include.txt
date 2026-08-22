@@ -1,0 +1,23 @@
+@name E2P Include (REQUIRED)
+@inputs ExecutorID:number
+@outputs RemoteEntID:number
+@persist IsDirectCode:number
+
+#[
+    If you want create .e2p file you MUST include this file always
+    Or it will not properly init with executor and shutdown your code!
+]#
+
+if (first()|duped()) {
+    dsSetScope(2)
+    RemoteEntID = entity():id()
+    IsDirectCode = 0
+}
+
+function dsInitProg() {
+    dsSendDirect("initExecutor", entity(ExecutorID), table(wirelink()))
+}
+
+if (first()) {
+    dsInitProg()
+} 

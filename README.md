@@ -40,6 +40,7 @@ This project pushes **Expression2** to its absolute limits, implementing complex
 * Expression2 **ZIP Reader** for ALX PC.
 * Few programs: Console, Burning software, file manager, network chat, partitions manager. 
 * Few **Mini-Games**: Flappy Bird, Pong and Snake.
+* Expression2 code executor (view e2 remoteupload extension).
 * Simple directory listing/file managing interface (DOS style).
 * Simple text viewer.  
 * Simple networking between PC's.

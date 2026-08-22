@@ -134,14 +134,17 @@ function number alxos_executor_close() {
 function alxos_executor_run(Code:string) {
     local Executor = alxos_findExecutor()
     
+    local FInfo = GpuData[2,table]
+    
     dsSendDirect("executeCode",Executor[3,entity],table(
         Devices,
         TickQuota,
+        FInfo["ext",string],
         Code
     )) 
 }
 
-function alxos_executor_ds(Name:string) {
+function alxos_executor_ds(Name:string) {    
     if (Name=="fs_readfile") {
         alxos_executor_run(dsGetString())
     } elseif (Name=="clear") {
@@ -151,8 +154,15 @@ function alxos_executor_ds(Name:string) {
         }
         alxos_executor_clear()
     } elseif (Name=="execError") {
-        "alxos_explorer_error"("Remote Executor timeout (chip crashed?)",420)     
-    } elseif (Name=="initExecutor") {
+        local ErrType = dsGetNumber()
+        local ErrorMsg = "Remote Executor timeout (chip crashed?)"
+        
+        if (ErrType==2) {
+            ErrorMsg = "Remote Executor ExecutorID is invalid!\nPlease check wire inputs on pci card e2 chips."    
+        }
+        
+        "alxos_explorer_error"(ErrorMsg,420)     
+    } elseif (Name=="initExecutor") {    
         local Info = dsGetTable()        
         GpuData["ExecutorWirelink",wirelink] = Info[1,wirelink]
         GpuData["ExecInit",number] = 1

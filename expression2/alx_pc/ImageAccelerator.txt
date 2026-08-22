@@ -89,21 +89,21 @@ if (dsClk()) {
                 dsSendDirect("imageReaderError",E2_GPU,1)
             } else {        
                 dsSendDirect("drawImage", JPGReader:entity(), ImgInfo)
-                runCmd("img_timeout",1000)
+                runCmd("img_timeout",1000,1)
             }
         } elseif (Type=="gif") {
             if (GIFReader == nowirelink()) {
                 dsSendDirect("imageReaderError",E2_GPU,1)
             } else {
                 dsSendDirect("drawImage", GIFReader:entity(), ImgInfo)
-                runCmd("img_timeout",1000)
+                runCmd("img_timeout",1000,1)
             }
         } elseif (Type=="png") {
             if (PNGReader == nowirelink()) {
                 dsSendDirect("imageReaderError",E2_GPU,1)
             } else {
                 dsSendDirect("drawImage", PNGReader:entity(), ImgInfo)
-                runCmd("img_timeout",1000)
+                runCmd("img_timeout",1000,1)
             }
         }
     } elseif (Name=="pci") {

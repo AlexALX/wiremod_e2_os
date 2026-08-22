@@ -1,3 +1,4 @@
+@inputs ExecutorID:number
 @outputs RemoteEntID:number
 
 # This code needs always be added to executor chip so will be proper sync

@@ -1,5 +1,6 @@
 @name Remote Executor
 @inputs InA Board:wirelink ExecutorID:number
+@outputs EntID:number
 @persist BIOS:entity Device_Name:string
 @persist Devices:table Init Caller:entity CodePrepend:string CodeAppend:string CodeExecute:string
 
@@ -8,8 +9,11 @@
     Created by AlexALX
     -------------------
     This device allow to execute e2 code via remoteupload extension from raw code
-    Currently support are limited to just code with no includes
+    Currently support are limited to just code with no includes (or must exists locally)
     And is totally isolated - no way to call gui directly.
+    File formats:
+    - .e2r contains program code directly
+    - .e2p path to expression2 chip (relative to garrysmod/data/expression2), must exists locally
 ]#
 
 if (first()|duped()) {
@@ -28,14 +32,15 @@ if (!duped()) {
 Init = 0
 Device_Name = "Remote Executor"
 Caller = noentity()
+EntID = entity():id()
 
 # This code needs always be added to executor chip so will be proper sync
-CodePrepend = "@outputs RemoteEntID:number\r\n@persist ExecutorID:number\r\n"
+CodePrepend = "@inputs ExecutorID:number\r\n@outputs RemoteEntID:number\r\n@persist ExecutorID:number IsDirectCode:number\r\n"
 CodeAppend = "
 if (first()|duped()) {
     dsSetScope(2)
     RemoteEntID = entity():id()
-    ExecutorID = "+entity():id()+"
+    IsDirectCode = 1
 }
 "
 
@@ -109,20 +114,31 @@ if (dsClk()) {
     local Name = dsClkName()
     
     if (Name=="executeCode") {
+        if (ExecutorID==0 | entity(ExecutorID)==noentity()) {
+            dsSendDirect("execError",dsGetSender(),2)
+            exit()
+        }
+        
         local Info = dsGetTable()
         Devices = Info[1,table]
         TickQuota = Info[2,number]
-        local Code = Info[3,string]
+        local Type = Info[3,string]
+        local Code = Info[4,string]
         Init = 1
         Caller = dsGetSender()
         
         local Executor = getentity(ExecutorID)
         
         #ifdef entity:remoteSetCode(string)
-        Executor:remoteSetCode(CodePrepend + Code + CodeAppend + CodeExecute)
+        
+        if (Type=="e2r") {        
+            Executor:remoteSetCode(CodePrepend + Code + CodeAppend + CodeExecute)
+        } elseif (Type=="e2p") {
+            Executor:remoteUpload(Code)
+        }
         #endif
         
-        runCmd("exec_timeout",1000)
+        runCmd("exec_timeout",1000,1)
     } elseif (Name=="pci") {
         pci_init()
     } elseif (Name=="usbcontroller") {
@@ -131,7 +147,7 @@ if (dsClk()) {
         shutdown()
     } elseif (DsHandler!="") {
         DsHandler(Name)
-    } elseif (Name=="initExecutor") {
+    } elseif (Name=="initExecutor") {        
         stopCmd()
         dsSendDirect("initExecutor", Caller, dsGetTable())  
 
