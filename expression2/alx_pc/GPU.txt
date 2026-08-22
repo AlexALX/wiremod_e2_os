@@ -39,6 +39,8 @@ EgpCleanHandler = ""
 PlugHandler = ""
 DSEvent = function() {}
 
+Screens = table()
+
 function initGpu() {
     local Info = dsGetTable()
     NB = Info[1,string]
@@ -59,6 +61,9 @@ function initGpu() {
     }
     GpuData = table()
     GpuPersistData = table()
+    
+    # add to global BIOS table
+    Devices["GPU_Screens",table] = Screens
 }
 
 function ready() {
@@ -84,7 +89,9 @@ function pcie_init() {
     dsSendDirect("pcie",BIOS,table("gpu",entity(),Device_Name))
     Screens:clear()
     EGP = nowirelink()
+    EGP_ID = -1
     DS = nowirelink()
+    DS_ID = -1
     for (I=0,1) {
         dsSendDirect("wirelink",entity(ioGetInputNumber("ScreenSockG_"+I)),entity())    
     }
@@ -95,7 +102,9 @@ function shutdown() {
     dsSendDirect("SHUTDOWN",BIOS,dsGetArray())
     Screens:clear()
     EGP = nowirelink()
+    EGP_ID = -1
     DS = nowirelink()
+    DS_ID = -1
 }
 
 function number findscreen(ID) {
@@ -115,7 +124,9 @@ function screen_connect() {
     if (WL) {                
         if (!EGP:entity():isValid() & WL:entity():type()=="gmod_wire_egp") {
             EGP = WL
+            EGP_ID = WLI
             Screens[WLI,number] = findscreen(ID)
+            Screens["EGP_WL",wirelink] = WL
             if (GpuData["BSOD",array]:count()) {
                 alxos_bsod(GpuData["BSOD",array])    
             }
@@ -123,7 +134,9 @@ function screen_connect() {
             local ScreenName = gpuScreenName(WL)            
             if (WL:entity():type()=="gmod_wire_digitalscreen" | ScreenName!="") {
                 DS = WL
+                DS_ID = WLI
                 Screens[WLI,number] = findscreen(ID)
+                Screens["DS_WL",wirelink] = WL
                 DSEvent()
             }
         }
@@ -166,8 +179,16 @@ if (inputClk()) {
                 EGP = nowirelink()
                 stopAllTimers()
                 dsSendDirect("BSOD",BIOS,array(3))
+                if (EGP_ID>0) {
+                    Screens[EGP_ID,number] = 0
+                }
+                Screens["EGP_WL",wirelink] = EGP
             } elseif (!DS:entity():id() | Screens[DS:entity():id(),number]==ID) {
                 DS = nowirelink()
+                if (DS_ID>0) {
+                    Screens[DS_ID,number] = 0
+                }
+                Screens["DS_WL",wirelink] = DS
                 DSEvent()
             }
         }

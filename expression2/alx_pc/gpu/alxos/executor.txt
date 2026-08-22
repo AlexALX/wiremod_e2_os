@@ -79,6 +79,9 @@ function alxos_executor_done() {
     EGP:egpParent(LAST_I,Parent)
     EGP:egpAlign(LAST_I,1)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    local Executor = alxos_findExecutor()
+    dsSendDirect("executeInitDone",Executor[3,entity],1)
 }
 
 function alxos_executor_progress() {
@@ -120,12 +123,14 @@ function number alxos_executor_clear() {
     local Executor = alxos_findExecutor()
     dsSendDirect("SHUTDOWN",Executor[3,entity],0)
 
+    DSEvent = function() {}
     "alxos_explorer_handlers"()
     "alxos_explorer_listcurdir"()
     return 0
 }
 
 function number alxos_executor_close() {
+    DSEvent = function() {}
     "alxos_explorer_handlers"()
     "alxos_explorer_listcurdir"()
     return 0
@@ -135,6 +140,11 @@ function alxos_executor_run(Code:string) {
     local Executor = alxos_findExecutor()
     
     local FInfo = GpuData[2,table]
+    
+    DSEvent = function() {
+        local Executor = alxos_findExecutor()
+        dsSendDirect("DS_Connect",Executor[3,entity],1)  
+    }
     
     dsSendDirect("executeCode",Executor[3,entity],table(
         Devices,

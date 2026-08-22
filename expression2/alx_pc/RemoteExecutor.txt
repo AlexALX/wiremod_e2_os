@@ -150,12 +150,15 @@ if (dsClk()) {
     } elseif (Name=="initExecutor") {        
         stopCmd()
         dsSendDirect("initExecutor", Caller, dsGetTable())  
-
+    } elseif (Name=="executeInitDone") {
         local Executor = getentity(ExecutorID)
         Executor:sendRemoteEvent(table(Devices, TickQuota))
     } elseif (Name=="executorKey") {
         local Executor = getentity(ExecutorID)
         dsSendDirect("executorKey", Executor, dsGetTable())    
+    } elseif (Name=="DS_Connect") {
+        local Executor = getentity(ExecutorID)
+        dsSendDirect("DS_Connect", Executor, dsGetNumber())  
     }
 }
 

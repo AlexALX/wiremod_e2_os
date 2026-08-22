@@ -1,5 +1,5 @@
-@name Test Remote E2R Prog
-@persist Devices:table TickQuota:number
+@name Test Remote E2P Prog
+@persist Devices:table TickQuota:number 
 @strict
 
 #[
@@ -7,20 +7,14 @@
     e2 remoteupload extension: wire_expression2_extension_enable remoteupload
 
     How to execute this program via Remote Executor:
-    1. You need copy this file from "garrysmod/data/expression2/alx_pc/gpu/remote" to "garrysmod/data/e2files"
-    2. Create file in ALX OS with name "testprog.e2r" and content "file://testprog.txt"
-    3. Spawn "remote executor" part from advdupe2, install to PCI slot.
-    4. Run file, you should see test dialog.
-    
-    If you want to run this file as a .e2p:
-    1. Uncomment e2p_include below, without this your remote executor will break!
-    2. Create file "testprog.e2p" with content "alx_pc/remote/testprog.txt"
-    3. Run file, you should see test dialog.
+    1. Create file "testprog.e2p" with content "alx_pc/remote/testprog_e2p.txt"
+    2. Run file, you should see test dialog.
 ]#
 
 # Add this ONLY if you want to make it work as .e2p
 # in .e2r ANY include will make error!
-##include "alx_pc/remote/e2p_include"
+#include "alx_pc/remote/e2p_include"
+#include "alx_pc/gpu/alxos/_main_"
 
 if (first()|duped()) {  
 
@@ -35,13 +29,15 @@ event remote(Sender:entity, Player:entity, Payload:table) {
     DS = Devices["GPU_Screens",table]["DS_WL",wirelink]
     
     # we must clear it always! since in isolated mode it will override EGP IDs!
-    EGP:egpClear()
+    egpClear()
     
-    local LAST_I = 0
+    local Parent = alxos_dialog("Test",400,60,"","")
     
-    EGP:egpText(LAST_I,"TEST EXECUTE INIT, PRESS F8 TO EXIT",vec2(256,256))
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"TEST EXECUTE INIT, PRESS F8 TO EXIT",vec2(200,20))
+    EGP:egpParent(LAST_I,Parent)
     EGP:egpAlign(LAST_I,1)
-    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
 }
 
 # F8 key are RESERVED for Executor to shutdown whole program!
