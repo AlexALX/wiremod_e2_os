@@ -1,0 +1,260 @@
+#include "alx_pc/standalone/doom_game/_shared_"
+#include "alx_pc/standalone/doom_game/bitreader"
+
+function number doom_bakeMapStep() {
+    if (Doom["subState",string] == "read_vertices") {
+        if (Doom["currentVertI",number] == 0) {
+            Doom["vertices",array] = array()
+            Doom["currentVertI",number] = 1
+        }
+        
+        local StartPos = Doom["lump_VERTEXES_offset",number] + 1
+        local Size = Doom["lump_VERTEXES_size",number]
+        local VertsCount = floor(Size / 4)
+        local VertsArray = Doom["vertices",array]
+        local StartI = Doom["currentVertI",number]
+        
+        Doom["pos",number] = StartPos + (StartI - 1) * 4
+        
+        for(I = StartI, VertsCount) {
+            if (!perf(80)) {
+                Doom["vertices",array] = VertsArray
+                Doom["currentVertI",number] = I
+                return 0
+            }
+            
+            local TargetIdx = (I - 1) * 2 + 1
+            VertsArray[TargetIdx, number] = doom_u16LE()
+            VertsArray[TargetIdx + 1, number] = doom_u16LE()
+        }
+        
+        Doom["vertices",array] = VertsArray
+        Doom["verticesCount",number] = VertsCount
+        
+        Doom["sectorsFloor",array] = array()
+        Doom["sectorsCeil",array] = array()
+        Doom["currentSectorI",number] = 1
+        Doom["subState",string] = "read_sectors"
+        return 0
+    }
+
+    if (Doom["subState",string] == "read_sectors") {
+        local StartPos = Doom["lump_SECTORS_offset",number] + 1
+        local Size = Doom["lump_SECTORS_size",number]
+        local SectorsCount = floor(Size / 26)
+        local SF = Doom["sectorsFloor",array]
+        local SC = Doom["sectorsCeil",array]
+        local StartI = Doom["currentSectorI",number]
+        
+        Doom["pos",number] = StartPos + (StartI - 1) * 26
+        
+        for(I = StartI, SectorsCount) {
+            if (!perf(80)) {
+                Doom["sectorsFloor",array] = SF
+                Doom["sectorsCeil",array] = SC
+                Doom["currentSectorI",number] = I
+                return 0
+            }
+            SF[I, number] = doom_u16LE() + 5000
+            SC[I, number] = doom_u16LE() + 5000
+            Doom["pos",number] = Doom["pos",number] + 22
+        }
+        Doom["sectorsFloor",array] = SF
+        Doom["sectorsCeil",array] = SC
+        
+        Doom["sidesSector",array] = array()
+        Doom["currentSideI",number] = 1
+        Doom["subState",string] = "read_sidedefs"
+        return 0
+    }
+
+    if (Doom["subState",string] == "read_sidedefs") {
+        local StartPos = Doom["lump_SIDEDEFS_offset",number] + 1
+        local Size = Doom["lump_SIDEDEFS_size",number]
+        local SidesCount = floor(Size / 30)
+        local SS = Doom["sidesSector",array]
+        local StartI = Doom["currentSideI",number]
+        
+        Doom["pos",number] = StartPos + (StartI - 1) * 30
+        
+        for(I = StartI, SidesCount) {
+            if (!perf(80)) {
+                Doom["sidesSector",array] = SS
+                Doom["currentSideI",number] = I
+                return 0
+            }
+            Doom["pos",number] = Doom["pos",number] + 28
+            SS[I, number] = doom_u16LE() + 1
+        }
+        Doom["sidesSector",array] = SS
+        
+        Doom["subState",string] = "init_linedefs"
+        return 0
+    }
+    
+    if (Doom["subState",string] == "init_linedefs") {
+        local StartPos = Doom["lump_LINEDEFS_offset",number] + 1
+        local Size = Doom["lump_LINEDEFS_size",number]
+        Doom["pos",number] = StartPos
+        Doom["linesCount",number] = floor(Size / 14)
+        Doom["lines",array] = array()
+        Doom["linesSector",array] = array()
+        Doom["currentLineI",number] = 1
+        Doom["subState",string] = "read_linedefs"
+        return 0
+    }
+    
+    if (Doom["subState",string] == "read_linedefs") {
+        local LinesCount = Doom["linesCount",number]
+        local LinesArray = Doom["lines",array]
+        local LinesSec = Doom["linesSector",array]
+        local SS = Doom["sidesSector",array]
+        local StartI = Doom["currentLineI",number]
+        
+        Doom["pos",number] = (Doom["lump_LINEDEFS_offset",number] + 1) + (StartI - 1) * 14
+        
+        for(I = StartI, LinesCount) {
+            if (!perf(80)) {
+                Doom["lines",array] = LinesArray
+                Doom["linesSector",array] = LinesSec
+                Doom["currentLineI",number] = I
+                return 0
+            }
+            
+            local VStart = doom_u16LE() + 1
+            local VEnd = doom_u16LE() + 1
+            Doom["pos",number] = Doom["pos",number] + 6
+            local SFrontRaw = doom_u16LE()
+            local SBackRaw = doom_u16LE()
+            
+            local SFront = SFrontRaw + 1
+            local SBack = (SBackRaw == 65535) ? 0 : (SBackRaw + 1)
+            
+            local TargetIdx = (I - 1) * 2 + 1
+            LinesArray[TargetIdx, number] = VStart
+            LinesArray[TargetIdx + 1, number] = VEnd
+            
+            local SecIdx = (I - 1) * 2 + 1
+            local FrontSecID = SS[SFront, number]
+            LinesSec[SecIdx, number] = (FrontSecID > 0) ? FrontSecID : 1
+            
+            if (SBack > 0) {
+                local BackSecID = SS[SBack, number]
+                LinesSec[SecIdx + 1, number] = (BackSecID > 0) ? BackSecID : 0
+            } else {
+                LinesSec[SecIdx + 1, number] = 0
+            }
+        }
+        
+        Doom["lines",array] = LinesArray
+        Doom["linesSector",array] = LinesSec
+        Doom["state",string] = "map_baking_grid"
+        Doom["subState",string] = "find_bounds"
+        return 1
+    }
+    
+    return 0
+}
+
+function number doom_bakeGridStep() {
+    if (Doom["subState",string] == "find_bounds") {
+        local VertsCount = Doom["verticesCount",number]
+        local VertsArray = Doom["vertices",array]
+        local MinX = 2000000 local MaxX = -2000000
+        local MinY = 2000000 local MaxY = -2000000
+        local Idx = 1
+        for(I = 1, VertsCount) {
+            local VX = VertsArray[Idx, number]
+            local VY = VertsArray[Idx + 1, number]
+            if (VX < MinX) { MinX = VX } if (VX > MaxX) { MaxX = VX }
+            if (VY < MinY) { MinY = VY } if (VY > MaxY) { MaxY = VY }
+            Idx = Idx + 2
+        }
+        Doom["mapMinX",number] = MinX Doom["mapMaxX",number] = MaxX
+        Doom["mapMinY",number] = MinY Doom["mapMaxY",number] = MaxY
+        Doom["gridSize",number] = 512
+        
+        Doom["gridTable",table] = table()
+        
+        Doom["subState",string] = "rasterize_lines"
+        Doom["currentGridLineI",number] = 1
+        return 0
+    }
+    
+    if (Doom["subState",string] == "rasterize_lines") {
+        local LinesCount = Doom["linesCount",number]
+        local LinesArray = Doom["lines",array]
+        local LinesSec = Doom["linesSector",array]
+        local VertsArray = Doom["vertices",array]
+        local SF = Doom["sectorsFloor",array]
+        local SC = Doom["sectorsCeil",array]
+        local Grid = Doom["gridTable",table]
+        local GSize = Doom["gridSize",number]
+        
+        local MinX = Doom["mapMinX",number] local MaxX = Doom["mapMaxX",number]
+        local MinY = Doom["mapMinY",number] local MaxY = Doom["mapMaxY",number]
+        local RangeX = MaxX - MinX local RangeY = MaxY - MinY
+        if (RangeX == 0) { RangeX = 1 } if (RangeY == 0) { RangeY = 1 }
+        
+        local StartI = Doom["currentGridLineI",number]
+        
+        for(I = StartI, LinesCount) {
+            if (!perf(85)) {
+                Doom["gridTable",table] = Grid
+                Doom["currentGridLineI",number] = I
+                return 0
+            }
+            
+            local LineIdx = (I - 1) * 2 + 1
+            local V1 = LinesArray[LineIdx, number]
+            local V2 = LinesArray[LineIdx + 1, number]
+            local SecIdx = (I - 1) * 2 + 1
+            local SecFront = LinesSec[SecIdx, number]
+            local SecBack = LinesSec[SecIdx + 1, number]
+            
+            if (SecBack > 0) {
+                if (SF[SecFront, number] == SF[SecBack, number] & SC[SecFront, number] == SC[SecBack, number]) {
+                    continue
+                }
+            }
+            
+            local V1Idx = (V1 - 1) * 2 + 1
+            local V2Idx = (V2 - 1) * 2 + 1
+            
+            local X1 = floor((VertsArray[V1Idx, number] - MinX) / RangeX * (GSize - 1))
+            local Y1 = floor((VertsArray[V1Idx + 1, number] - MinY) / RangeY * (GSize - 1))
+            local X2 = floor((VertsArray[V2Idx, number] - MinX) / RangeX * (GSize - 1))
+            local Y2 = floor((VertsArray[V2Idx + 1, number] - MinY) / RangeY * (GSize - 1))
+            
+            local DX = abs(X2 - X1) local DY = abs(Y2 - Y1)
+            local SX = (X1 < X2) ? 1 : -1 local SY = (Y1 < Y2) ? 1 : -1
+            local Err = DX - DY
+            local CX = X1 local CY = Y1 local Run = 1
+            
+            local FHeight = SF[SecFront, number]
+            local CHeight = SC[SecFront, number]
+            
+            if (SecBack == 0) {
+                FHeight = 5000
+                CHeight = 5000
+            }
+            
+            local PackedHeight = (floor(FHeight) && 65535) + ((floor(CHeight) && 65535) * 65536)
+            
+            while (Run) {
+                Grid[CX + CY * GSize, number] = PackedHeight
+                if (CX == X2 & CY == Y2) { Run = 0 }
+                else {
+                    local E2 = Err * 2
+                    if (E2 > -DY) { Err = Err - DY CX = CX + SX }
+                    if (E2 < DX) { Err = Err + DX CY = CY + SY }
+                }
+            }
+        }
+        
+        Doom["gridTable",table] = Grid
+        Doom["state",string] = "game_ready"
+        return 1
+    }
+    return 0
+}

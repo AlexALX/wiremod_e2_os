@@ -1,0 +1,177 @@
+#include "alx_pc/standalone/doom_game/_shared_"
+
+function number doom_drawTexture2D() {
+    DS[1048573, number] = 16
+    DS[1048572, number] = 16
+    
+    local Tex = Doom["wallTexture",array]
+    local NumRays = 16
+    
+    local X = Doom["currentRenderX",number]
+    if (X < NumRays) {
+        for(Y = 0, 15) {
+            local Addr = X + Y * NumRays
+            local PixelColor = Tex[X + (Y << 4) + 1, number]
+            DS[Addr, number] = PixelColor
+        }
+        X = X + 1
+        if (X >= NumRays) {
+            Doom["currentRenderX",number] = 0
+            Doom["state",string] = ""
+            return 1
+        }
+        Doom["currentRenderX",number] = X
+        return 0
+    }
+    return 0
+}
+
+function number doom_drawMap2D() {
+    DS[1048573, number] = 512
+    DS[1048572, number] = 512
+    
+    local GSize = Doom["gridSize",number]
+    local Grid = Doom["gridTable",table]
+    
+    local PX = Doom["playerX",number]
+    local PY = Doom["playerY",number]
+    local PA = Doom["playerAngle",number]
+    
+    local ScreenSize = 512
+    local Scale = GSize / ScreenSize
+    
+    if (Doom["currentDebugY",number] == 0) {
+        Doom["currentDebugY",number] = 0
+        Doom["currentDebugX",number] = 0
+        Doom["mapCanvasBuffer",array] = array()
+        Doom["screenBuffer",array] = array()
+    }
+    
+    local Y = Doom["currentDebugY",number]
+    local StartX = Doom["currentDebugX",number]
+    local MapBuf = Doom["mapCanvasBuffer",array]
+    local ScrBuf = Doom["screenBuffer",array]
+    
+    while (Y < ScreenSize) {
+        for(X = StartX, ScreenSize - 1) {
+            if (!perf(85)) {
+                Doom["currentDebugY",number] = Y
+                Doom["currentDebugX",number] = X
+                Doom["mapCanvasBuffer",array] = MapBuf
+                Doom["screenBuffer",array] = ScrBuf
+                return 0
+            }
+            
+            local GX = floor(X * Scale)
+            local FlipY = (ScreenSize - 1) - Y
+            local GY = floor(FlipY * Scale)
+            
+            local Addr = X + Y * ScreenSize
+            local Color = 0
+            
+            local PackedHeight = Grid[GX + GY * GSize, number]
+            if (PackedHeight != 0) {
+                local FloorH = PackedHeight && 65535
+                if (FloorH == 5000) {
+                    Color = 999000
+                    DS[Addr, number] = Color
+                }
+            }
+            
+            MapBuf[Addr + 1, number] = Color
+            ScrBuf[Addr + 1, number] = Color
+        }
+        
+        StartX = 0
+        Y = Y + 1
+    }
+    
+    Doom["currentDebugY",number] = 0
+    Doom["currentDebugX",number] = 0
+    Doom["mapCanvasBuffer",array] = MapBuf
+    Doom["screenBuffer",array] = ScrBuf
+    
+    Doom["lastRadarX",number] = PX
+    Doom["lastRadarY",number] = PY
+    Doom["lastRadarA",number] = PA
+    
+    Doom["radarFirstRun",number] = 1
+    return 1
+}
+
+function doom_updatePlayerRadar() {
+    local ScreenSize = 512
+    local GSize = Doom["gridSize",number]
+    local Scale = ScreenSize / GSize
+    
+    local PX = Doom["playerX",number]
+    local PY = Doom["playerY",number]
+    local PA = Doom["playerAngle",number]
+    
+    local LX = Doom["lastRadarX",number]
+    local LY = Doom["lastRadarY",number]
+    local LA = Doom["lastRadarA",number]
+    
+    if (Doom["radarFirstRun",number] == 1) {
+        LX = PX
+        LY = PY
+        LA = PA
+        Doom["radarFirstRun",number] = 2
+    } else {
+        if (PX == LX & PY == LY & PA == LA) {
+            return
+        }
+    }
+    
+    local LScreenX = floor(LX * Scale)
+    local LScreenY = (ScreenSize - 1) - floor(LY * Scale)
+    
+    local MapBuf = Doom["mapCanvasBuffer",array]
+    local ScrBuf = Doom["screenBuffer",array]
+    
+    for(Y = max(0, LScreenY - 18), min(ScreenSize - 1, LScreenY + 18)) {
+        for(X = max(0, LScreenX - 16), min(ScreenSize - 1, LScreenX + 16)) {
+            local Addr = X + Y * ScreenSize
+            local OriginalColor = MapBuf[Addr + 1, number]
+            
+            if (ScrBuf[Addr + 1, number] != OriginalColor) {
+                DS[Addr, number] = OriginalColor
+                ScrBuf[Addr + 1, number] = OriginalColor
+            }
+        }
+    }
+    
+    local ScreenX = floor(PX * Scale)
+    local ScreenY = (ScreenSize - 1) - floor(PY * Scale)
+    
+    for(Y = max(0, ScreenY - 3), min(ScreenSize - 1, ScreenY + 3)) {
+        for(X = max(0, ScreenX - 3), min(ScreenSize - 1, ScreenX + 3)) {
+            local DX = X - ScreenX
+            local DY = Y - ScreenY
+            if (DX * DX + DY * DY < 9) {
+                local Addr = X + Y * ScreenSize
+                DS[Addr, number] = 900000
+                ScrBuf[Addr + 1, number] = 900000
+            }
+        }
+    }
+    
+    local DirX = ScreenX + floor(cosr(PA) * 12)
+    local DirY = ScreenY - floor(sinr(PA) * 12)
+    
+    for(Y = max(0, DirY - 2), min(ScreenSize - 1, DirY + 2)) {
+        for(X = max(0, DirX - 2), min(ScreenSize - 1, DirX + 2)) {
+            local DX = X - DirX
+            local DY = Y - DirY
+            if (DX * DX + DY * DY < 4) {
+                local Addr = X + Y * ScreenSize
+                DS[Addr, number] = 990000
+                ScrBuf[Addr + 1, number] = 990000
+            }
+        }
+    }
+    
+    Doom["lastRadarX",number] = PX
+    Doom["lastRadarY",number] = PY
+    Doom["lastRadarA",number] = PA
+}

@@ -1,0 +1,32 @@
+#include "alx_pc/standalone/doom_game/_shared_"
+
+function number doom_bakeTextureStep() {
+    Doom["wallTexture",array] = array()
+    local TexArray = Doom["wallTexture",array]
+    
+    local ColorBrickBase  = 620000
+    local ColorBrickLight = 830000
+    local ColorSeam       = 222000
+    
+    for(Y = 0, 15) {
+        for(X = 0, 15) {
+            local Color = ColorBrickBase
+            
+            if (((X >> 2) + (Y >> 2)) % 2 == 0) {
+                Color = ColorBrickLight
+            }
+            
+            if (Y == 0 | Y == 4 | Y == 8 | Y == 12 | X == 0 | X == 8) {
+                Color = ColorSeam
+            }
+            
+            TexArray[X + (Y << 4) + 1, number] = Color
+        }
+    }
+    
+    Doom["wallTexture",array] = TexArray
+    Doom["texW",number] = 16
+    Doom["texH",number] = 16
+    Doom["state",string] = "game_ready"
+    return 1
+}

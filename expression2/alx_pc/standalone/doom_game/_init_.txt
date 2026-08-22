@@ -1,0 +1,178 @@
+@name DOOM_Game_Main
+
+#include "alx_pc/standalone/doom_game/_shared_"
+#include "alx_pc/standalone/doom_game/wad_parser"
+#include "alx_pc/standalone/doom_game/map_baker"
+#include "alx_pc/standalone/doom_game/texture_baker"
+#include "alx_pc/standalone/doom_game/player"
+#include "alx_pc/standalone/doom_game/raycaster"
+#include "alx_pc/standalone/doom_game/debug"
+
+function doomInit(Data:string) {
+    Doom = table()
+    Doom["start",number] = curtime()
+    
+    DoomError = ""
+    DoomProcessing = 1
+    DoomWarning = ""
+    
+    Doom["wadData",string] = Data
+    Doom["size",number] = Data:length()
+    
+    Doom["state",string] = "parse_wad"
+    Doom["subState",string] = "header"
+    
+    Doom["chunkOffset",number] = 0
+    Doom["chunkData",string] = ""
+    
+    DS[1048569, number] = 0
+    DS[1048574, number] = 0
+    DS[1048575, number] = 1
+    DS[1048573, number] = 64
+    DS[1048572, number] = 128
+    
+    Doom["currentRenderX",number] = 0
+    Doom["texLumpFound",number] = 0
+    
+    if (!DoomNoPrint) {
+        print("DOOM Engine initialized")
+    }
+}
+
+function doomClear() {
+    Doom = table()
+}
+
+function doomAbort() {
+    Doom["state",string] = ""
+    Doom["subState",string] = ""
+    DoomCurrentState = ""
+    DoomError = ""
+    DoomProcessing = 0
+    doomClear()
+}
+
+function doomDone() {
+    Doom["state",string] = "done"
+    DoomProcessing = 0
+    
+    local PlayTime = round(curtime() - Doom["start",number], 2)
+    if (!DoomNoPrint) {
+        print("DOOM Finished, session time: " + PlayTime + "s")
+    }
+    
+    timer(0.001, function() {
+        doomClear()
+    })
+}
+
+function doomPlayer(User:entity) {
+    Doom["playerEntity",entity] = User
+}
+
+event tick() {
+    if (Doom["state",string] == "" | Doom["state",string] == "done" | DoomError) {
+        exit()
+    }
+    
+    DoomCurrentState = Doom["state",string]
+    
+    if (Doom["state",string] == "game_loop") {
+        if (Doom["currentRenderX",number] == 0) {
+            doom_playerUpdate()
+        }
+        
+        if (DoomDebug == 2) {
+            doom_drawTexture2D()
+        } elseif (DoomDebug == 3) {
+            if (!Doom["radarFirstRun",number]) {
+                doom_drawMap2D()
+            } else {
+                doom_updatePlayerRadar()
+            }
+        } else {        
+            doom_renderView()
+        }
+        exit()
+    }
+    
+    while (perf(95)) {
+        if (Doom["state",string] == "parse_wad") {
+            
+            if (Doom["subState",string] == "request_dir" | Doom["subState",string] == "request_dir_tex") {
+                local TargetPos = Doom["dirOffset",number] + Doom["chunkOffset",number] + 1
+                
+                if (TargetPos > Doom["size",number]) {
+                    Doom["state",string] = "error"
+                    doom_error("Unexpected end of directory data")
+                    exit()
+                }
+                
+                Doom["chunkData",string] = Doom["wadData",string]:sub(TargetPos, TargetPos + 1023)
+                Doom["chunkOffset",number] = Doom["chunkOffset",number] + 1024
+                
+                if (Doom["subState",string] == "request_dir_tex") {
+                    Doom["subState",string] = "search_texture_lump"
+                } else {
+                    Doom["subState",string] = "scan_directory"
+                }
+                exit()
+            }
+            
+            if (doom_parseWadStep()) {
+                if (Doom["state",string] == "map_baker") {
+                    break
+                }
+                if (Doom["state",string] == "texture_baker") {
+                    break
+                }
+            }
+            
+        } elseif (Doom["state",string] == "map_baker") {
+            if (doom_bakeMapStep()) {
+                if (Doom["state",string] == "map_baking_grid") {
+                    if (DoomDebug) {
+                        print("--- GEOMETRY LOAD REPORT ---")
+                        print("Target Texture Name from SIDEDEFS: " + Doom["targetTextureName",string])
+                        print("Successfully loaded Vertices: " + Doom["verticesCount",number])
+                        print("Successfully loaded Linedefs: " + Doom["linesCount",number])
+                        print("Next step: Generating 2D Grid Matrix")
+                        print("----------------------------")
+                    }
+                }
+            }
+        } elseif (Doom["state",string] == "map_baking_grid") {
+            if (doom_bakeGridStep()) {
+                if (Doom["state",string] == "game_ready") {
+                    Doom["state",string] = "texture_baker"
+                    Doom["subState",string] = "init_texture_bake"
+                    
+                    print("--- MATRIX BAKE REPORT ---")
+                    print("Map Bounds X: [" + Doom["mapMinX",number] + " to " + Doom["mapMaxX",number] + "]")
+                    print("Map Bounds Y: [" + Doom["mapMinY",number] + " to " + Doom["mapMaxY",number] + "]")
+                    print("2D Grid generated successfully: " + Doom["gridSize",number] + "x" + Doom["gridSize",number])
+                    print("DOOM Engine Engine is ready to play!")
+                    print("--------------------------")
+                    
+                    break
+                }
+            }
+        } elseif (Doom["state",string] == "texture_baker") {
+            if (doom_bakeTextureStep()) {
+                if (Doom["state",string] == "game_ready") {
+                    if (DoomDebug) {
+                        print("--- TEXTURE BAKE REPORT ---")
+                        print("WAD Texture dimensions: " + Doom["texW",number] + "x" + Doom["texH",number])
+                        print("Successfully baked 16x16 Texture Matrix from WAD")
+                        print("DOOM Engine Engine is ready to play!")
+                        print("--------------------------")
+                    }
+                    doom_playerInit()
+                    Doom["state",string] = "game_loop"
+                    break
+                }
+            }
+        }
+    }
+}
+

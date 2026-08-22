@@ -1,0 +1,60 @@
+#include "alx_pc/standalone/doom_game/_shared_"
+
+function number doom_u8() {
+    local Pos = Doom["pos",number]
+    local Value = toByte(Doom["wadData",string], Pos)
+    Doom["pos",number] = Pos + 1
+    return Value
+}
+
+function number doom_u16LE() {
+    local Pos = Doom["pos",number]
+    local Data = Doom["wadData",string]
+    local Low = toByte(Data, Pos)
+    local High = toByte(Data, Pos + 1)
+    Doom["pos",number] = Pos + 2
+    local Val = Low + (High * 256)
+    if (Val > 32767) { Val = Val - 65536 }
+    return Val
+}
+
+function number doom_u32LE() {
+    local Pos = Doom["pos",number]
+    local Data = Doom["wadData",string]
+    local B1 = toByte(Data, Pos)
+    local B2 = toByte(Data, Pos + 1)
+    local B3 = toByte(Data, Pos + 2)
+    local B4 = toByte(Data, Pos + 3)
+    Doom["pos",number] = Pos + 4
+    return B1 || (B2 << 8) || (B3 << 16) || (B4 << 24)
+}
+
+function number doom_u8_chunk() {
+    local Pos = Doom["pos",number]
+    local Value = toByte(Doom["chunkData",string], Pos)
+    Doom["pos",number] = Pos + 1
+    return Value
+}
+
+function number doom_u32LE_chunk() {
+    local Pos = Doom["pos",number]
+    local Data = Doom["chunkData",string]
+    local B1 = toByte(Data, Pos)
+    local B2 = toByte(Data, Pos + 1)
+    local B3 = toByte(Data, Pos + 2)
+    local B4 = toByte(Data, Pos + 3)
+    Doom["pos",number] = Pos + 4
+    return B1 || (B2 << 8) || (B3 << 16) || (B4 << 24)
+}
+
+function string doom_readType8_chunk() {
+    local Pos = Doom["pos",number]
+    local Name = ""
+    for(I = 0, 7) {
+        local CharCode = toByte(Doom["chunkData",string], Pos + I)
+        if (CharCode == 0) { break }
+        Name = Name + toChar(CharCode)
+    }
+    Doom["pos",number] = Pos + 8
+    return Name
+}

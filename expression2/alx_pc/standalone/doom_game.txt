@@ -1,0 +1,67 @@
+@name DOOM Game Prototype
+@inputs Keyboard:wirelink User:entity
+@strict
+
+#include "alx_pc/standalone/includes/imagereader"
+#include "alx_pc/standalone/doom_game/_init_"
+
+#[
+    DOOM Game Ptotoype
+    Created by AlexALX (c) 2026
+    -------------------
+    Due to slow Digital Screen its really total mess and unplayable.
+    So its not finished, no enemies, just can walk over level.
+    
+    What was done:
+    - Loading doom WAD file, origianl doom.wad 12mb one or freedoom1.wad 28mb
+    - First level MAP load
+    - Textures loader (walls)
+    - basic 3d renderer at low 64*128 resolution
+    - player movement WASD + left/right arrow keys
+    
+    Prerequires:
+    1. Set wire_expression2_unlimited 1
+    2. Connect DS to Digital Screen.
+    3. Connect Keyboard to Wire Keyboard.
+    4. Connect User to Wire Keyboard output.
+          
+    How to use:
+          
+    Via Web:
+    !doom https://github.com/Akbar30Bill/DOOM_wads/raw/refs/heads/master/doom.wad
+    
+    Or manually:
+    1. you need to have original wad file or freedom1.wad one.
+    2. Place it under garrysmod/data/e2files/doom.wad.txt file extension must be .txt!!!
+    3. wire_expression2_file_max_size must be 32000 (32 mb)
+    4. use !doomfile doom.wad.txt chat command
+]#
+
+if (first() | duped()) {
+    Command = "!doom"
+    
+    Funcs = table()
+    
+    Funcs["readerAbort", function] = function() {
+        print(_HUD_PRINTTALK, "DOOM execution aborted.")
+        doomAbort()
+    }
+    
+    Funcs["readerLoad", function] = function(Body:string, Size:number, Path:string) {
+        doomInit(Body)
+    }
+    
+    Funcs["readerCheck", function] = function() {
+        return checkScreen(DS)
+    }
+    
+    Funcs["readerError", function] = function(Error:string, Path:string) {
+        print(_HUD_PRINTTALK, Error)
+    }
+}
+
+event input(Name:string) {
+    if (Name=="User") {
+        doomPlayer(User)
+    }
+}

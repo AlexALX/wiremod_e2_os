@@ -1,0 +1,18 @@
+@persist Doom:table DoomDebug DoomNoPrint
+@outputs DoomCurrentState:string DoomProgress:table DoomProgressText:string DoomProcessing:number DoomError:string
+@inputs DS:wirelink
+
+if (first() | duped()) {
+    DoomDebug = 1
+    DoomNoPrint = 0
+    Doom_LumpData = ""
+}
+
+function doom_error(Msg:string) {
+    DoomError = Msg
+    DoomProcessing = 0
+    Doom["state",string] = ""
+    if (!DoomNoPrint) {
+        print(DoomError)
+    }
+}

@@ -1,0 +1,160 @@
+#include "alx_pc/standalone/doom_game/_shared_"
+
+function number doom_renderView() {
+    local GSize = Doom["gridSize",number]
+    local Grid = Doom["gridTable",table]
+    
+    local PX = Doom["playerX",number]
+    local PY = Doom["playerY",number]
+    local PA = Doom["playerAngle",number]
+    
+    local FOV = 1.0472
+    local HalfFOV = FOV / 2
+    local NumRays = 64
+    local ScreenHeight = 128
+    
+    local SkyColor = 225000
+    local FloorColor = 333000
+    
+    local Tex = Doom["wallTexture",array]
+    
+    if (Doom["distBufferInit",number] == 0) {
+        Doom["distanceBuffer",array] = array()
+        local DBuf = Doom["distanceBuffer",array]
+        for(I = 1, NumRays) { DBuf[I, number] = -1 }
+        Doom["distanceBuffer",array] = DBuf
+        
+        Doom["screenBuffer3D",array] = array()
+        local SBuf = Doom["screenBuffer3D",array]
+        for(I = 1, NumRays * ScreenHeight) { SBuf[I, number] = 0 }
+        Doom["screenBuffer3D",array] = SBuf
+        
+        Doom["distBufferInit",number] = 1
+    }
+    
+    local DistBuffer = Doom["distanceBuffer",array]
+    local ScrBuf = Doom["screenBuffer3D",array]
+    local X = Doom["currentRenderX",number]
+    
+    while (X < NumRays & perf(90)) {
+        local RayAngle = PA - HalfFOV + (X / (NumRays - 1)) * FOV
+        
+        local CosA = cosr(RayAngle)
+        local SinA = sinr(RayAngle)
+        
+        local DeltaDistX = abs(CosA) < 0.001 ? 1e30 : abs(1 / CosA)
+        local DeltaDistY = abs(SinA) < 0.001 ? 1e30 : abs(1 / SinA)
+        
+        local MapX = floor(PX)
+        local MapY = floor(PY)
+        
+        local SideDistX = 0 local StepX = 0
+        if (CosA < 0) { StepX = -1 SideDistX = (PX - MapX) * DeltaDistX }
+        else { StepX = 1 SideDistX = (MapX + 1.0 - PX) * DeltaDistX }
+        
+        local StepY = 0 local SideDistY = 0
+        if (SinA < 0) { StepY = -1 SideDistY = (PY - MapY) * DeltaDistY }
+        else { StepY = 1 SideDistY = (MapY + 1.0 - PY) * DeltaDistY }
+        
+        local Hit = 0 local Side = 0 local MaxSteps = 100 local Steps = 0
+        
+        while (Hit == 0 & Steps < MaxSteps) {
+            if (SideDistX < SideDistY) {
+                SideDistX = SideDistX + DeltaDistX
+                MapX = MapX + StepX
+                Side = 0
+            } else {
+                SideDistY = SideDistY + DeltaDistY
+                MapY = MapY + StepY
+                Side = 1
+            }
+            Steps = Steps + 1
+            
+            if (MapX >= 0 & MapX < GSize & MapY >= 0 & MapY < GSize) {
+                local CurrentPacked = Grid[MapX + MapY * GSize, number]
+                if (CurrentPacked != 0) {
+                    local FloorH = CurrentPacked && 65535
+                    local CeilH = (CurrentPacked >> 16) && 65535
+                    
+                    if (FloorH == 5000 | CeilH == 5000) {
+                        Hit = 1
+                    }
+                }
+            } else {
+                Hit = 1
+            }
+        }
+        
+        local PerpWallDist = 0
+        if (Side == 0) { PerpWallDist = SideDistX - DeltaDistX }
+        else { PerpWallDist = SideDistY - DeltaDistY }
+        
+        local CorrectedDist = PerpWallDist * cosr(RayAngle - PA)
+        if (CorrectedDist < 0.2) { CorrectedDist = 0.2 }
+        
+        DistBuffer[X + 1, number] = CorrectedDist
+        
+        local LineHeight = floor((ScreenHeight * (GSize / 64)) / CorrectedDist)
+        
+        local DrawStart = floor((ScreenHeight - LineHeight) / 2)
+        local DrawEnd = DrawStart + LineHeight
+        
+        local WallX = 0
+        if (Side == 0) { WallX = PY + PerpWallDist * SinA }
+        else { WallX = PX + PerpWallDist * CosA }
+        WallX = WallX - floor(WallX)
+        if (WallX < 0) { WallX = WallX + 1 }
+        
+        local TexX = floor(WallX * 16)
+        if (Side == 0 & CosA > 0) { TexX = 15 - TexX }
+        if (Side == 1 & SinA < 0) { TexX = 15 - TexX }
+        TexX = clamp(TexX, 0, 15)
+        
+        local ClampedStart = clamp(DrawStart, 0, ScreenHeight - 1)
+        local ClampedEnd = clamp(DrawEnd, 0, ScreenHeight - 1)
+        
+        local TexStep = 16 / (LineHeight == 0 ? 1 : LineHeight)
+        local TexPos = (DrawStart < 0) ? (-DrawStart * TexStep) : 0
+        
+        for(Y = 0, ScreenHeight - 1) {
+            local Addr = X + Y * NumRays
+            local NewColor = 0
+            
+            if (Y < ClampedStart) {
+                NewColor = SkyColor
+            } elseif (Y >= ClampedStart & Y <= ClampedEnd) {
+                local TexY = floor(TexPos) && 15
+                TexPos = TexPos + TexStep
+                
+                local PixelColor = Tex[TexX + (TexY * 16) + 1, number]
+                if (Side == 1) {
+                    local R = max(0, floor(PixelColor / 100000) - 2)
+                    local G = max(0, floor((PixelColor % 100000) / 10000) - 2)
+                    local B = max(0, floor((PixelColor % 10000) / 1000) - 2)
+                    PixelColor = (R * 100000) + (G * 10000) + (B * 1000)
+                }
+                NewColor = PixelColor
+            } else {
+                NewColor = FloorColor
+            }
+            
+            if (ScrBuf[Addr + 1, number] != NewColor) {
+                DS[Addr, number] = NewColor
+                ScrBuf[Addr + 1, number] = NewColor
+            }
+        }
+        
+        X = X + 1
+    }
+    
+    Doom["distanceBuffer",array] = DistBuffer
+    Doom["screenBuffer3D",array] = ScrBuf
+    
+    if (X >= NumRays) {
+        Doom["currentRenderX",number] = 0
+        return 1
+    }
+    
+    Doom["currentRenderX",number] = X
+    return 0
+}

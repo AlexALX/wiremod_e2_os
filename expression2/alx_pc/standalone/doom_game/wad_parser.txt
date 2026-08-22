@@ -1,0 +1,103 @@
+#include "alx_pc/standalone/doom_game/_shared_"
+#include "alx_pc/standalone/doom_game/bitreader"
+
+function number doom_parseWadStep() {
+    if (Doom["subState",string] == "header") {
+        if (Doom["size",number] < 12) {
+            Doom["state",string] = "error"
+            doom_error("Invalid WAD Size")
+            return 1
+        }
+        
+        Doom["pos",number] = 1
+        local Magic = Doom["wadData",string]:sub(1,4)
+        if (Magic != "IWAD" & Magic != "PWAD") {
+            Doom["state",string] = "error"
+            doom_error("Not a valid WAD file")
+            return 1
+        }
+        
+        Doom["pos",number] = 5
+        Doom["lumpCount",number] = doom_u32LE()
+        Doom["dirOffset",number] = doom_u32LE()
+        Doom["currentLumpIdx",number] = 0
+        Doom["mapLumpsFound",number] = 0
+        Doom["texLumpFound",number] = 0
+        
+        Doom["subState",string] = "request_dir"
+        return 0
+    }
+
+    if (Doom["subState",string] == "scan_directory") {
+        local ChunkLen = Doom["chunkData",string]:length()
+        local Step = 16
+        
+        Doom["pos",number] = 1
+        
+        for(Offset = 1, ChunkLen, Step) {
+            if (Doom["pos",number] + 15 > ChunkLen) { break }
+            
+            local FilePos  = doom_u32LE_chunk()
+            local FileSize = doom_u32LE_chunk()
+            local LumpName = doom_readType8_chunk()
+            
+            Doom["currentLumpIdx",number] = Doom["currentLumpIdx",number] + 1
+            
+            if (LumpName == "WALL00_1" | LumpName == "WALL01_1" | LumpName == "STARTAN" | LumpName == "W33_5") {
+                if (Doom["texLumpFound",number] == 0 & FileSize > 8) {
+                    Doom["lump_TEXT_offset",number] = FilePos
+                    Doom["lump_TEXT_size",number] = FileSize
+                    Doom["texLumpFound",number] = 1
+                }
+            }
+            
+            if (Doom["mapLumpsFound",number] > 0 & Doom["mapLumpsFound",number] < 5) {
+                if (LumpName == "VERTEXES") {
+                    Doom["lump_VERTEXES_offset",number] = FilePos
+                    Doom["lump_VERTEXES_size",number] = FileSize
+                    Doom["mapLumpsFound",number] = Doom["mapLumpsFound",number] + 1
+                } elseif (LumpName == "LINEDEFS") {
+                    Doom["lump_LINEDEFS_offset",number] = FilePos
+                    Doom["lump_LINEDEFS_size",number] = FileSize
+                    Doom["mapLumpsFound",number] = Doom["mapLumpsFound",number] + 1
+                } elseif (LumpName == "SIDEDEFS") {
+                    Doom["lump_SIDEDEFS_offset",number] = FilePos
+                    Doom["lump_SIDEDEFS_size",number] = FileSize
+                    Doom["mapLumpsFound",number] = Doom["mapLumpsFound",number] + 1
+                } elseif (LumpName == "SECTORS") {
+                    Doom["lump_SECTORS_offset",number] = FilePos
+                    Doom["lump_SECTORS_size",number] = FileSize
+                    Doom["mapLumpsFound",number] = Doom["mapLumpsFound",number] + 1
+                }
+            }
+            
+            if (LumpName == "E1M1") {
+                Doom["targetLumpOffset",number] = FilePos
+                Doom["targetLumpSize",number] = FileSize
+                Doom["mapLumpsFound",number] = 1
+            }
+            
+            if (Doom["mapLumpsFound",number] == 5 & (Doom["texLumpFound",number] == 1 | Doom["currentLumpIdx",number] >= Doom["lumpCount",number])) {
+                Doom["state",string] = "map_baker"
+                Doom["subState",string] = "read_vertices"
+                return 1
+            }
+        }
+        
+        if (Doom["currentLumpIdx",number] >= Doom["lumpCount",number]) {
+            if (Doom["mapLumpsFound",number] == 5) {
+                Doom["state",string] = "map_baker"
+                Doom["subState",string] = "read_vertices"
+                return 1
+            }
+            Doom["state",string] = "error"
+            doom_error("Map E1M1 or geometry not found")
+            return 1
+        }
+        
+        Doom["subState",string] = "request_dir"
+        return 0
+    }
+    
+    return 0
+}

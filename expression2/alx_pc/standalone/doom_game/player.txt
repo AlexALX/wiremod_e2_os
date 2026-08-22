@@ -1,0 +1,88 @@
+#include "alx_pc/standalone/doom_game/_shared_"
+
+function doom_playerInit() {
+    local GSize = Doom["gridSize",number]
+    
+    Doom["playerX",number] = GSize / 2
+    Doom["playerY",number] = GSize / 2
+    Doom["playerAngle",number] = 0
+    
+    Doom["playerSpeed",number] = 0.12 * (GSize / 64)
+    Doom["playerRotSpeed",number] = 0.04
+    
+    Doom["keyW",number] = 0
+    Doom["keyS",number] = 0
+    Doom["keyA",number] = 0
+    Doom["keyD",number] = 0
+    Doom["keyLeft",number] = 0
+    Doom["keyRight",number] = 0
+}
+
+function doom_playerUpdate() {
+    local Grid = Doom["gridTable",table]
+    local GSize = Doom["gridSize",number]
+    
+    local PX = Doom["playerX",number]
+    local PY = Doom["playerY",number]
+    local PA = Doom["playerAngle",number]
+    local Speed = Doom["playerSpeed",number]
+    local RotSpeed = Doom["playerRotSpeed",number]
+    
+    if (Doom["keyLeft",number]) {
+        PA = PA - RotSpeed
+    }
+    if (Doom["keyRight",number]) {
+        PA = PA + RotSpeed
+    }
+    Doom["playerAngle",number] = PA
+    
+    local DX = 0
+    local DY = 0
+    
+    if (Doom["keyW",number]) {
+        DX = DX + cosr(PA) * Speed
+        DY = DY + sinr(PA) * Speed
+    }
+    if (Doom["keyS",number]) {
+        DX = DX - cosr(PA) * Speed
+        DY = DY - sinr(PA) * Speed
+    }
+    if (Doom["keyA",number]) {
+        DX = DX + sinr(PA) * Speed
+        DY = DY - cosr(PA) * Speed
+    }
+    if (Doom["keyD",number]) {
+        DX = DX - sinr(PA) * Speed
+        DY = DY + cosr(PA) * Speed
+    }
+    
+    local TargetX = clamp(PX + DX, 1, GSize - 1)
+    local TargetY = clamp(PY + DY, 1, GSize - 1)
+    
+    local PackedX = Grid[floor(TargetX) + floor(PY) * GSize, number]
+    local FloorX = PackedX && 65535
+    if (PackedX == 0 | FloorX != 5000) {
+        PX = TargetX
+    }
+    
+    local PackedY = Grid[floor(PX) + floor(TargetY) * GSize, number]
+    local FloorY = PackedY && 65535
+    if (PackedY == 0 | FloorY != 5000) {
+        PY = TargetY
+    }
+    
+    Doom["playerX",number] = PX
+    Doom["playerY",number] = PY
+}
+
+event keyPressed(Player:entity, Key:string, Down:number, KeyBind:string) {
+    local KeyboardPlayer = Doom["playerEntity",entity]
+    if (Player != KeyboardPlayer | Doom["state",string] != "game_loop") { exit() }
+    
+    if (Key == "w") { Doom["keyW",number] = Down }
+    if (Key == "s") { Doom["keyS",number] = Down }
+    if (Key == "a") { Doom["keyA",number] = Down }
+    if (Key == "d") { Doom["keyD",number] = Down }
+    if (Key == "left") { Doom["keyLeft",number] = Down }
+    if (Key == "right") { Doom["keyRight",number] = Down }
+}

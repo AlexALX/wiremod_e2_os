@@ -49,6 +49,7 @@ This project pushes **Expression2** to its absolute limits, implementing complex
 * ZGPU Image Renderer (E2 -> ZASM bridge).
 * Standalone BMP, JPG, GIF, PNG Readers and Midi Player.
 * Standalone [Starfall](https://steamcommunity.com/sharedfiles/filedetails/?id=3412004213) BMP Reader.
+* Doom game prototype (not included in workshop), just load map level and player movement.
 * And some other features and devices!
 
 Also includes PHP version of WM1 File System.
