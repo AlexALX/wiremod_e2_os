@@ -1,7 +1,4 @@
 @name Test Remote E2Z Prog
-@persist Devices:table TickQuota:number CurrentFS:table Assets:table
-@persist EGP:wirelink DS:wirelink
-
 #[
     To use this chip via Remote Executor you need to enable 
     e2 remoteupload extension: wire_expression2_extension_enable remoteupload
@@ -22,9 +19,9 @@
         as "e2files/testprog_e2z/e2files/_main_.txt". 
         Make sure name are "_main_.txt"!
         
-    4. Copy file "garrysmod/data/expression2/alx_pc/remote/e2p_include.txt" 
-        to "testprog_e2z/e2files/alx_pc/remote/".
-        You need create alx_pc and alx_pc/remote folders.
+    4. Copy file "garrysmod/data/expression2/alx_pc/remote/includes/example_e2z.txt" 
+        to "testprog_e2z/e2files/alx_pc/remote/includes/".
+        You need create alx_pc, alx_pc/remote and alx_pc/remote/includes subfolders.
         
     5. Create file "testfile.txt" in "testprog_e2z" folder with any content you want, for example: Hello from text file!
     6. Compress all files and folders from "testprog_e2z" into single testprog_e2z.zip file.
@@ -33,7 +30,7 @@
         "test file.txt" file 
         "e2files" folder with:
         - "e2files/_main_.txt"
-        - "e2files/alx_pc/remote/e2p_include.txt"
+        - "e2files/alx_pc/remote/includes/example_e2z.txt"
         
         If you see "testprog_e2z" in your ROOT folder in zip - you did it wrong!
         
@@ -46,9 +43,10 @@
 # Add this ONLY if you want to make it work as .e2p or .e2z
 # in .e2r ANY include will make error!
 #include "alx_pc/remote/e2p_include"
+# Note: this file should not be added into zip archive, its added automatically by remote executor
 
 if (first()|duped()) {  
-
+    #include "alx_pc/remote/includes/example_e2z"
 }
 
 # use this event as entry point into program!
@@ -64,22 +62,7 @@ event remote(Sender:entity, Player:entity, Payload:table) {
     EGP = Devices["GPU_Screens",table]["EGP_WL",wirelink]
     DS = Devices["GPU_Screens",table]["DS_WL",wirelink]
     
-    # we must clear it always! since in isolated mode it will override EGP IDs!
-    EGP:egpClear()
-        
-    local LAST_I = 1
-    
-    EGP:egpText(LAST_I,"TEST E2Z EXECUTE INIT, PRESS F8 TO EXIT",vec2(256,226))
-    EGP:egpAlign(LAST_I,1)
-    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++
-    
-    EGP:egpText(LAST_I,"Content of asset \"testfile.txt\":",vec2(256,246))
-    EGP:egpAlign(LAST_I,1)
-    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++
-    
-    EGP:egpText(LAST_I,Assets["testfile.txt",string],vec2(256,266))
-    EGP:egpAlign(LAST_I,1)
-    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++
+    drawExampleText()
 }
 
 # F8 key are RESERVED for Executor to shutdown whole program!

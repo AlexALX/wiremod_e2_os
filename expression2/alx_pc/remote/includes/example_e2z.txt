@@ -1,0 +1,21 @@
+@persist Devices:table TickQuota:number CurrentFS:table Assets:table
+@persist EGP:wirelink DS:wirelink
+
+function drawExampleText() {
+    # we must clear it always! since in isolated mode it will override EGP IDs!
+    EGP:egpClear()
+        
+    local LAST_I = 1
+    
+    EGP:egpText(LAST_I,"TEST E2Z EXECUTE INIT, PRESS F8 TO EXIT",vec2(256,226))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++
+    
+    EGP:egpText(LAST_I,"Content of asset \"testfile.txt\":",vec2(256,246))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++
+    
+    EGP:egpText(LAST_I,Assets["testfile.txt",string],vec2(256,266))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++
+}

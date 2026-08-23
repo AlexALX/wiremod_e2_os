@@ -2,7 +2,7 @@
 @inputs InA Board:wirelink ExecutorID:number
 @outputs EntID:number
 @persist BIOS:entity Device_Name:string CurrentFS:table Assets:table
-@persist Devices:table Init Caller:entity CodePrepend:string CodeAppend:string CodeExecute:string
+@persist Devices:table Init Caller:entity CodePrepend:string CodeAppend:string CodeExecute:string CodeInclude:string
 
 #[
     ALX Wiremod E2 PC
@@ -14,6 +14,9 @@
     File formats:
     - .e2r contains program code directly
     - .e2p path to expression2 chip (relative to garrysmod/data/expression2), must exists locally
+    - .e2z executable archive bundle with assets and includes support
+    
+    Read more about it on wiki: https://github.com/AlexALX/wiremod_e2_os/wiki/Creating-external-program
 ]#
 
 if (first()|duped()) {
@@ -48,6 +51,34 @@ if (first()|duped()) {
 CodeExecute = "
 function dsInitProg() {
     dsSendDirect(\"initExecutor\", entity(ExecutorID), table(wirelink()))        
+}
+
+if (first()) {
+    dsInitProg()
+} 
+"
+
+CodeInclude = "
+@name E2P/E2Z Include (REQUIRED)
+@inputs ExecutorID:number
+@outputs RemoteEntID:number
+@persist IsDirectCode:number
+
+#[
+    If you want create .e2p or .e2z file you MUST include this file always
+    Or it will not properly init with executor and shutdown your code!
+
+    Note: this file should not be added into e2z zip archive, its added automatically by remote executor.
+]#
+
+if (first()|duped()) {
+    dsSetScope(2)
+    RemoteEntID = entity():id()
+    IsDirectCode = 0
+}
+
+function dsInitProg() {
+    dsSendDirect(\"initExecutor\", entity(ExecutorID), table(wirelink()))
 }
 
 if (first()) {
@@ -146,6 +177,9 @@ if (dsClk()) {
         if (Type=="e2z") {
             local Includes = FInfo["includes",table]
             Assets = FInfo["assets",table]
+            
+            # auto append it to file
+            Includes["alx_pc/remote/e2p_include",string] = CodeInclude
             
             Executor:remoteSetCode(Code, Includes)
         } elseif (Type=="e2r") {      
