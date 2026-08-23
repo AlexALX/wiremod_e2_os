@@ -1,0 +1,101 @@
+@name Test Remote E2Z Prog
+@persist Devices:table TickQuota:number CurrentFS:table Assets:table
+@persist EGP:wirelink DS:wirelink
+
+#[
+    To use this chip via Remote Executor you need to enable 
+    e2 remoteupload extension: wire_expression2_extension_enable remoteupload
+    
+    There is example e2z file in github:
+    https://github.com/AlexALX/wiremod_e2_os/tree/master/examples/example_e2z.zip
+    You can check it structure and copy to "garrysmod/data/e2files/"
+    Then rename to example_e2z.zip.txt and use as 
+    "file://example_e2z.zip.txt" when creating file in ALX OS
+    Or via http:
+    "https://raw.githubusercontent.com/AlexALX/wiremod_e2_os/refs/heads/master/examples/example_e2z.zip"
+
+    How to execute this program via Remote Executor:
+    1. Create new folder in your gmod like "garrysmod/data/e2files/testprog_e2z/".
+    2. Create folder "e2files" inside "testprog_e2z".
+    
+    3. Save this file "garrysmod/data/expression2/alx_pc/remote/testprog_e2z.txt" 
+        as "e2files/testprog_e2z/e2files/_main_.txt". 
+        Make sure name are "_main_.txt"!
+        
+    4. Copy file "garrysmod/data/expression2/alx_pc/remote/e2p_include.txt" 
+        to "testprog_e2z/e2files/alx_pc/remote/".
+        You need create alx_pc and alx_pc/remote folders.
+        
+    5. Create file "testfile.txt" in "testprog_e2z" folder with any content you want, for example: Hello from text file!
+    6. Compress all files and folders from "testprog_e2z" into single testprog_e2z.zip file.
+    
+    7. Open compressed file, it should have in ROOT of zip:
+        "test file.txt" file 
+        "e2files" folder with:
+        - "e2files/_main_.txt"
+        - "e2files/alx_pc/remote/e2p_include.txt"
+        
+        If you see "testprog_e2z" in your ROOT folder in zip - you did it wrong!
+        
+    8. Now rename "testprog_e2z.zip" to "testprog.zip.txt" and put it in "garrysmod/data/e2files/"
+    8. Create file in ALX OS with name "testprog.e2z" and content "file://testprog.zip.txt"
+    3. Spawn "remote executor" part from advdupe2, install to PCI slot.
+    4. Run file, you should see test messages on EGP.
+]#
+
+# Add this ONLY if you want to make it work as .e2p or .e2z
+# in .e2r ANY include will make error!
+#include "alx_pc/remote/e2p_include"
+
+if (first()|duped()) {  
+
+}
+
+# use this event as entry point into program!
+event remote(Sender:entity, Player:entity, Payload:table) {
+    # protect from broadcast
+    if (Sender:id()!=ExecutorID) { exit() }
+    
+    Devices = Payload[1,table]
+    TickQuota = Payload[2,number]
+    CurrentFS = Payload[3,table]
+    Assets = Payload[4,table]
+    
+    EGP = Devices["GPU_Screens",table]["EGP_WL",wirelink]
+    DS = Devices["GPU_Screens",table]["DS_WL",wirelink]
+    
+    # we must clear it always! since in isolated mode it will override EGP IDs!
+    EGP:egpClear()
+        
+    local LAST_I = 1
+    
+    EGP:egpText(LAST_I,"TEST E2Z EXECUTE INIT, PRESS F8 TO EXIT",vec2(256,226))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++
+    
+    EGP:egpText(LAST_I,"Content of asset \"testfile.txt\":",vec2(256,246))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++
+    
+    EGP:egpText(LAST_I,Assets["testfile.txt",string],vec2(256,266))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++
+}
+
+# F8 key are RESERVED for Executor to shutdown whole program!
+function dsKeyPressed(Key:string, Pressed) {
+    # handle keys here
+}
+
+if (dsClk()) {
+    local Name = dsClkName()
+
+    if (Name=="executorKey") {
+        # Handle key press
+        local Info = dsGetTable()
+        dsKeyPressed(Info[1,string], Info[2,number])
+    } elseif (Name=="DS_Connect") {
+        # update DS connection if its changed
+        DS = Devices["GPU_Screens",table]["DS_WL",wirelink]   
+    }
+}

@@ -1,6 +1,6 @@
 @name Test Remote E2R Prog
 @persist Devices:table TickQuota:number CurrentFS:table
-@strict
+@persist EGP:wirelink DS:wirelink
 
 #[
     To use this chip via Remote Executor you need to enable 
@@ -14,11 +14,14 @@
     
     If you want to run this file as a .e2p:
     1. Uncomment e2p_include below, without this your remote executor will break!
-    2. Create file "testprog.e2p" with content "alx_pc/remote/testprog.txt"
+    2. Create file "testprog.e2p" with content "alx_pc/remote/testprog.txt" (this is string value! not a file content)
     3. Run file, you should see test dialog.
+    
+    There is example how exactly should look .e2p inside:
+    https://github.com/AlexALX/wiremod_e2_os/tree/master/examples/example_e2p.txt
 ]#
 
-# Add this ONLY if you want to make it work as .e2p
+# Add this ONLY if you want to make it work as .e2p or .e2z
 # in .e2r ANY include will make error!
 ##include "alx_pc/remote/e2p_include"
 
@@ -42,7 +45,7 @@ event remote(Sender:entity, Player:entity, Payload:table) {
     # we must clear it always! since in isolated mode it will override EGP IDs!
     EGP:egpClear()
     
-    local LAST_I = 0
+    local LAST_I = 1
     
     EGP:egpText(LAST_I,"TEST EXECUTE INIT, PRESS F8 TO EXIT",vec2(256,256))
     EGP:egpAlign(LAST_I,1)

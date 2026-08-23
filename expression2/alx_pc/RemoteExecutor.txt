@@ -1,7 +1,7 @@
 @name Remote Executor
 @inputs InA Board:wirelink ExecutorID:number
 @outputs EntID:number
-@persist BIOS:entity Device_Name:string CurrentFS:table
+@persist BIOS:entity Device_Name:string CurrentFS:table Assets:table
 @persist Devices:table Init Caller:entity CodePrepend:string CodeAppend:string CodeExecute:string
 
 #[
@@ -55,10 +55,18 @@ if (first()) {
 } 
 "
 
+function clearMemory() {
+    Devices = table()
+    CurrentFS = table()
+    Assets = table()    
+}
+
 function setNoCode() {
     #ifdef entity:remoteSetCode(string)
     getentity(ExecutorID):remoteSetCode(CodePrepend + CodeAppend)
     #endif
+    
+    clearMemory()
 }
 
 function shutdown() {
@@ -85,7 +93,7 @@ function usb_init() {
 function number exec_timeout() {
     dsSendDirect("execError",Caller,1)
     setNoCode()
-    return 0    
+    return 0
 }
 
 }
@@ -123,8 +131,11 @@ if (dsClk()) {
         Devices = Info[1,table]
         TickQuota = Info[2,number]
         CurrentFS = Info[3,table]
-        local Type = Info[4,string]
-        local Code = Info[5,string]
+        local FInfo = Info[4,table]
+        
+        local Type = (FInfo["real_ext",string]!="" ? FInfo["real_ext",string] : FInfo["ext",string]):lower()
+        local Code = FInfo["content",string]
+
         Init = 1
         Caller = dsGetSender()
         
@@ -132,7 +143,12 @@ if (dsClk()) {
         
         #ifdef entity:remoteSetCode(string)
         
-        if (Type=="e2r") {        
+        if (Type=="e2z") {
+            local Includes = FInfo["includes",table]
+            Assets = FInfo["assets",table]
+            
+            Executor:remoteSetCode(Code, Includes)
+        } elseif (Type=="e2r") {      
             Executor:remoteSetCode(CodePrepend + Code + CodeAppend + CodeExecute)
         } elseif (Type=="e2p") {
             Executor:remoteUpload(Code)
@@ -153,7 +169,10 @@ if (dsClk()) {
         dsSendDirect("initExecutor", Caller, dsGetTable())  
     } elseif (Name=="executeInitDone") {
         local Executor = getentity(ExecutorID)
-        Executor:sendRemoteEvent(table(Devices, TickQuota, CurrentFS))
+        Executor:sendRemoteEvent(table(Devices, TickQuota, CurrentFS, Assets))
+        
+        # clear memory now
+        clearMemory()
     } elseif (Name=="executorKey") {
         local Executor = getentity(ExecutorID)
         dsSendDirect("executorKey", Executor, dsGetTable())    

@@ -22,7 +22,7 @@ ALXOS_PROG_ASOC["e2p",string] = "alxos_executor"
 ALXOS_PROG_ASOC["gms",string] = "alxos_soundplay"
 ALXOS_PROG_ASOC["mid",string] = "alxos_midi_player"
 ALXOS_PROG_ASOC["zip",string] = "alxos_zip_reader"
-#ALXOS_PROG_ASOC["e2z",string] = "alxos_zip_reader"
+ALXOS_PROG_ASOC["e2z",string] = "alxos_zip_reader"
 
 # Add custom executables here
 

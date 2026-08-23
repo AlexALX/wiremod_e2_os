@@ -23,7 +23,12 @@ function array alxos_findExecutor() {
 function alxos_executor_init(Args:table) {
     #ifndef entity:remoteSetCode(string)
         if (1) {
-            "alxos_explorer_error"("Remote Upload E2 Extension is disabled, cannot run code.\n\nYou can enable it in server console:\nwire_expression2_extension_enable remoteupload",500)
+            "alxos_explorer_error"(
+                "Remote Upload E2 Extension is disabled, cannot run code.\n\n"+
+                "You can enable it in server console:\n"+
+                "wire_expression2_extension_enable remoteupload",
+                500
+            )
             return
         }
     #endif
@@ -42,7 +47,9 @@ function alxos_executor_init(Args:table) {
     local FInfo = Args[1,table]
     local ExplorerFS = Args[2,table]
     
-    ExplorerFile = FInfo["name",string]+(FInfo["ext",string]!="" ? "."+FInfo["ext",string] : "")
+    local RealExt = FInfo["real_ext",string]!="" ? FInfo["real_ext",string] : FInfo["ext",string]
+    
+    ExplorerFile = FInfo["name",string]+"."+RealExt
     
     GpuData[1,table] = ExplorerFS
     GpuData[2,table] = FInfo
@@ -50,7 +57,7 @@ function alxos_executor_init(Args:table) {
 
     if (FInfo["content",string]) {
         "alxos_executor_run"(FInfo["content",string])
-        return   
+        return
     }
     
     dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(
@@ -142,17 +149,18 @@ function alxos_executor_run(Code:string) {
     local ExplorerFS = GpuData[1,table]
     local FInfo = GpuData[2,table]
     
+    FInfo["content",string] = Code
+    
     DSEvent = function() {
         local Executor = alxos_findExecutor()
         dsSendDirect("DS_Connect",Executor[3,entity],1)  
     }
-    
+
     dsSendDirect("executeCode",Executor[3,entity],table(
         Devices,
         TickQuota,
         ExplorerFS,
-        FInfo["ext",string],
-        Code
+        FInfo
     ))
 }
 

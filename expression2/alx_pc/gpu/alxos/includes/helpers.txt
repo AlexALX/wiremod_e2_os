@@ -1,0 +1,25 @@
+function string alxos_nicesize(Sz,Dec) {
+    local SzS = Sz+" Bytes"
+    if (Sz/1024>1) {
+        SzS = floor(Sz/1024,Dec)+" KB"
+    }
+    return SzS
+}
+
+function string alxos_nicesize(Sz) {
+    return alxos_nicesize(Sz,2)
+}
+
+function number alxos_wm1_isdir(Entry:table) {
+    return ((Entry["attr",number] >> 4) && 1)       
+}
+
+function string alxos_wm1_date(Time) {
+    local Date = date(Time)
+    return format("%02d",Date["day",number])+"/"+format("%02d",Date["month",number])+"/"+Date["year",number]
+}
+
+function string alxos_wm1_time(Time) {
+    local Date = date(Time)
+    return format("%02d",Date["hour",number])+":"+format("%02d",Date["min",number])+":"+format("%02d",Date["sec",number])
+}

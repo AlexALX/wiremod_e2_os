@@ -52,13 +52,35 @@ function alxos_zip_init(Args:table) {
         return
     }
     
+    GpuData["E2Z",number] = 0
+    
     local BytesToRead = FileSize - StartPos
+    if (FInfo["ext",string]:lower()=="e2z") {
+        #ifndef entity:remoteSetCode(string)
+            if (1) {
+                "alxos_zip_finish"(
+                    "Remote Upload E2 Extension is disabled,\n"+
+                    "cannot run e2z code.\n\n"+
+                    "You can enable it in server console:\n"+
+                    "wire_expression2_extension_enable remoteupload"
+                )
+                return
+            }
+        #endif
+        
+        GpuData["E2Z",number] = 1        
+        
+        StartPos = 0
+        BytesToRead = FileSize
+    }
+    
     dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(
         ExplorerFS,FInfo,StartPos,BytesToRead
     )))
 
     local Parent = "alxos_explorer_dialog"("Opening file",400,80,"progress","alxos_zip_clear")[number]
 
+    DialogData["textPos",number] = LAST_I
     DialogData[-10,table]:pushNumber(LAST_I)
     EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
     EGP:egpParent(LAST_I,Parent)
@@ -96,6 +118,174 @@ function alxos_zipread_progress() {
     }
     
     runCmd("alxos_zipread_progress",1) 
+}
+
+function alxos_zip_executor_run() {
+    local FileData = table()        
+    local NameArr = ExplorerFile:explode(".")
+    local Last = NameArr:count()
+    
+    local RealExt = NameArr[Last,string]
+    FileData["ext",string] = "e2r"
+    NameArr:remove(Last)
+    FileData["name",string] = NameArr:concat(".")
+    
+    local Files = GpuData["E2Z_Includes",table]
+    
+    FileData["content",string] = Files["_main_",string]
+    Files:remove("_main_")
+    FileData["includes",table] = Files
+    FileData["assets",table] = GpuData["E2Z_Assets",table]
+    FileData["real_ext",string] = RealExt
+
+    # clear memory now
+    GpuData["E2Z_Files",table] = table()
+    GpuData["E2Z_Assets",table] = table()
+    
+    dsSendDirect("alxos_openfile",E2_CPU,table(entity(),FileData))
+}
+
+function alxos_zip_readNextFile() {
+    local Files = GpuData["E2Z_Files",table]
+    local CurrentIndex = GpuData["E2Z_CurrentIndex",number]
+    
+    if (CurrentIndex > Files:count()) {
+        alxos_zip_executor_run()
+        return
+    }
+    
+    local Entry = Files[CurrentIndex, table]
+    GpuData["currentEntry", table] = Entry
+    
+    local FileName = Entry["name",string]
+    
+    local TextPos = DialogData["textPos",number]
+    local NameSize = Entry["name",string]:length()
+    local Start = max(0,NameSize-25)
+    if (NameSize>25) {
+        FileName = "..."+FileName:sub(Start, NameSize)
+    }
+    
+    local TText = DialogData["textTotal",number]
+    EGP:egpSetText(TText, "Total Files: " + CurrentIndex + " / " + Files:count())
+    
+    local TTask = DialogData["textTask",number]
+    EGP:egpSetText(TTask, "Current File: " + FileName)
+
+    zipOpenFile(Entry)  
+    
+    runCmd("alxos_zip_progress", 1)
+}
+
+function alxos_zip_executor_next() {
+    local Entry = GpuData["currentEntry", table]
+    local FileName = Entry["name", string]
+    local FileContent = Zip["fileData", string]
+    
+    local TableIndex = "E2Z_Assets"
+    if (FileName:find("e2files/")==1) {
+        TableIndex = "E2Z_Includes"
+        FileName = Entry["shortName", string]:sub(9)
+    }
+    
+    GpuData[TableIndex, table][FileName, string] = FileContent   
+    GpuData["E2Z_CurrentIndex", number] = GpuData["E2Z_CurrentIndex", number] + 1
+        
+    alxos_zip_readNextFile()    
+}
+
+function alxos_zip_executor_progress_init() {
+    local ZipFiles = GpuData["E2Z_Files",table]
+    
+    local Width = 400
+    local Height = 120
+    local LeftPos = 20 - Width / 2
+    local Parent = "alxos_explorer_dialog"("Reading E2Z archive",Width,Height,"progress","alxos_zip_clear")[number]
+
+    DialogData["DialogW",number] = Width
+    DialogData["DialogH",number] = Height
+
+    DialogData[-10,table]:pushNumber(LAST_I)
+    DialogData["textTotal",number] = LAST_I
+    EGP:egpText(LAST_I,"Total Files: 1 / "+ZipFiles:count(),alxos_dlgPos(-180,-42))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+
+    DialogData[-10,table]:pushNumber(LAST_I)
+    DialogData["textTask",number] = LAST_I
+    EGP:egpText(LAST_I,"Current File: Opening",alxos_dlgPos(-180,3))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpBox(LAST_I,alxos_dlgPos(LeftPos,-22),vec2(Width-40,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,125,125,125,255) LAST_I++
+
+    DialogData["boxCurrent",number] = LAST_I
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpBox(LAST_I,alxos_dlgPos(LeftPos,-22),vec2(1,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    DialogData["percCurrent",number] = LAST_I
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"0%",alxos_dlgPos(0,-22))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,200,200,200,255) LAST_I++
+    
+    local PercID = DialogData[-4,number]
+    local BoxID = DialogData[-5,number]
+    EGP:egpPos(BoxID-1,alxos_dlgPos(LeftPos, 23))
+    EGP:egpPos(PercID,alxos_dlgPos(0, 23))
+    
+    DialogData["openProgress",number] = 2
+}
+
+
+function alxos_zip_executor() {
+    local Files = Zip["files",table]
+    
+    local ZipFiles = table()
+    local HasMain = 0
+    
+    foreach (Index:number, Entry:table = Files) {
+        if (Entry["size",number]==0) { continue }
+        
+        local NameArr = Entry["name",string]:explode(".")
+        local Last = NameArr:count()
+        
+        local Ext = NameArr[Last,string]
+        NameArr:remove(Last)
+        local Name = NameArr:concat(".")
+
+        Entry["shortName",string] = Name
+        Entry["ext",string] = Ext
+        
+        ZipFiles:pushTable(Entry)
+        
+        if (Name=="e2files/_main_") {
+            HasMain = 1
+        }
+    }
+    
+    if (!HasMain) {
+        "alxos_zip_finish"(
+            "Invalid e2z file, program entry point not found!\n"+
+            "Check if file \"_main_.txt\" exists in zip \"e2files\" dir."
+        )
+        return
+    }
+    
+    GpuData["E2Z_Includes",table] = table()
+    GpuData["E2Z_Assets",table] = table()
+    GpuData["E2Z_Files",table] = ZipFiles
+    
+    GpuData["E2Z_CurrentIndex",number] = 1
+    
+    alxos_zip_executor_progress_init()
+    alxos_zip_readNextFile()
 }
 
 function alxos_zip_files() {
@@ -183,6 +373,8 @@ function alxos_zip_open(Info:table) {
 
 function alxos_zip_postinit(Data:string) {
     
+    local FInfo = GpuData[2, table]
+    
     if (GpuData["chunk_read", number]==1) {        
         local NewChunkLength = Data:length()
         
@@ -254,8 +446,13 @@ function alxos_zip_postinit(Data:string) {
             Zip["state",string] = "find_eocd"
         }
     } else {        
-        zipInit(Data, 1)
-        GpuData["chunk_read", number] = 1
+        
+        local ChunkMode = GpuData["E2Z",number] ? 0 : 1
+        
+        zipInit(Data, ChunkMode)
+        if (ChunkMode) {
+            GpuData["chunk_read", number] = 1
+        }
     }
     runCmd("alxos_zip_progress",1,1)
 }
@@ -415,17 +612,28 @@ function alxos_zip_progress() {
     }
     
     if (Zip["state", string]=="ready") {
-        alxos_zip_files()
+        local FInfo = GpuData[2,table]
+        
+        if (GpuData["E2Z",number]) {
+            alxos_zip_executor()
+        } else {        
+            alxos_zip_files()
+        }
         GpuData["zipInit",number] = 1
         return
     }
     
     if (Zip["state", string]=="done") {
-        alxos_zip_openfile()
+        local FInfo = GpuData[2, table]
+        if (GpuData["E2Z",number]) {
+            alxos_zip_executor_next()
+        } else {
+            alxos_zip_openfile()
+        }
         return
     }
     
-    if (DialogData["openProgress",number]) {           
+    if (DialogData["openProgress",number]==1) {           
         local CalcP = 0
         
         local ExplorerFS = GpuData[1, table]
@@ -465,6 +673,41 @@ function alxos_zip_progress() {
         if (BoxW<1) { BoxW = 1 }
         EGP:egpSize(BoxID,vec2(BoxW,20))
         EGP:egpSetText(PercID,CalcP+"%")    
+    }
+    
+    if (DialogData["openProgress",number]==2) {
+        local Files = GpuData["E2Z_Files",table]
+        local CurrentIndex = GpuData["E2Z_CurrentIndex",number]
+        
+        local TotalP = round(CurrentIndex / Files:count() * 100)
+        local PercID = DialogData["percCurrent",number]
+        local BoxID = DialogData["boxCurrent",number]
+        local BoxW = DialogData[-6,number]
+        BoxW = ceil(BoxW/100*TotalP)
+        if (BoxW<1) { BoxW = 1 }
+        EGP:egpSize(BoxID,vec2(BoxW,20))
+        EGP:egpSetText(PercID,TotalP+"%")
+        
+        local CurrentP = 0
+        if (Zip["state", string]=="decompress") {
+            local CompPos = Deflate_CompressedPos
+            local CompMax = Deflate_CompressedData:length()
+            if (CompMax == 0) { CompMax = 1 }
+            CurrentP = CompPos/CompMax*100
+        } elseif (Zip["state", string]=="build_string") {
+            local I = Zip["currentBuildStep", number]
+            local Max = Zip["totalBuildSteps", number]
+            CurrentP = I/Max*100
+        }
+        
+        CurrentP = round(CurrentP,2)
+        local PercID = DialogData[-4,number]
+        local BoxID = DialogData[-5,number]
+        local BoxW = DialogData[-6,number]
+        CurBoxW = ceil(BoxW/100*CurrentP)
+        if (CurBoxW<1) { CurBoxW = 1 }
+        EGP:egpSize(BoxID,vec2(CurBoxW,20))
+        EGP:egpSetText(PercID,CurrentP+"%")
     }
     
     runCmd("alxos_zip_progress",1)     
