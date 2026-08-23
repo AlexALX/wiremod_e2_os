@@ -1,5 +1,5 @@
 @name Test Remote E2R Prog
-@persist Devices:table TickQuota:number
+@persist Devices:table TickQuota:number CurrentFS:table
 @strict
 
 #[
@@ -22,14 +22,19 @@
 # in .e2r ANY include will make error!
 ##include "alx_pc/remote/e2p_include"
 
-if (first()|duped()) {  
-
+if (first()|duped()) {
+    # hacky way to never override, it is set by executor or e2p_include
+    if (0) { ExecutorID = 0 }
 }
 
 # use this event as entry point into program!
-event remote(Sender:entity, Player:entity, Payload:table) {
+event remote(Sender:entity, Player:entity, Payload:table) { 
+    # protect from broadcast
+    if (Sender:id()!=ExecutorID) { exit() }
+    
     Devices = Payload[1,table]
     TickQuota = Payload[2,number]
+    CurrentFS = Payload[3,table]
     
     EGP = Devices["GPU_Screens",table]["EGP_WL",wirelink]
     DS = Devices["GPU_Screens",table]["DS_WL",wirelink]

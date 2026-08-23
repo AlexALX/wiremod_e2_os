@@ -139,6 +139,7 @@ function number alxos_executor_close() {
 function alxos_executor_run(Code:string) {
     local Executor = alxos_findExecutor()
     
+    local ExplorerFS = GpuData[1,table]
     local FInfo = GpuData[2,table]
     
     DSEvent = function() {
@@ -149,9 +150,10 @@ function alxos_executor_run(Code:string) {
     dsSendDirect("executeCode",Executor[3,entity],table(
         Devices,
         TickQuota,
+        ExplorerFS,
         FInfo["ext",string],
         Code
-    )) 
+    ))
 }
 
 function alxos_executor_ds(Name:string) {    

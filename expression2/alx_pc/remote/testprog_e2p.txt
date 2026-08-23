@@ -1,5 +1,5 @@
 @name Test Remote E2P Prog
-@persist Devices:table TickQuota:number 
+@persist Devices:table TickQuota:number CurrentFS:table
 @strict
 
 #[
@@ -22,8 +22,12 @@ if (first()|duped()) {
 
 # use this event as entry point into program!
 event remote(Sender:entity, Player:entity, Payload:table) {
+    # protect from broadcast
+    if (Sender:id()!=ExecutorID) { exit() }
+    
     Devices = Payload[1,table]
     TickQuota = Payload[2,number]
+    CurrentFS = Payload[3,table]
     
     EGP = Devices["GPU_Screens",table]["EGP_WL",wirelink]
     DS = Devices["GPU_Screens",table]["DS_WL",wirelink]
