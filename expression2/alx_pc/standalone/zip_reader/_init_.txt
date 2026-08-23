@@ -110,6 +110,8 @@ event tick()
     #print(Zip["state",string],Zip["decSubState", string])
 
     while (perf(95)) {
+        
+        if (ZipError) { break }
 
         if (Zip["state",string] == "find_eocd") {
             local Result = zipFindEOCDStep()
@@ -129,7 +131,7 @@ event tick()
             zipParseCentralEntryStep()
         } elseif (Zip["state",string] == "decompress") {
             
-            if (DeflateInitState != "ready") {
+            if (DeflateInitState != "ready") {                
                 deflateInitTablesStep()
                 exit()
             }

@@ -69,7 +69,7 @@ function number deflateDecompressStep(Ctx:table)
             Len--
         }
         Ctx["rawLen", number] = Len
-        if (Len == 0) {
+        if (Len == 0) {       
             if (Ctx["blockFinal", number] == 1) { return 1 } 
             else { Ctx["decSubState", string] = "read_block_header" }
         }
@@ -354,7 +354,9 @@ function number deflateDecompressStep(Ctx:table)
                         Rev = (Rev << 1) || (Tmp && 1)
                         Tmp = Tmp >> 1 
                     }
-                    DynDistanceTable[Len + "_" + Rev, number] = I
+                    
+                    local NumericKey = (Len << 16) || Rev
+                    DynDistanceTable[NumericKey, number] = I + 1
                 }
                 I++
             }
@@ -428,6 +430,8 @@ function number deflateDecompressStep(Ctx:table)
                         Ctx["CodeTree", table] = table()
                         Ctx["distBitsRead", number] = 0
                         Ctx["distCurrentCode", number] = 0
+                        Ctx["litCompiledTable", number] = 0
+                        Ctx["distCompiledTable", number] = 0
                         return 0
                     }
                 } else {
@@ -474,11 +478,7 @@ function number deflateDecompressStep(Ctx:table)
             local DistCode = deflateBits(5)
             if (DistCode < 0) { DeflateError = "Deflate: EOF in Dist Code" return -1 }
             
-            local Rev = 0
-            local Tmp = DistCode
-            for(B = 0, 4) { Rev = (Rev << 1) || (Tmp && 1) Tmp = Tmp >> 1 }
-            
-            local NumericKey = (5 << 16) || Rev
+            local NumericKey = (5 << 16) || DistCode
             local DIdx = DeflateFixedDistanceTable[NumericKey, number]
             Ctx["lzDistBase", number] = DeflateDistBase[DIdx + 1, number]
             Ctx["lzDistExtraBits", number] = DeflateDistExtra[DIdx + 1, number]
@@ -501,12 +501,12 @@ function number deflateDecompressStep(Ctx:table)
             
             CurrentCode = CurrentCode || (Bit << BitsRead)
             BitsRead++
-            
-            local Key = BitsRead + "_" + CurrentCode
+        
+            local Key = (BitsRead << 16) || CurrentCode
             local DistTable = Ctx["DynDistanceTable", table]
             
-            if (DistTable:exists(Key)) {
-                local DIdx = DistTable[Key, number]
+            if (DistTable[Key, number] > 0) {
+                local DIdx = DistTable[Key, number] - 1
                 
                 Ctx["lzDistBase", number] = DeflateDistBase[DIdx + 1, number]
                 Ctx["lzDistExtraBits", number] = DeflateDistExtra[DIdx + 1, number]
@@ -544,8 +544,9 @@ function number deflateDecompressStep(Ctx:table)
         local OutLen    = Ctx["outputLength", number]
         local OutData   = Ctx["outputData", table]
         
-        while (Remains > 0 & perf(90)) {
+        while (Remains > 0 & perf(90)) {    
             local Byte = OutData[OutLen - TotalDist + 1, number]
+            
             OutLen++
             OutData[OutLen, number] = Byte
             Remains--

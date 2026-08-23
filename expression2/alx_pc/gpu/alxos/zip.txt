@@ -45,6 +45,13 @@ function alxos_zip_init(Args:table) {
     
     GpuData["chunk_read", number] = 0
     
+    # process zip in zip
+    if (FInfo["content",string]) {        
+        zipInit(FInfo["content",string], 0)
+        runCmd("alxos_zip_progress",1,1)
+        return
+    }
+    
     local BytesToRead = FileSize - StartPos
     dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(
         ExplorerFS,FInfo,StartPos,BytesToRead
@@ -292,7 +299,7 @@ function number alxos_zip_finish(Err:string) {
     }
     
     if (Err) {
-        Pos = vec2(20,18)    
+        Pos = vec2(225,18)    
     }
         
     local Parent = "alxos_explorer_dialog"("ZIP Reader"+(Err!="" ? " Error" : ""),450,Height,"ok","alxos_zip_clear")[number]
@@ -301,6 +308,7 @@ function number alxos_zip_finish(Err:string) {
         for(I=1,NewLines:count()) {
             DialogData[-10,table]:pushNumber(LAST_I)
             EGP:egpText(LAST_I,NewLines[I,string],Pos)
+            EGP:egpAlign(LAST_I,1)
             EGP:egpParent(LAST_I,Parent)
             EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
             
@@ -329,7 +337,7 @@ function number alxos_zip_finish() {
 }
 
 function alxos_zip_openfile() {
-    GpuData["zipAdded",number] = 1
+    GpuData["zipAdded",number] = GpuData["zipAdded",number] + 1
     local FileData = table()        
     local NameArr = Zip["fileName",string]:explode(".")
     local Last = NameArr:count()
@@ -343,8 +351,9 @@ function alxos_zip_openfile() {
     # add zip to path
     local Path = "alxos_explorer_getpath"()[table]
     Path:pushString(ExplorerFile)
+    ExplorerFile = ""
     
-    dsSendDirect("alxos_openfile",E2_CPU,table(entity(),FileData))    
+    dsSendDirect("alxos_openfile",E2_CPU,table(entity(),FileData))   
 }
 
 function alxos_zip_nextchunk() {
@@ -472,6 +481,12 @@ function alxos_zip_ds(Name:string) {
         alxos_zip_clear()
     } elseif (Name=="alxos_runprog") {
         "alxos_explorer_ds"(Name)
+    } elseif (Name=="alxos_openfile") {
+        local Info = dsGetTable()
+        
+        if (Info[1,number]==-1) {
+            alxos_zip_finish("Cannot open file, unsupported format.")        
+        }
     }
 }
 

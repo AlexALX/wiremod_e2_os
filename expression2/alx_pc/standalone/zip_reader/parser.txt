@@ -53,7 +53,7 @@ function number zipParseEOCDStep()
     local CentralSize = zipU32()
     local CentralOffset = zipU32()
     local CommentLength = zipU16()
-
+    
     # We currently support only single-disk archives.
     if (DiskNumber != 0 | CentralDisk != 0 | EntriesDisk != Entries) {
         ZipError = "Multi-disk ZIP archives are not supported"
