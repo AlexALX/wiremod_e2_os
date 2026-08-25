@@ -12,7 +12,8 @@
 
 function alxos_execute(Name:string) {
     if (ALXOS_PROGS:exists(Name)) {
-        Name(table())   
+        Name(table())
+        CurrentProg = Name   
     } else {
         "alxos_explorer_error"("Function "+Name+" is missing.")
     }
@@ -20,7 +21,8 @@ function alxos_execute(Name:string) {
 
 function alxos_execute(Name:string,Args:table) {
     if (ALXOS_PROGS:exists(Name)) {
-        Name(Args)   
+        Name(Args)
+        CurrentProg = Name
     } else {
         "alxos_explorer_error"("Function "+Name+" is missing.")
     }

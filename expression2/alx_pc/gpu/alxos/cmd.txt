@@ -1,7 +1,7 @@
 @name cmd.e2e
 @persist CmdFS:table CmdAllFs:table CmdDir:table CmdPath:table
 @persist CmdKeyH:string CmdDsH:string CmdCopy:table
-@persist CmdCursor CmdLinesC CmdLines:array CmdHistory:array
+@persist CmdCursor CmdLinesC CmdLines:array CmdHistory:array CmdInputRE:string CmdInputFunc:function
 
 #[
 	ALX Wiremod E2 OS
@@ -11,6 +11,11 @@
 ]#
 
 #include "alx_pc/gpu/alxos/_main_"
+
+function alxos_toggle_cursor(Show:number) {
+    local Cursor = GpuData[3,number]
+    EGP:egpSetText(Cursor,(Show ? "_" : ""))
+}
 
 function alxos_console_move() {
     if (CmdLinesC>=25) {
@@ -31,6 +36,10 @@ function alxos_console_move() {
         CmdLinesC = 25
         if (LAST_I>100) { LAST_I = GpuData[3,number]+1 }
     }
+    
+    if (GpuData[3,number]) { 
+        alxos_toggle_cursor(0)
+    }
 }
 
 function alxos_console_msg(Str:string) {
@@ -46,6 +55,15 @@ function alxos_console_msg(Str:string) {
         CmdLinesC++
         #alxos_console_move()
     }
+
+}
+
+function alxos_console_handlers() {
+    CurrentProg = "alxos_console"
+    KeyHandler = "alxos_console_key"
+    DsHandler = "alxos_console_ds"
+    PlugHandler = "alxos_console_onplug"
+    timer("cursor_draw",500)
 }
 
 function alxos_console_listdir(FS:table,Dir,Sd) {
@@ -61,6 +79,13 @@ function alxos_show_cursor() {
     local Cursor = GpuData[3,number]
     EGP:egpSetText(Cursor,(CmdCursor ? "_" : ""))
     timer("cursor_draw",500)    
+}
+
+function alxos_hide_cursor() {
+    CmdCursor = 0
+    local Cursor = GpuData[3,number]
+    EGP:egpSetText(Cursor,"")
+    stoptimer("cursor_draw")
 }
 
 function alxos_upd_cursor() {
@@ -81,7 +106,6 @@ function alxos_draw_cursor() {
 }
 
 function alxos_console_command() {
-    
     alxos_console_move()
     
     GpuData[-1,number] = LAST_I
@@ -103,10 +127,36 @@ function alxos_console_command() {
     }
 }
 
+function alxos_console_input(Msg:string, Func:function, RE:string) {
+    CmdInputFunc = Func
+    CmdInputRE = RE
+    
+    alxos_console_msg(Msg)
+    
+    GpuData[-1,number] = LAST_I
+    GpuData[-2,number] = BIOS_X + Msg:length()*10
+    GpuData[-4,string] = ""
+    
+    alxos_console_move()
+    
+    EGP:egpText(LAST_I,"",vec2(GpuData[-2,number]-BIOS_X,0))
+    EGP:egpFont(LAST_I,"Courier New")
+    EGP:egpParent(LAST_I,LAST_I-1)
+    EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
+
+    KeyHandler = "alxos_console_inputkey"
+    alxos_upd_cursor()
+    alxos_show_cursor()
+}
+function alxos_console_input(Msg:string, Func:function) {
+    alxos_console_input(Msg, Func, "^[A-Za-z0-9_ /.:-]$")
+}
+
 function alxos_console_err(Err:string) {
     alxos_console_msg(Err)
     alxos_console_command()
     KeyHandler = "alxos_console_key"
+    alxos_show_cursor()
 }
 
 function alxos_console_cls() {
@@ -375,12 +425,22 @@ function alxos_console_delpre(Name:string) {
     }
 }
 
+# redraw last msg
+function alxos_console_redraw_last(Msg:string) {
+    EGP:egpSetText(LAST_I-1,Msg)
+}
+
+# redraw msg by index (0 - last, 1 - 2 msgs before, and so)
+function alxos_console_redraw_msg(Index, Msg:string) {
+    EGP:egpSetText(LAST_I-1-Index,Msg)
+}
+
 function alxos_console_delpost(Name:string) {
     CmdDsH = ""
     stopCmd()
     
     #local PercID = CmdLines[CmdLinesC,number]
-    EGP:egpSetText(LAST_I-1,"Removing file... 100%")
+    alxos_console_redraw_last("Removing file... 100%")
     
     alxos_console_err("File succesfully removed.")
     GpuData[-10,table] = table()
@@ -402,9 +462,8 @@ function number alxos_console_cmd() {
     local Cur = CurTask[2,number]
     if (Max==0) { return 0 }
     
-    #local PercID = CmdLines[CmdLinesC,number]
     local CalcP = round(Cur/Max*100)
-    EGP:egpSetText(LAST_I-1,"Removing file... "+CalcP+"%")
+    alxos_console_redraw_last("Removing file... "+CalcP+"%")
 
     return 0
 }
@@ -465,6 +524,10 @@ function alxos_console_run(Command:string) {
             alxos_console_msg("fput FileName content - write to file with content")
             alxos_console_msg("fget FileName - read first 48 bytes from file")
             alxos_console_msg("start FileName.e2e - run E2 executable")
+            alxos_console_msg(" e2r, e2p, e2z also supported by this command")
+            alxos_console_msg("open FileName.jpg - load image on Digital Screen")
+            alxos_console_msg(" Supported images: jpg, gif, bmp, png")
+            alxos_console_msg("open FileName.zip - open zip")
             alxos_console_command()
         break
         case "volumes",
@@ -674,18 +737,24 @@ function alxos_console_run(Command:string) {
                 return
             }
             
-            if (alxos_wm1_isdir(File) | File["ext",string]!="e2e") {
+            local Ext = File["ext",string]:lower()
+            
+            if (alxos_wm1_isdir(File) | Ext!="e2e" & Ext!="e2r" & Ext!="e2p" & Ext!="e2z") {
                 alxos_console_err("This is not E2 executable file.")
                 return
             }
             
             KeyHandler = ""
-            dsSendDirect("alxos_execute",E2_CPU,table(entity(),CmdFS,File))
+            if (Ext=="e2e") {
+                dsSendDirect("alxos_execute",E2_CPU,table(entity(),CmdFS,File))
+            } else {
+                dsSendDirect("alxos_openfile",E2_CPU,table(entity(),File))    
+            }
         break
         case "version",
         case "ver",
-            alxos_console_msg("ALX Wiremod E2 OS - Console v1.0")
-            alxos_console_msg("(c) 2018 by AlexALX")
+            alxos_console_msg("ALX Wiremod E2 OS - Console v1.1")
+            alxos_console_msg("(c) 2018-2026 by AlexALX")
             alxos_console_command()
         break
         case "fput",
@@ -777,6 +846,39 @@ function alxos_console_run(Command:string) {
             CmdDsH = "alxos_explorer_fget_post"         
             dsSendDirect("fs_readfile",CmdFS["hdd_io",wirelink]:entity(),table(entity(),CmdFS["fs_str_id",string],table(CmdFS,File,0,48)))  
         break
+        case "open",
+        case "openfile",
+            if (Arg=="") {
+                alxos_console_err("Please enter file name.")
+                return   
+            }
+        
+            local File = table()
+        
+            for(I=0,CmdDir[3,table]:count()) {
+                local Entry = CmdDir[3,table][I,table]
+                local FullName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
+                if (FullName==Arg) {
+                    File = Entry
+                    break
+                }
+            }
+            
+            if (!File:count()) {
+                alxos_console_err("File with this name not exists.")
+                return
+            }
+            
+            local Ext = File["ext",string]:lower()
+            
+            if (alxos_wm1_isdir(File) | Ext!="jpg" & Ext!="gif" & Ext!="bmp" & Ext!="png" & Ext!="zip") {
+                alxos_console_err("File format "+Ext+" not supported.")
+                return
+            }
+            
+            KeyHandler = ""
+            dsSendDirect("alxos_openfile",E2_CPU,table(entity(),File))
+        break
         default,
             if (Command!="") {
                 alxos_console_msg("Unknown command.")
@@ -786,8 +888,62 @@ function alxos_console_run(Command:string) {
     }
 }
 
+function alxos_console_noinput() {
+    CmdInputFunc = function(Input:string) { 
+        return 1 
+    }
+    alxos_hide_cursor()
+}
+
+function alxos_console_inputkey(Key:string,Pressed) {
+    if (!Pressed) { return } 
+    
+    if (Key=="enter") {
+        local Result = CmdInputFunc(GpuData[-4,string])[number]
+        
+        if (Result) {
+            alxos_console_noinput() 
+        }
+    } elseif (Key=="f8") {
+        CmdInputFunc("_EXIT_")[number]
+        alxos_console_handlers()
+        alxos_console_command()
+    } elseif (Key=="delete") { 
+        local I = GpuData[-1,number]
+        local Cmd = GpuData[-4,string]
+    
+        EGP:egpSetText(I,"")
+        GpuData[-4,string] = ""
+        GpuData[-2,number] = GpuData[-2,number] - Cmd:length()*10
+        alxos_upd_cursor()
+    } elseif (Key=="backspace") { 
+        local I = GpuData[-1,number]
+        local Cmd = GpuData[-4,string]
+        if (Cmd=="") { return }
+        Cmd = Cmd:sub(0,Cmd:length()-1)
+        EGP:egpSetText(I,Cmd)
+        GpuData[-4,string] = Cmd
+        GpuData[-2,number] = GpuData[-2,number] - 10
+        alxos_upd_cursor()        
+    } elseif (Pressed==2) {
+        local KMem = toByte(Key) # handle capital/small without writting own code
+        local Char = toChar((KMem>=128 ? KMem-80 : KMem))
+        
+        if (Char:findRE(CmdInputRE) & (KMem<=122 | KMem>=128 & KMem<=143)) {
+            local I = GpuData[-1,number]
+            local Cmd = GpuData[-4,string]
+            Cmd += Char
+            EGP:egpSetText(I,Cmd)
+            GpuData[-4,string] = Cmd
+            GpuData[-2,number] = GpuData[-2,number] + 10
+            alxos_upd_cursor()
+        }
+    }    
+}
+
 function alxos_console_key(Key:string,Pressed) {
     if (!Pressed) { return } 
+    
     if (Key=="enter") {
         alxos_console_run(GpuData[-4,string])
     } elseif (Key=="up" | Key=="down") {
@@ -857,7 +1013,7 @@ function alxos_console_key(Key:string,Pressed) {
     }
 }
 
-function alxos_console_ds(Name:string) {
+function alxos_console_ds(Name:string) {        
     if (CmdDsH!="") {
         CmdDsH(Name)
     } elseif (Name=="fs_listdir") {
@@ -869,6 +1025,11 @@ function alxos_console_ds(Name:string) {
         "alxos_execute"(Info[1,string],TInfo)
     } elseif (Name=="alxos_fail") {
         alxos_console_err(dsGetString())
+    } elseif (Name=="alxos_openfile") {
+        local Info = dsGetTable()
+        if (Info[1,number]==-1) {
+            alxos_console_err("Failed to open file, unsupported format")     
+        }    
     }
 }
 
@@ -883,6 +1044,14 @@ function alxos_console_postinit(Name:string) {
     KeyHandler = "alxos_console_key"  
 
     CmdDsH = ""
+}
+
+function table alxos_console_getpath() {
+    return CmdPath
+}
+
+function table alxos_console_getdir() {
+    return CmdDir
 }
 
 function alxos_console_init(Args:table) {
@@ -911,8 +1080,8 @@ function alxos_console_init(Args:table) {
     GpuData[1,table] = table()
     GpuData[2,number] = 0
     
-    alxos_console_msg("ALX Wiremod E2 OS - Console v1.0")
-    alxos_console_msg("(c) 2018 by AlexALX")
+    alxos_console_msg("ALX Wiremod E2 OS - Console v1.1")
+    alxos_console_msg("(c) 2018-2026 by AlexALX")
     
     CmdDsH = "alxos_console_postinit"
     alxos_console_listdir(CmdFS,CmdDir[1,number],CmdDir[2,number])       

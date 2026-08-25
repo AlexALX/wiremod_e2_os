@@ -14,14 +14,20 @@
 ]#
 
 #include "alx_pc/gpu/alxos/_main_"
+#include "alx_pc/gpu/alxos/shared/images"
 #include "alx_pc/standalone/bmp_reader/_init_"
 
 function alxos_bmp_init(Args:table) {
     if (!DS:entity():isValid()) {
-        "alxos_explorer_error"("Digital screen not connected! Rendering canceled.",420)
+        if (CurrentProg=="alxos_console") {
+            "alxos_console_err"("Digital screen not connected!\nRendering canceled.")
+        } else {
+            "alxos_explorer_error"("Digital screen not connected! Rendering canceled.",420)
+        }
         return
     }
     
+    GpuData["lastProg",string] = CurrentProg
     GpuData["BMPInit",number] = 1
     KeyHandler = "alxos_bmp_key"
     
@@ -31,13 +37,20 @@ function alxos_bmp_init(Args:table) {
     GpuData[1,table] = ExplorerFS
     GpuData[2,table] = FInfo
     GpuData[5,number] = 0
+    GpuData["bmpProgress",number] = 0
     
     ExplorerFile = FInfo["name",string]+(FInfo["ext",string]!="" ? "."+FInfo["ext",string] : "")
+    
+    if (CurrentProg=="alxos_console") {
+        DialogData = table()
+        "alxos_bmp_postinit"()
+        return
+    }
     
     local Width = 450
     local Height = 110
 
-    local Parent = "alxos_explorer_dialog"("BMP Settings",Width,Height,"","alxos_bmp_close")[number]
+    local Parent = "alxos_explorer_dialog"("BMP Settings",Width,Height,"","alxos_img_close")[number]
     
     DialogData[7,number] = LAST_I
     
@@ -142,7 +155,11 @@ function alxos_bmp_init(Args:table) {
 
 function alxos_bmp_postinit() {
     if (!DS:entity():isValid()) {
-        "alxos_explorer_error"("Digital screen not connected! Rendering canceled.",420)
+        if (GpuData["lastProg",string]=="alxos_console") {
+            "alxos_console_err"("Digital screen not connected!\nRendering canceled.")
+        } else {
+            "alxos_explorer_error"("Digital screen not connected! Rendering canceled.",420)
+        }
         return
     }
 
@@ -153,6 +170,14 @@ function alxos_bmp_postinit() {
     #KeyHandler = "alxos_bmp_key"
     ExplorerCurTask = "bmp"
     
+    DS[1048574] = 0
+    DS[1048569] = 2
+    DS[1048575] = 1
+    
+    DSEvent = function() {
+        bmpSetDS(DS)    
+    }
+    
     if (!FInfo["content",string]) {        
         dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(
             ExplorerFS,FInfo,0,66
@@ -161,29 +186,27 @@ function alxos_bmp_postinit() {
         GpuData["bmpFull",number] = 0
     }
         
-    local Width = 400
-    local Height = 80
-
-    local Parent = "alxos_explorer_dialog"("Opening file",Width,Height,"progress","alxos_bmp_clear")[number]
+    if (GpuData["lastProg",string]=="alxos_console") {
+        "alxos_console_msg"("Opening file... Press ENTER or F8 to cancel")
+        "alxos_console_msg"("0%")
+        "alxos_console_move"()
+    } else {
+        local Width = 400
+        local Height = 80
     
-    DialogData["DialogW",number] = Width
-    DialogData["DialogH",number] = Height
+        local Parent = "alxos_explorer_dialog"("Opening file",Width,Height,"progress","alxos_img_clear")[number]
+        
+        DialogData["DialogW",number] = Width
+        DialogData["DialogH",number] = Height
+        
+        GpuData[5,number] = 0
     
-    GpuData[5,number] = 0
-
-    DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpAlign(LAST_I,1)
-    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
-    
-    DSEvent = function() {
-        bmpSetDS(DS)    
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpAlign(LAST_I,1)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
     }
-
-    DS[1048574] = 0
-    DS[1048569] = 2
-    DS[1048575] = 1
     
     GpuData["bmpState", string] = "header"
     
@@ -211,23 +234,22 @@ function alxos_bmp_postinit() {
     }
 }
 
-function alxos_bmp_warning(Warning:string) {
-    DialogData["WarningShown",number] = 1
-
-    local Lines = Warning:explode("\n"):count()*2
-
-    local Width = DialogData["DialogW",number]
-    local Height = 90
-    local Title = "Warning"
-    
-    local PosX = 256 - (Width / 2)
-    local PosY = (256 + DialogData["DialogH",number] / 2) + 20
-    
-    alxos_dialog_warning(Title, Width, Height, vec2(PosX,PosY), Warning, Lines*20)
-}
-
 function number alxos_bmp_finish(Err:string) {
-    local Parent = "alxos_explorer_dialog"("BMP Reader"+(Err!="" ? " Error" : ""),450,60,"ok","alxos_bmp_clear")[number]
+    if (GpuData["lastProg",string]=="alxos_console") {
+        if (Err) {
+            "alxos_console_err"(Err)
+        } else {
+            local Index = DialogData["WarningShownIndex",number]
+            "alxos_console_redraw_msg"(Index,"100%")
+            "alxos_console_msg"("Opening BMP file success finished.\nRender time: "+round(BmpRenderTime,2)+"s.")
+        }
+        
+        "alxos_console_handlers"()
+        "alxos_console_command"()
+        return 0
+    }
+    
+    local Parent = "alxos_explorer_dialog"("BMP Reader"+(Err!="" ? " Error" : ""),450,60,"ok","alxos_img_clear")[number]
 
     DialogData[-10,table]:pushNumber(LAST_I)
     EGP:egpText(LAST_I,(Err!="" ? Err : "Opening BMP file success finished, render time: "+round(BmpRenderTime,2)+"s."),alxos_dlgPos(0,-12))
@@ -268,8 +290,13 @@ function alxos_bmp_progress_full() {
         BoxW = 1
     }
 
-    EGP:egpSize(BoxID,vec2(BoxW,20))
-    EGP:egpSetText(PercID,CalcP+"%")
+    if (GpuData["lastProg",string]=="alxos_console") {
+        local Index = DialogData["WarningShownIndex",number]
+        "alxos_console_redraw_msg"(Index,CalcP+"%")
+    } else {
+        EGP:egpSize(BoxID,vec2(BoxW,20))
+        EGP:egpSetText(PercID,CalcP+"%")
+    }
 
     if (CalcP<100) {
         runCmd("alxos_bmp_progress_full",10)
@@ -379,8 +406,13 @@ function alxos_bmp_progress() {
         BoxW = 1
     }
 
-    EGP:egpSize(BoxID,vec2(BoxW,20))
-    EGP:egpSetText(PercID,CalcP+"%")
+    if (GpuData["lastProg",string]=="alxos_console") {
+        local Index = DialogData["WarningShownIndex",number]
+        "alxos_console_redraw_msg"(Index,CalcP+"%")
+    } else {
+        EGP:egpSize(BoxID,vec2(BoxW,20))
+        EGP:egpSetText(PercID,CalcP+"%")
+    }
 
     if (CalcP<100) {
         runCmd("alxos_bmp_progress",10)
@@ -403,7 +435,7 @@ function number alxos_bmp_step() {
         }
         
         if (BmpWarning & !DialogData["WarningShown",number]) {
-            alxos_bmp_warning(BmpWarning)
+            alxos_img_warning(BmpWarning)
         }
             
         GpuData["realRowBytes", number] = BmpData[28, number]
@@ -562,36 +594,15 @@ function alxos_bmp_step(Data:string) {
     alxos_bmp_step()        
 }
 
-function number alxos_bmp_clear() {
-    if (!checkPerf(7000)) {
-        runCmd("alxos_bmp_clear",1)
-        return 0
-    }
-    
-    DSEvent = function() {}
-    
-    "alxos_explorer_handlers"()
-    "alxos_explorer_listcurdir"()
-    return 0
-}
-
-function number alxos_bmp_close() {
-    DSEvent = function() {}
-    
-    "alxos_explorer_handlers"()
-    "alxos_explorer_listcurdir"()
-    return 0
-}
-
 function alxos_bmp_ds(Name:string) {
     if (Name=="fs_readfile") {
         alxos_bmp_step(dsGetString())
     } elseif (Name=="clear") {
         if (!checkPerf(7000)) {
-            runCmd("alxos_bmp_clear",1)
+            runCmd("alxos_img_clear",1)
             return
         }
-        alxos_bmp_clear()
+        alxos_img_clear()
     }
 }
 
@@ -605,8 +616,8 @@ function number alxos_bmp_key(Key:string,Pressed) {
     
     if (Key=="f8") {
         stoptimer("cmd")
-        dsSendDirect("clear",GpuData[1,table]["hdd_io",wirelink]:entity(),entity())
-        alxos_bmp_close()
+        dsSendDirect("clear",GpuData[1,table]["hdd_io",wirelink]:entity(),1)
+        alxos_img_close()
         return 1
     } elseif (Key=="enter" & Title!="Opening file" & Title!="BMP Settings") {
         alxos_bmp_key("f8",1)

@@ -1,7 +1,7 @@
 @name E2P/E2Z Include (REQUIRED)
 @inputs ExecutorID:number
 @outputs RemoteEntID:number
-@persist IsDirectCode:number
+@persist IsDirectCode:number ExitProg:function
 
 #[
     If you want create .e2p or .e2z file you MUST include this file always
@@ -14,12 +14,30 @@ if (first()|duped()) {
     dsSetScope(2)
     RemoteEntID = entity():id()
     IsDirectCode = 0
-}
 
-function dsInitProg() {
-    dsSendDirect("initExecutor", entity(ExecutorID), table(wirelink()))
-}
+    function dsInitProg() {
+        dsSendDirect("initExecutor", entity(ExecutorID), table(wirelink()))
+    }
+    
+    function endProg() {
+        stopAllTimers()
+        dsSendDirect("SHUTDOWN", entity(ExecutorID), 1)
+        exit()
+    }
+    
+    function exitProg() {
+        stopAllTimers()
+        dsSendDirect("exitProg", entity(ExecutorID), 1)
+        exit()
+    }
+    
+    # just for unify
+    ExitProg = function() { 
+        exitProg() 
+    }
+    
+    if (first()) {
+        dsInitProg()
+    } 
 
-if (first()) {
-    dsInitProg()
-} 
+}

@@ -23,21 +23,37 @@ function array alxos_findExecutor() {
 function alxos_executor_init(Args:table) {
     #ifndef entity:remoteSetCode(string)
         if (1) {
-            "alxos_explorer_error"(
-                "Remote Upload E2 Extension is disabled, cannot run code.\n\n"+
+            local Error = "Remote Upload E2 Extension is disabled,\n"+
+                "cannot run code.\n\n"+
                 "You can enable it in server console:\n"+
-                "wire_expression2_extension_enable remoteupload",
-                500
-            )
+                "wire_expression2_extension_enable remoteupload"
+            
+            if (CurrentProg=="alxos_console") {
+                "alxos_console_err"(Error)
+            } else {
+                "alxos_explorer_error"(
+                    Error,
+                    500
+                )
+            }
             return
         }
     #endif
     
     local Executor = alxos_findExecutor()
     if (!Executor:count()) {
-        "alxos_explorer_error"("Remote Executor not found, please insert PCI card and reboot.",500)
+        local Error = "Remote Executor not found, please insert PCI card and reboot."
+        
+        if (CurrentProg=="alxos_console") {
+            "alxos_console_err"(Error)
+        } else {
+            "alxos_explorer_error"(
+                Error,
+                500
+            )
+        }
         return
-    }
+    }    
     
     GpuData["ExecInit",number] = 0
     KeyHandler = "alxos_executor_key"
@@ -64,13 +80,21 @@ function alxos_executor_init(Args:table) {
         ExplorerFS,FInfo,0,FInfo["size",number]
     )))
     
-    local Parent = "alxos_explorer_dialog"("Opening file",400,80,"progress","alxos_executor_clear")[number]
-
-    DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpAlign(LAST_I,1)
-    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    GpuData["lastProg", string] = CurrentProg
+    
+    if (CurrentProg=="alxos_console") {                
+        "alxos_console_msg"("Opening file... Press ENTER or F8 to cancel")
+        "alxos_console_msg"("0%")
+        "alxos_console_move"()
+    } else {
+        local Parent = "alxos_explorer_dialog"("Opening file",400,80,"progress","alxos_executor_clear")[number]
+    
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpAlign(LAST_I,1)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    }
     
     DialogData[1,number] = 1
     DialogData[3,number] = 1
@@ -79,13 +103,18 @@ function alxos_executor_init(Args:table) {
 }
 
 function alxos_executor_done() {
-    local Parent = "alxos_explorer_dialog"("Code Executed",400,60,"","")[number]
-    
-    DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Code is executing...",vec2(200,20))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpAlign(LAST_I,1)
-    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    if (GpuData["lastProg", string]=="alxos_console") {
+        "alxos_console_msg"("Code is executing... Press F8 to cancel")
+        "alxos_console_move"()
+    } else {
+        local Parent = "alxos_explorer_dialog"("Code Executed",400,60,"","")[number]
+        
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Code is executing...",vec2(200,20))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpAlign(LAST_I,1)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    }
     
     local Executor = alxos_findExecutor()
     dsSendDirect("executeInitDone",Executor[3,entity],1)
@@ -110,9 +139,14 @@ function alxos_executor_progress() {
         local BoxW = DialogData[-6,number]
         local CalcP = round(I/Max*100)
         BoxW = ceil(BoxW/100*CalcP)
-        if (BoxW<1) { BoxW = 1 }
-        EGP:egpSize(BoxID,vec2(BoxW,20))
-        EGP:egpSetText(PercID,CalcP+"%")
+        if (BoxW<1) { BoxW = 1 }     
+        
+        if (GpuData["lastProg",string]=="alxos_console") {            
+            "alxos_console_redraw_last"(CalcP+"%")
+        } else {
+            EGP:egpSize(BoxID,vec2(BoxW,20))
+            EGP:egpSetText(PercID,CalcP+"%")
+        }
     }
     
     runCmd("alxos_executor_progress",1) 
@@ -123,6 +157,7 @@ function number alxos_executor_clear() {
         runCmd("alxos_executor_clear",1)
         return 0
     }
+    stoptimer("cmd")
     
     local ExplorerFS = GpuData[1,table]
     dsSendDirect("clear",ExplorerFS["hdd_io",wirelink]:entity(),1)
@@ -131,15 +166,41 @@ function number alxos_executor_clear() {
     dsSendDirect("SHUTDOWN",Executor[3,entity],0)
 
     DSEvent = function() {}
-    "alxos_explorer_handlers"()
-    "alxos_explorer_listcurdir"()
+    
+    if (GpuData["lastProg", string]=="alxos_console") {
+        local CmdPath = "alxos_console_getpath"()[table]
+        local CmdDir = "alxos_console_getdir"()[table]
+        "alxos_execute"("alxos_console",table(table(),ExplorerFS,AllFs,CmdPath,CmdDir))
+    } else {
+        "alxos_explorer_handlers"()
+        "alxos_explorer_listcurdir"()
+    }
     return 0
+}
+
+function alxos_executor_end() {
+    stoptimer("cmd")
+    local ExplorerFS = GpuData[1,table]
+    dsSendDirect("clear",ExplorerFS["hdd_io",wirelink]:entity(),1)
+    
+    DSEvent = function() {}
+
+    local Executor = alxos_findExecutor()
+    dsSendDirect("SHUTDOWN",Executor[3,entity],0)
 }
 
 function number alxos_executor_close() {
     DSEvent = function() {}
-    "alxos_explorer_handlers"()
-    "alxos_explorer_listcurdir"()
+    
+    if (GpuData["lastProg", string]=="alxos_console") {
+        local ExplorerFS = GpuData[1,table]
+        local CmdPath = "alxos_console_getpath"()[table]
+        local CmdDir = "alxos_console_getdir"()[table]
+        "alxos_execute"("alxos_console",table(table(),ExplorerFS,AllFs,CmdPath,CmdDir))
+    } else {
+        "alxos_explorer_handlers"()
+        "alxos_explorer_listcurdir"()
+    }
     return 0
 }
 
@@ -147,7 +208,7 @@ function alxos_executor_run(Code:string) {
     local Executor = alxos_findExecutor()
     
     local ExplorerFS = GpuData[1,table]
-    local FInfo = GpuData[2,table]
+    local FInfo = GpuData[2,table]:copy()
     
     FInfo["content",string] = Code
     
@@ -155,16 +216,23 @@ function alxos_executor_run(Code:string) {
         local Executor = alxos_findExecutor()
         dsSendDirect("DS_Connect",Executor[3,entity],1)  
     }
+    
+    local Info = table()
+    Info["Devices",table] = Devices
+    Info["TickQuota",number] = TickQuota
+    Info["ExplorerFS",table] = ExplorerFS
+    Info["AllFs",table] = AllFs
+    Info["FInfo",table] = FInfo
+    Info["LastProgram",string] = GpuData["lastProg",string]
+    
+    if (GpuData["lastProg", string]=="alxos_console") {
+        "alxos_console_redraw_last"("100%")
+    }
 
-    dsSendDirect("executeCode",Executor[3,entity],table(
-        Devices,
-        TickQuota,
-        ExplorerFS,
-        FInfo
-    ))
+    dsSendDirect("executeCode",Executor[3,entity],Info)
 }
 
-function alxos_executor_ds(Name:string) {    
+function alxos_executor_ds(Name:string) {      
     if (Name=="fs_readfile") {
         alxos_executor_run(dsGetString())
     } elseif (Name=="clear") {
@@ -181,14 +249,25 @@ function alxos_executor_ds(Name:string) {
             ErrorMsg = "Remote Executor ExecutorID is invalid!\nPlease check wire inputs on pci card e2 chips."    
         }
         
-        "alxos_explorer_error"(ErrorMsg,420)     
+        if (GpuData["lastProg", string]=="alxos_console") {
+            "alxos_console_handlers"()
+            "alxos_console_err"(ErrorMsg)
+        } else {        
+            "alxos_explorer_error"(ErrorMsg,420)
+        }    
     } elseif (Name=="initExecutor") {    
         local Info = dsGetTable()        
         GpuData["ExecutorWirelink",wirelink] = Info[1,wirelink]
         GpuData["ExecInit",number] = 1
         
         alxos_executor_done()
-    } 
+    } elseif (Name=="exitProg") {    
+        alxos_executor_end()
+        alxos_executor_close()
+    } elseif (Name=="alxos_runprog") {
+        alxos_executor_end()        
+        "alxos_explorer_ds"(Name)
+    }
 }
 
 function number alxos_executor_key(Key:string,Pressed) {
@@ -197,10 +276,7 @@ function number alxos_executor_key(Key:string,Pressed) {
     local Index = DialogData[-5,number]
     local Type = DialogData[-2,string]
     
-    if (Key=="f8") {
-        stoptimer("cmd")
-        dsSendDirect("clear",GpuData[1,table]["hdd_io",wirelink]:entity(),entity())
-        
+    if (Key=="f8") {  
         alxos_executor_clear()
         return 1
     } elseif (Key=="enter" & !GpuData["ExecInit",number]) {

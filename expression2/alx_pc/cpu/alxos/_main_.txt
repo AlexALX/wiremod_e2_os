@@ -1,6 +1,6 @@
 @name ALX Wiremod OS Main func
 @persist SysFs:table SysDir:table FsTbls:table AllFs:table
-@persist ALXOS_PROG_ASOC:table ALXOS_DsH:string
+@persist ALXOS_PROG_ASOC:table ALXOS_PROGS:table ALXOS_DsH:string
 
 #[
 	ALX Wiremod E2 OS
@@ -26,6 +26,18 @@ function number alxos_openfile(FInfo:table) {
         return 1
     }
     return 0
+}
+
+function alxos_runprog_ds() {
+    local Info = dsGetTable()
+    local Name = Info[1,string]
+    local FInfo = Info[2,table]
+    
+    if (ALXOS_PROGS:exists(Name)) {
+        Name(FInfo)
+    } else {
+        dsSendDirect(dsClkName(),dsGetSender(),table(-1))
+    }
 }
 
 function alxos_openfile_ds() {

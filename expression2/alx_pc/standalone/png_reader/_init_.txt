@@ -47,7 +47,7 @@ function pngInit(Data:string,MaxSize:number,NoKeepAR:number)
         return
     }
     
-    Progress["stepTotal",number] = 5
+    Progress["stepTotal",number] = 4
     Png["pos",number] = 9
     
     timer(0.001, function() {

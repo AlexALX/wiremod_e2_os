@@ -31,7 +31,7 @@
         "e2files" folder with:
         - "e2files/_main_.txt"
         - "e2files/alx_pc/remote/includes/example_e2z.txt"
-        
+
         If you see "testprog_e2z" in your ROOT folder in zip - you did it wrong!
         
     8. Now rename "testprog_e2z.zip" to "testprog.zip.txt" and put it in "garrysmod/data/e2files/"
@@ -54,10 +54,16 @@ event remote(Sender:entity, Player:entity, Payload:table) {
     # protect from broadcast
     if (Sender:id()!=ExecutorID) { exit() }
     
-    Devices = Payload[1,table]
-    TickQuota = Payload[2,number]
-    CurrentFS = Payload[3,table]
-    Assets = Payload[4,table]
+    Devices = Payload["Devices",table]
+    TickQuota = Payload["TickQuota",number]
+    CurrentFS = Payload["CurrentFS",table]
+    AllFs = Payload["AllFs",table]
+    
+    # This will have alxos_explorer or alxos_console
+    LastProgram = Payload["LastProgram",string]
+    
+    # This is only for e2z
+    Assets = Payload["Assets",table]
     
     EGP = Devices["GPU_Screens",table]["EGP_WL",wirelink]
     DS = Devices["GPU_Screens",table]["DS_WL",wirelink]
@@ -67,6 +73,15 @@ event remote(Sender:entity, Player:entity, Payload:table) {
 
 # F8 key are RESERVED for Executor to shutdown whole program!
 function dsKeyPressed(Key:string, Pressed) {
+    if (Key=="enter") {
+        exitProg()
+    }
+    
+    if (Key=="f7") {
+        # this will exit to directory you was initially running
+        dsSendDirect("alxos_runprog",Devices["cpu",entity],table("alxos_console"))    
+    }
+    
     # handle keys here
 }
 

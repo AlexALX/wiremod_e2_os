@@ -1,5 +1,4 @@
 @name ALX Wiremod OS CPU Programs
-@persist ALXOS_PROGS:table
 
 #[
 	ALX Wiremod E2 OS

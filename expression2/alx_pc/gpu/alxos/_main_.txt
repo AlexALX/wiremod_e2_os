@@ -1,5 +1,5 @@
 @name ALX Wiremod OS Main func
-@persist HTTP_Handler:string FILE_Handler:string DialogData:table AllFs:table ALXOS_INCLUDED
+@persist HTTP_Handler:string FILE_Handler:string DialogData:table AllFs:table ALXOS_INCLUDED CurrentProg:string
 #[
 	ALX Wiremod E2 OS
 	Created by AlexALX
@@ -17,6 +17,7 @@ function alxos_init(CurFS:table,AllFS:table) {
     AllFs = AllFS
     SysFS = CurFS
     EgpCleanHandler = "alxos_OnEgpClear"
+    CurrentProg = ""
 }
 
 function alxos_OnEgpClear() {
@@ -32,6 +33,7 @@ function alxos_clear(BSOD:array) {
     KeyHandler = ""
     PlugHandler = ""
     ALXOS_PlugHandler = ""
+    CurrentProg = ""
     if (BSOD[1,number]) {
         stopAllTimers()
         "alxos_bsod"(BSOD)

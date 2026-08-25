@@ -1,6 +1,7 @@
 @name Test Remote E2R Prog
-@persist Devices:table TickQuota:number CurrentFS:table
+@persist Devices:table TickQuota:number CurrentFS:table AllFs:table LastProgram:string
 @persist EGP:wirelink DS:wirelink
+@persist ExitProg:function ExecutorID:number
 
 #[
     To use this chip via Remote Executor you need to enable 
@@ -26,8 +27,7 @@
 ##include "alx_pc/remote/e2p_include"
 
 if (first()|duped()) {
-    # hacky way to never override, it is set by executor or e2p_include
-    if (0) { ExecutorID = 0 }
+
 }
 
 # use this event as entry point into program!
@@ -35,9 +35,16 @@ event remote(Sender:entity, Player:entity, Payload:table) {
     # protect from broadcast
     if (Sender:id()!=ExecutorID) { exit() }
     
-    Devices = Payload[1,table]
-    TickQuota = Payload[2,number]
-    CurrentFS = Payload[3,table]
+    Devices = Payload["Devices",table]
+    TickQuota = Payload["TickQuota",number]
+    CurrentFS = Payload["CurrentFS",table]
+    AllFs = Payload["AllFs",table]
+
+    # This will have alxos_explorer or alxos_console
+    LastProgram = Payload["LastProgram",string]
+    
+    # This is only for e2z
+    #Assets = Payload["Assets",table]
     
     EGP = Devices["GPU_Screens",table]["EGP_WL",wirelink]
     DS = Devices["GPU_Screens",table]["DS_WL",wirelink]
@@ -47,13 +54,27 @@ event remote(Sender:entity, Player:entity, Payload:table) {
     
     local LAST_I = 1
     
-    EGP:egpText(LAST_I,"TEST EXECUTE INIT, PRESS F8 TO EXIT",vec2(256,256))
+    EGP:egpText(LAST_I,"TEST EXECUTE INIT, PRESS ENTER OR F8 TO EXIT",vec2(256,246))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++
+    
+    EGP:egpText(LAST_I,"PRESS F7 TO EXIT INTO CONSOLE",vec2(256,266))
     EGP:egpAlign(LAST_I,1)
     EGP:egpColor(LAST_I,255,255,255,255) LAST_I++
 }
 
 # F8 key are RESERVED for Executor to shutdown whole program!
 function dsKeyPressed(Key:string, Pressed) {
+    if (Key=="enter") {
+        # this function automatically added
+        ExitProg()
+    }
+    
+    if (Key=="f7") {
+        # this will exit to directory you was initially running
+        dsSendDirect("alxos_runprog",Devices["cpu",entity],table("alxos_console"))    
+    }
+
     # handle keys here
 }
 

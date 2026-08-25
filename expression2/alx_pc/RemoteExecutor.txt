@@ -1,7 +1,7 @@
 @name Remote Executor
 @inputs InA Board:wirelink ExecutorID:number
 @outputs EntID:number
-@persist BIOS:entity Device_Name:string CurrentFS:table Assets:table
+@persist BIOS:entity Device_Name:string RemoteInfo:table
 @persist Devices:table Init Caller:entity CodePrepend:string CodeAppend:string CodeExecute:string CodeInclude:string
 
 #[
@@ -44,6 +44,12 @@ if (first()|duped()) {
     dsSetScope(2)
     RemoteEntID = entity():id()
     IsDirectCode = 1
+    
+    ExitProg = function() {
+        stopAllTimers()
+        dsSendDirect(\"exitProg\", entity(ExecutorID), 1)
+        exit()     
+    }
 }
 "
 
@@ -62,7 +68,7 @@ CodeInclude = "
 @name E2P/E2Z Include (REQUIRED)
 @inputs ExecutorID:number
 @outputs RemoteEntID:number
-@persist IsDirectCode:number
+@persist IsDirectCode:number ExitProg:function
 
 #[
     If you want create .e2p or .e2z file you MUST include this file always
@@ -75,21 +81,38 @@ if (first()|duped()) {
     dsSetScope(2)
     RemoteEntID = entity():id()
     IsDirectCode = 0
+
+    function dsInitProg() {
+        dsSendDirect(\"initExecutor\", entity(ExecutorID), table(wirelink()))
+    }
+    
+    function endProg() {
+        stopAllTimers()
+        dsSendDirect(\"SHUTDOWN\", entity(ExecutorID), 1)
+        exit()
+    }
+    
+    function exitProg() {
+        stopAllTimers()
+        dsSendDirect(\"exitProg\", entity(ExecutorID), 1)
+        exit()
+    }
+    
+    # just for unify
+    ExitProg = function() { 
+        exitProg() 
+    }
+    
+    if (first()) {
+        dsInitProg()
+    } 
+
 }
 
-function dsInitProg() {
-    dsSendDirect(\"initExecutor\", entity(ExecutorID), table(wirelink()))
-}
-
-if (first()) {
-    dsInitProg()
-} 
 "
 
 function clearMemory() {
-    Devices = table()
-    CurrentFS = table()
-    Assets = table()    
+    RemoteInfo = table()    
 }
 
 function setNoCode() {
@@ -158,11 +181,8 @@ if (dsClk()) {
             exit()
         }
         
-        local Info = dsGetTable()
-        Devices = Info[1,table]
-        TickQuota = Info[2,number]
-        CurrentFS = Info[3,table]
-        local FInfo = Info[4,table]
+        RemoteInfo = dsGetTable()
+        local FInfo = RemoteInfo["FInfo",table]
         
         local Type = (FInfo["real_ext",string]!="" ? FInfo["real_ext",string] : FInfo["ext",string]):lower()
         local Code = FInfo["content",string]
@@ -176,7 +196,6 @@ if (dsClk()) {
         
         if (Type=="e2z") {
             local Includes = FInfo["includes",table]
-            Assets = FInfo["assets",table]
             
             # auto append it to file
             Includes["alx_pc/remote/e2p_include",string] = CodeInclude
@@ -196,6 +215,9 @@ if (dsClk()) {
         usb_init()
     } elseif (Name=="SHUTDOWN") {
         shutdown()
+    } elseif (Name=="exitProg") {
+        dsSendDirect("exitProg",Caller,1)
+        shutdown()
     } elseif (DsHandler!="") {
         DsHandler(Name)
     } elseif (Name=="initExecutor") {        
@@ -203,7 +225,11 @@ if (dsClk()) {
         dsSendDirect("initExecutor", Caller, dsGetTable())  
     } elseif (Name=="executeInitDone") {
         local Executor = getentity(ExecutorID)
-        Executor:sendRemoteEvent(table(Devices, TickQuota, CurrentFS, Assets))
+        
+        RemoteInfo["Assets",table] = RemoteInfo["FInfo",table]["assets",table]
+        RemoteInfo:remove("FInfo")
+             
+        Executor:sendRemoteEvent(RemoteInfo)
         
         # clear memory now
         clearMemory()

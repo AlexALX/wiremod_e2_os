@@ -320,6 +320,7 @@ function alxos_explorer_handlers() {
     DsHandler = "alxos_explorer_ds"  
     KeyHandler = "alxos_explorer_key"
     PlugHandler = "alxos_explorer_onplug"
+    CurrentProg = "alxos_explorer"
 }
 
 function alxos_explorer_listcurdir() {

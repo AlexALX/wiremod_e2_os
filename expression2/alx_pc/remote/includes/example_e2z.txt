@@ -1,4 +1,4 @@
-@persist Devices:table TickQuota:number CurrentFS:table Assets:table
+@persist Devices:table TickQuota:number CurrentFS:table AllFs:table Assets:table LastProgram:string
 @persist EGP:wirelink DS:wirelink
 
 function drawExampleText() {
@@ -7,15 +7,21 @@ function drawExampleText() {
         
     local LAST_I = 1
     
-    EGP:egpText(LAST_I,"TEST E2Z EXECUTE INIT, PRESS F8 TO EXIT",vec2(256,226))
-    EGP:egpAlign(LAST_I,1)
-    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++
+    local LAST_Y = 216
     
-    EGP:egpText(LAST_I,"Content of asset \"testfile.txt\":",vec2(256,246))
+    EGP:egpText(LAST_I,"TEST E2Z EXECUTE INIT, PRESS ENTER OR F8 TO EXIT",vec2(256,LAST_Y))
     EGP:egpAlign(LAST_I,1)
-    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++
+    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++ LAST_Y += 20
     
-    EGP:egpText(LAST_I,Assets["testfile.txt",string],vec2(256,266))
+    EGP:egpText(LAST_I,"PRESS F7 TO EXIT INTO CONSOLE",vec2(256,LAST_Y))
     EGP:egpAlign(LAST_I,1)
-    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++
+    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++ LAST_Y += 20
+    
+    EGP:egpText(LAST_I,"Content of asset \"testfile.txt\":",vec2(256,LAST_Y))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++ LAST_Y += 20
+    
+    EGP:egpText(LAST_I,Assets["testfile.txt",string],vec2(256,LAST_Y))
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,255,255,255,255) LAST_I++ LAST_Y += 20
 }

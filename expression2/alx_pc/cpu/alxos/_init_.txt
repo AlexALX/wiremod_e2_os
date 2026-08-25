@@ -362,6 +362,8 @@ function alxos_ds(Name:string) {
         alxos_openfile_ds()
     } elseif (Name=="alxos_execute") {
         alxos_execude_ds()
+    } elseif (Name=="alxos_runprog") {
+        alxos_runprog_ds()
     } elseif (Name=="sata_onplug") {
         local Info = dsGetTable()
         if (!SysFs["hddinfo",table]["entid",number]) {
