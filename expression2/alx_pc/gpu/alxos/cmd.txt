@@ -55,7 +55,14 @@ function alxos_console_msg(Str:string) {
         CmdLinesC++
         #alxos_console_move()
     }
+}
 
+function alxos_console_rawmsg(Str:string) {
+    CmdLines[CmdLinesC,number] = LAST_I
+    EGP:egpText(LAST_I,Str,vec2(BIOS_X,LAST_Y))
+    EGP:egpFont(LAST_I,"Courier New")
+    EGP:egpColor(LAST_I,168,168,168,255) LAST_I++ LAST_Y+=20
+    CmdLinesC++
 }
 
 function alxos_console_handlers() {
@@ -159,17 +166,19 @@ function alxos_console_err(Err:string) {
     alxos_show_cursor()
 }
 
+function alxos_console_cls_safe() {
+    LAST_I = 1
+    LAST_Y = 0
+    EGP:egpClear()
+    CmdLinesC = 1
+    CmdLines = array()    
+    CmdCursor = 0
+}
+
 function alxos_console_cls() {
     egpClear()
-    CmdLinesC = 1
-    CmdLines = array()
-    
-    GpuData[1,table] = table()
-    GpuData[2,number] = 0
-    
+    alxos_console_cls_safe()
     alxos_console_command()
-    
-    CmdCursor = 0
     alxos_draw_cursor()
 }
 

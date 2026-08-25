@@ -53,8 +53,14 @@ function number alxos_img_init(Args:table, Format:string) {
 function alxos_prog_img_unplug() {
     stopAllTimers()
     ExplorerDsH = ""
-    "alxos_explorer_handlers"()
-    "alxos_explorer_msg"("Disk was unplugged.",200,"Information")    
+    if (GpuData["lastProg",string]=="alxos_console") {
+        "alxos_console_msg"("Disk was unplugged.")
+        "alxos_console_command"()
+        "alxos_console_handlers"()
+    } else {
+        "alxos_explorer_handlers"()
+        "alxos_explorer_msg"("Disk was unplugged.",200,"Information")    
+    }
 }
 
 function alxos_img_postinit() {

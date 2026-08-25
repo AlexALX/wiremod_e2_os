@@ -63,24 +63,35 @@ function alxos_explorer_reader_init(Info:table) {
     
     GpuData["lastProg",string] = CurrentProg
     
-    "alxos_explorer_bg"()
     "alxos_explorer_handlers"()
     
     GpuData["zipAdded",number] = ZipAdded
     
     ExplorerFile = FInfo["name",string]+(FInfo["ext",string]!="" ? "."+FInfo["ext",string] : "")
-    "alxos_explorer_ft"(array("Quit")) #"Edit"
+    
+    if (GpuData["lastProg",string]!="alxos_console") {
+        "alxos_explorer_bg"()
+        "alxos_explorer_ft"(array("Quit")) #"Edit"
+    }
     
     local LAST_SI = GpuData[100,number]
     if (LAST_SI>0) { LAST_I = LAST_SI } else { GpuData[100,number] = LAST_I }
-
-    local Parent = "alxos_explorer_dialog"("Opening file",400,80,"progress","alxos_explorer_reader_close")[number]
-
-    DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpAlign(LAST_I,1)
-    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    if (GpuData["lastProg",string]=="alxos_console") {        
+        "alxos_hide_cursor"()
+        "alxos_console_msg"("Opening file... Press F8 to cancel")
+        "alxos_console_msg"("0%")
+        "alxos_console_move"()
+    } else {
+        local Parent = "alxos_explorer_dialog"("Opening file",400,80,"progress","alxos_explorer_reader_close")[number]
+    
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpAlign(LAST_I,1)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+        
+    }
     
     local ExplorerFS = "alxos_explorer_getfs"()[table]
     
@@ -142,12 +153,20 @@ function alxos_explorer_reader_move(Key:string) {
     
     GpuData[-101,number] = 1
     
-    local Parent = "alxos_explorer_dialog"("Opening file",400,80,"progress","alxos_explorer_reader_close")[number]
-    DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpAlign(LAST_I,1)
-    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    if (GpuData["lastProg",string]=="alxos_console") {
+        "alxos_console_cls_safe"()
+        "alxos_console_msg"("Opening file... Press F8 to cancel")
+        "alxos_console_msg"("0%")
+        "alxos_console_move"()
+    } else {    
+        local Parent = "alxos_explorer_dialog"("Opening file",400,80,"progress","alxos_explorer_reader_close")[number]
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpAlign(LAST_I,1)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    }
     
     local FInfo = GpuData[7,table]
     
@@ -197,9 +216,13 @@ function number alxos_explorer_reader_cmd(Args:table) {
         local St = GpuData[13,number]
         local Ed = St+48
         
-        EGP:egpText(LAST_I,CurStr:sub(St,Ed),vec2(10,LAST_Y))
-        EGP:egpFont(LAST_I,"Courier New") # monowidth font, sorry not cross-platform :(
-        EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ LAST_Y += 19
+        if (GpuData["lastProg",string]=="alxos_console") {
+            "alxos_console_rawmsg"(CurStr:sub(St,Ed))
+        } else {
+            EGP:egpText(LAST_I,CurStr:sub(St,Ed),vec2(10,LAST_Y))
+            EGP:egpFont(LAST_I,"Courier New") # monowidth font, sorry not cross-platform :(
+            EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ LAST_Y += 19
+        }
         
         TotalLines++ 
         if (TotalLines>23 | Last>=Max) { 
@@ -215,7 +238,7 @@ function number alxos_explorer_reader_cmd(Args:table) {
     return 1
 }
 
-function alxos_explorer_reader(Data:string) { 
+function alxos_explorer_reader(Data:string) {    
     local ExplorerFS = "alxos_explorer_getfs"()[table]
     
     local FInfo = GpuData[7,table] 
@@ -235,9 +258,14 @@ function alxos_explorer_reader(Data:string) {
             local BoxID = DialogData[-5,number]
             local BoxW = DialogData[-6,number]
             local CalcP = round(Count/24*100)
-            BoxW = ceil(BoxW/100*CalcP)
-            EGP:egpSize(BoxID,vec2(BoxW,20))
-            EGP:egpSetText(PercID,CalcP+"%")
+            
+            if (GpuData["lastProg",string]=="alxos_console") {
+                "alxos_console_redraw_last"(CalcP+"%")
+            } else {            
+                BoxW = ceil(BoxW/100*CalcP)
+                EGP:egpSize(BoxID,vec2(BoxW,20))
+                EGP:egpSetText(PercID,CalcP+"%")
+            }
         }
         GpuData[10,number] = Count
         
@@ -249,7 +277,12 @@ function alxos_explorer_reader(Data:string) {
         #print(Start+Offset+" | "+End)
         dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(ExplorerFS,FInfo,Start+Offset+1,End)))      
     } else {
-        "alxos_explorer_closedialog"()
+        if (GpuData["lastProg",string]=="alxos_console") {
+            "alxos_console_cls_safe"()
+            "alxos_console_msg"("Controls: Arrow Keys - Move, F8 - Exit")
+        } else {
+            "alxos_explorer_closedialog"()
+        }
     
         local Str = GpuData[9,string]+Data
         # fix for lines
@@ -298,10 +331,22 @@ function alxos_explorer_reader_key(Key:string, Pressed) {
             else { St += Max Ed += AddMax }
             if (St<=1) { St = 1 Ed = St+AddMax }
             GpuData[13,number] = St
-            for(I=1,Lines:count()) {
-                local Item = Lines[I,array]
-                EGP:egpText(Item[1,number],Item[2,string]:sub(St,Ed),EGP:egpPos(Item[1,number]))   
-            }              
+            
+            local IsConsole = GpuData["lastProg",string]=="alxos_console"
+            
+            if (GpuData["lastProg",string]=="alxos_console") {
+                "alxos_console_cls_safe"()
+                "alxos_console_msg"("Controls: Arrow Keys - Move, F8 - Exit")              
+                for(I=1,Lines:count()) {
+                    local Item = Lines[I,array]
+                    "alxos_console_rawmsg"(Item[2,string]:sub(St,Ed))
+                }
+            } else {            
+                for(I=1,Lines:count()) {
+                    local Item = Lines[I,array]
+                    EGP:egpText(Item[1,number],Item[2,string]:sub(St,Ed),EGP:egpPos(Item[1,number]))   
+                }
+            } 
         } elseif (Key=="up" | Key=="down") {
             "alxos_explorer_reader_move"(Key)
         }

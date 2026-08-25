@@ -9,7 +9,12 @@
 
 function alxos_midi_init(Args:table) {
     if (!Devices["spu",entity]:isValid()) {
-        "alxos_explorer_error"("No sound card detected!",260)
+        local Msg = "No sound card detected!"
+        if (CurrentProg=="alxos_console") {
+            "alxos_console_err"(Msg)
+        } else {
+            "alxos_explorer_error"(Msg,260)
+        }
         return
     }
     
@@ -22,14 +27,27 @@ function alxos_midi_init(Args:table) {
     
     dsSendDirect("findMidiPlayer",Devices["spu",entity],1)
     
+    if (CurrentProg=="alxos_console") {
+        DialogData = table()
+    }
+    
     GpuData["midiStart",number] = 0
 }
 
 function alxos_prog_midi_unplug() {
     stopAllTimers()
     ExplorerDsH = ""
-    "alxos_explorer_handlers"()
-    "alxos_explorer_msg"("Disk was unplugged.",200,"Information")
+    
+    local Msg = "Disk was unplugged."
+    
+    if (GpuData["lastProg",string]=="alxos_console") {
+        "alxos_console_msg"(Msg)
+        "alxos_console_command"()
+        "alxos_console_handlers"()
+    } else {    
+        "alxos_explorer_handlers"()
+        "alxos_explorer_msg"(Msg,200,"Information")
+    }
 }
 
 function alxos_midi_postinit() {
@@ -38,8 +56,14 @@ function alxos_midi_postinit() {
         local WLT = dsGetTable()
         GpuData["midiPlayer",wirelink] = WLT[1,wirelink]    
     } else {
-        "alxos_explorer_handlers"()
-        "alxos_explorer_error"("MIDI Player not connected to your Sound Card.",450)
+        local Msg = "MIDI Player not connected to your Sound Card."
+        if (GpuData["lastProg",string]=="alxos_console") {
+            "alxos_console_err"(Msg)
+            "alxos_console_handlers"()
+        } else {
+            "alxos_explorer_handlers"()
+            "alxos_explorer_error"(Msg,450)
+        }
         return
     }
 
@@ -54,6 +78,10 @@ function alxos_midi_postinit() {
     GpuData[2,table] = FInfo
     GpuData[5,number] = 0
     
+    if (GpuData["lastProg",string]=="alxos_console") {
+        KeyHandler = "alxos_midi_key"    
+    }
+    
     if (FInfo["content",string]) {
         "alxos_midi_play"(FInfo["content",string])
         return   
@@ -62,14 +90,20 @@ function alxos_midi_postinit() {
     dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(
         ExplorerFS,FInfo,0,FInfo["size",number]
     )))
-
-    local Parent = "alxos_explorer_dialog"("Opening file",400,80,"progress","alxos_midi_clear")[number]
-
-    DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
-    EGP:egpParent(LAST_I,Parent)
-    EGP:egpAlign(LAST_I,1)
-    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    if (GpuData["lastProg",string]=="alxos_console") {
+        "alxos_console_msg"("Opening file... Press F8 to cancel")
+        "alxos_console_msg"("0%")
+        "alxos_console_move"()
+    } else {
+        local Parent = "alxos_explorer_dialog"("Opening file",400,80,"progress","alxos_midi_clear")[number]
+    
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpAlign(LAST_I,1)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    }
     
     DialogData[1,number] = 1
     DialogData[3,number] = 1
@@ -97,8 +131,13 @@ function alxos_midiread_progress() {
         local CalcP = round(I/Max*100)
         BoxW = ceil(BoxW/100*CalcP)
         if (BoxW<1) { BoxW = 1 }
-        EGP:egpSize(BoxID,vec2(BoxW,20))
-        EGP:egpSetText(PercID,CalcP+"%")
+        
+        if (GpuData["lastProg",string]=="alxos_console") {
+            "alxos_console_redraw_last"(CalcP+"%")
+        } else {        
+            EGP:egpSize(BoxID,vec2(BoxW,20))
+            EGP:egpSetText(PercID,CalcP+"%")
+        }
     }
     
     runCmd("alxos_midiread_progress",1) 
@@ -121,18 +160,34 @@ function number alxos_midi_clear() {
     
     dsSendDirect("midiStop",Devices["spu",entity],0)
 
-    "alxos_explorer_handlers"()
-    "alxos_explorer_listcurdir"()
+    if (GpuData["lastProg",string]=="alxos_console") {
+        "alxos_console_handlers"()
+        "alxos_console_command"()
+    } else {
+        "alxos_explorer_handlers"()
+        "alxos_explorer_listcurdir"()
+    }
     return 0
 }
 
 function number alxos_midi_finish(Err:string) {
-    local Height = 60
-    local Pos = vec2(220,18)
     
     if (Err=="SPEAKER_UNPLUG") {
         Err = "Midi Player was disconnected!"    
     }
+    
+    if (GpuData["lastProg",string]=="alxos_console") {
+        if (Err) {
+            "alxos_console_err"(Err)
+        }
+        
+        "alxos_console_handlers"()
+        "alxos_console_command"()
+        return 0
+    }
+    
+    local Height = 60
+    local Pos = vec2(220,18)
     
     local NewLines = Err:explode("\n") 
     
@@ -182,7 +237,14 @@ function alxos_midi_play(Data:string) {
     
     local MidiPlayer = GpuData["midiPlayer",wirelink]    
     if (MidiPlayer==nowirelink()) {
-        "alxos_explorer_error"("MIDI Player not connected to your Sound Card.",450)
+        local Msg = "MIDI Player not connected to your Sound Card."
+        if (GpuData["lastProg",string]=="alxos_console") {
+            "alxos_console_err"(Msg)
+            "alxos_console_handlers"()
+        } else {
+            "alxos_explorer_handlers"()
+            "alxos_explorer_error"(Msg,450)
+        }
         return
     }
     
@@ -192,6 +254,15 @@ function alxos_midi_play(Data:string) {
         "alxos_midi_player",
         table(Data, entity(), GpuPersistData["MidiMode",string])
     ))
+    
+    if (GpuData["lastProg",string]=="alxos_console") {
+        "alxos_console_redraw_last"("Current Step: [0 / 3]")
+        "alxos_console_msg"("0%")
+        "alxos_console_msg"("Opening Midi")
+        "alxos_console_msg"("0%")
+        "alxos_console_move"()
+        return
+    }
 
     local Width = 400
     local Height = 120
@@ -202,7 +273,7 @@ function alxos_midi_play(Data:string) {
     local Parent = "alxos_explorer_dialog"("Reading Midi",Width,Height,"progress","alxos_midi_clear")[number]
 
     DialogData[-10,table]:pushNumber(LAST_I)
-    EGP:egpText(LAST_I,"Current Step: 0 / 5",alxos_dlgPos(-180,-42))
+    EGP:egpText(LAST_I,"Current Step: 0 / 3",alxos_dlgPos(-180,-42))
     EGP:egpParent(LAST_I,Parent)
     EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
 
@@ -332,6 +403,16 @@ function alxos_midi_modetext(Mode:string) {
 
 function alxos_midi_warning(Warning:string) {
     DialogData["WarningShown",number] = 1
+    
+    if (GpuData["lastProg",string]=="alxos_console") {
+        local CUR_I = LAST_I
+        
+        "alxos_console_msg"(Warning)
+        "alxos_console_move"()
+        
+        DialogData["WarningShownIndex",number] = LAST_I-CUR_I
+        return
+    }
 
     local Width = DialogData["DialogW",number]
     local Height = 90
@@ -362,37 +443,47 @@ function alxos_midi_playprogress() {
         CurTask += " "+Progress["curTime",string]+" / "+Progress["maxTime",string]  
     }
         
-    EGP:egpSetText(TW, "Current Step: "+CurTask)
-    
-    local PercID = DialogData["PercID",number]
-    local BoxID = DialogData["BoxID",number]
-    local BoxW = DialogData["BoxW",number]
     local CalcP = Progress["progressPercent",number]
-    
     local Text = Progress["progressCurrent",number] + " / " + Progress["progressMax",number] + " (" + CalcP+"%)"
     
     if (CurrentState=="done") {
         CalcP = 100
         Text = CalcP+"%"
-        
-        if (!DialogData["Paused",number]) {
-            DialogData["Paused",number] = 1
-            alxos_midi_player_playicon()
-        }
     }
     
-    if (CurrentState=="pause" & !DialogData["Paused",number]) {
-        DialogData["Paused",number] = 1
-        alxos_midi_player_playicon()
-    } elseif (CurrentState=="play" & DialogData["Paused",number]) {
-        DialogData["Paused",number] = 0
-        alxos_midi_player_playicon()
+    if (GpuData["lastProg",string]=="alxos_console") {
+        local Index = DialogData["WarningShownIndex",number]
+        "alxos_console_redraw_msg"(Index+1,CurTask)
+        "alxos_console_redraw_msg"(Index,Text)
+    } else {
+    
+        EGP:egpSetText(TW, "Current Step: "+CurTask)
+        
+        local PercID = DialogData["PercID",number]
+        local BoxID = DialogData["BoxID",number]
+        local BoxW = DialogData["BoxW",number]
+        
+        if (CurrentState=="done") {        
+            if (!DialogData["Paused",number]) {
+                DialogData["Paused",number] = 1
+                alxos_midi_player_playicon()
+            }
+        }
+        
+        if (CurrentState=="pause" & !DialogData["Paused",number]) {
+            DialogData["Paused",number] = 1
+            alxos_midi_player_playicon()
+        } elseif (CurrentState=="play" & DialogData["Paused",number]) {
+            DialogData["Paused",number] = 0
+            alxos_midi_player_playicon()
+        }
+    
+        BoxW = ceil(BoxW/100*CalcP)
+        if (BoxW<1) { BoxW = 1 }
+        EGP:egpSize(BoxID,vec2(BoxW,20))
+        EGP:egpSetText(PercID,Text)
+    
     }
-
-    BoxW = ceil(BoxW/100*CalcP)
-    if (BoxW<1) { BoxW = 1 }
-    EGP:egpSize(BoxID,vec2(BoxW,20))
-    EGP:egpSetText(PercID,Text)
 
     if (Error | CurrentState=="") {
         alxos_midi_finish(Error)
@@ -408,6 +499,24 @@ function alxos_midi_playprogress() {
 
 function alxos_midi_player() {
     DialogData[4,number] = 0
+    DialogData["midiPlay",number] = 1
+    
+    local MidiPlayer = GpuData["midiPlayer",wirelink]
+    local MidiPlayMode = MidiPlayer["MidiPlayMode",string]
+    
+    if (GpuData["lastProg",string]=="alxos_console") {        
+        local UpperCaseMode = MidiPlayMode:sub(1,1):upper() + MidiPlayMode:sub(2)        
+        
+        "alxos_console_msg"("Controls: F1 - Play/Pause, F2 - Repeat, F8 - exit")
+        "alxos_console_msg"("Modes: F3 - Synth, F4 - Instrumental, F5 - Addon")
+        "alxos_console_msg"("Current Mode: "+UpperCaseMode)
+        "alxos_console_msg"("")
+        "alxos_console_msg"("")
+        "alxos_console_move"()
+        
+        runCmd("alxos_midi_playprogress",100)
+        return    
+    }
     
     local Width = 400
     local Height = 260
@@ -415,9 +524,6 @@ function alxos_midi_player() {
     local Parent = "alxos_explorer_dialog"("Playing Midi",Width,Height,"progress","alxos_midi_clear")[number]
     
     "alxos_explorer_ft"(array("Pause","Repeat","Synth","Instr","Addon","","","Quit"))
-    
-    local MidiPlayer = GpuData["midiPlayer",wirelink]
-    local MidiPlayMode = MidiPlayer["MidiPlayMode",string]
     
     # fix dialog handlers
     local PercID = DialogData[-4,number]
@@ -661,37 +767,60 @@ function alxos_midi_progress() {
     local Warning = MidiPlayer["MidiWarning",string]
     local Mode = MidiPlayer["MidiPlayMode",string]
     
-    local TW = DialogData[3,number]
-        
-    EGP:egpSetText(TW-2, "Current Step: "+Progress["step",number] + " / 3")
-    
-    local PercID = DialogData[5,number]
-    local BoxID = DialogData[4,number]
-    local BoxW = DialogData[-6,number]
-    local CalcP = round(Progress["step",number] * 100 / 3)
-    
-    BoxW = ceil(BoxW/100*CalcP)
-    if (BoxW<1) { BoxW = 1 }
-    EGP:egpSize(BoxID,vec2(BoxW,20))
-    EGP:egpSetText(PercID,CalcP+"%")
-    
-    local PercID = DialogData[-4,number]
-    local BoxID = DialogData[-5,number]
-    local BoxW = DialogData[-6,number]
-    local CalcP = Progress["progressPercent",number]
-    
     local CurTask = Progress["progressTask",string]
+    
+    local CalcP = round(Progress["step",number] * 100 / 3)
     
     if (Progress["curTime",string]!="") {
         CurTask += " "+Progress["curTime",string]+" / "+Progress["maxTime",string]  
     }
     
-    EGP:egpSetText(TW-1, "Current Task: "+CurTask)
+    local ProgressText = Progress["progressCurrent",number] + " / " + Progress["progressMax",number] + 
+            " (" + Progress["progressPercent",number]+"%)"
     
-    BoxW = ceil(BoxW/100*CalcP)
-    if (BoxW<1) { BoxW = 1 }
-    EGP:egpSize(BoxID,vec2(BoxW,20))
-    EGP:egpSetText(PercID,Progress["progressCurrent",number] + " / " + Progress["progressMax",number] + " (" + CalcP+"%)")
+    if (GpuData["lastProg",string]=="alxos_console") {    
+        local Step = Progress["step",number]
+        local Update = 1
+        if (Step>3) {
+            Step = 3
+            CalcP = 100
+            ProgressText = "100%"
+            Update = 0
+        }
+        
+        "alxos_console_redraw_msg"(3,"Current Step: ["+Step+" / 3]")
+        "alxos_console_redraw_msg"(2,CalcP+"%")
+        if (Update) {
+            "alxos_console_redraw_msg"(1,CurTask)
+        }
+        "alxos_console_redraw_msg"(0,ProgressText)
+    } else {    
+        local TW = DialogData[3,number]
+            
+        EGP:egpSetText(TW-2, "Current Step: "+Progress["step",number] + " / 3")
+        
+        local PercID = DialogData[5,number]
+        local BoxID = DialogData[4,number]
+        local BoxW = DialogData[-6,number]
+        
+        BoxW = ceil(BoxW/100*CalcP)
+        if (BoxW<1) { BoxW = 1 }
+        EGP:egpSize(BoxID,vec2(BoxW,20))
+        EGP:egpSetText(PercID,CalcP+"%")
+        
+        local PercID = DialogData[-4,number]
+        local BoxID = DialogData[-5,number]
+        local BoxW = DialogData[-6,number]
+        local CalcP = Progress["progressPercent",number]
+        
+        EGP:egpSetText(TW-1, "Current Task: "+CurTask)
+        
+        BoxW = ceil(BoxW/100*CalcP)
+        if (BoxW<1) { BoxW = 1 }
+        EGP:egpSize(BoxID,vec2(BoxW,20))
+        EGP:egpSetText(PercID,ProgressText)
+    
+    }
     
     if (Processing==0 & GpuData["midiStart",number] | Error) {
         if (CurrentState=="done") {
@@ -742,21 +871,32 @@ function alxos_midi_key(Type:string) {
 
 function alxos_midi_setmode(Mode:string,Index:number) {
     GpuPersistData["MidiMode",string] = Mode
-                
-    for (I=4,6) {
-        local Col = vec4(168,168,168,255)
-        if (I==Index) { continue }
-        if (Mode==DialogData["Text"+I,string]:lower()) { Col = vec4(0,168,168,255) }
-        EGP:egpColor(DialogData[-4,table][I,number],Col)
-    }
     
-    alxos_midi_modetext(Mode)
+    if (GpuData["lastProg",string]=="alxos_console") {
+        "alxos_console_redraw_msg"(2, "Current Mode: "+Mode:sub(1,1):upper()+Mode:sub(2))
+    } else {
+        for (I=4,6) {
+            local Col = vec4(168,168,168,255)
+            if (I==Index) { continue }
+            if (Mode==DialogData["Text"+I,string]:lower()) { Col = vec4(0,168,168,255) }
+            EGP:egpColor(DialogData[-4,table][I,number],Col)
+        }
+        
+        alxos_midi_modetext(Mode)
+    }
 
     dsSendDirect("midiSetMode",Devices["spu",entity],Mode)
 }
 
 function alxos_midi_key(Key:string,Pressed) {
     if (!Pressed) { return }
+    
+    if (!DialogData["midiPlay",number]) {
+        if (Key=="f8") {
+            alxos_midi_clear()
+        }
+        return
+    }
     
     if (Key=="f1") {
         alxos_midi_key("play")
@@ -832,5 +972,3 @@ function alxos_midi_key(Key:string,Pressed) {
         }
     }
 }
-
-
