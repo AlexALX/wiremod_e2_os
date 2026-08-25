@@ -64,7 +64,7 @@ function pngUpdateProgress()
             break
 
         case "done",
-            Progress["step",number] = 5
+            Progress["step",number] = 4
             pngProgress("Done", 0, 0)
             break
 
