@@ -333,6 +333,9 @@ function alxos_zip_consoleinput() {
         local Entry = GpuData["ZipEntries",table][Input:toNumber(),table]
         
         if (Entry:count()) {
+            # reset
+            "alxos_console_noinput"()
+            
             KeyHandler = "alxos_zip_key"
             "alxos_zip_open"(Entry)
         } else {
@@ -354,11 +357,13 @@ function alxos_zip_files() {
         
         "alxos_console_msg"("Zip files:")
         
+        local Count = 0
         foreach (Index:number, Entry:table = Files) {
             if (Entry["size",number]==0) { continue }
 
             MenuTree:pushTable(Entry)
-            "alxos_console_msg"("["+(Index+1)+"] "+Entry["name",string] + " - " + alxos_nicesize(Entry["size",number]))
+            Count++
+            "alxos_console_msg"("["+Count+"] "+Entry["name",string] + " - " + alxos_nicesize(Entry["size",number]))
         }
 
         "alxos_console_msg"("Press F8 to cancel")
@@ -425,7 +430,7 @@ function alxos_zip_open(Entry:table) {
     if (Last==1) {
         ZipError = "No file extension detected, can't open file."
         "alxos_zip_finish"(ZipError)
-        return    
+        return
     }
     
     GpuData["currentEntry", table] = Entry
@@ -594,7 +599,8 @@ function number alxos_zip_close() {
 
 function number alxos_zip_finish(Err:string) {
     if (GpuData["lastProg",string]=="alxos_console") {
-        if (Err) { 
+        if (Err) {
+            "alxos_console_handlers"()
             "alxos_console_err"(Err)
         }
         return 0
@@ -670,7 +676,9 @@ function alxos_zip_openfile() {
     FileData["content",string] = Zip["fileData",string]
     
     if (CurrentProg=="alxos_console") {
-        "alxos_console_redraw_msg"((FileData["ext",string]:lower()=="bmp" ? 0 : 1),"Opening file "+Zip["fileName",string])
+        "alxos_console_redraw_msg"(0,"100%")
+        "alxos_console_msg"("Opening file "+Zip["fileName",string])
+        "alxos_console_move"()
     }
     
     dsSendDirect("alxos_openfile",E2_CPU,table(entity(),FileData))   
@@ -747,6 +755,8 @@ function alxos_zip_progress() {
     }
     
     if (Zip["state", string]=="done") {
+        stopCmd()
+        
         local FInfo = GpuData[2, table]
         if (GpuData["E2Z",number]) {
             alxos_zip_executor_next()

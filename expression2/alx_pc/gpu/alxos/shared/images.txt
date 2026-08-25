@@ -163,6 +163,12 @@ function alxos_img_draw(Data:string) {
     local GifMode = GpuPersistData["gifMode",number]
 
     if (GpuData["lastProg",string]=="alxos_console") {
+        
+        local FInfo = GpuData[2,table]
+        
+        if (FInfo["content",string]!="") {
+            "alxos_console_msg"("")        
+        } 
         "alxos_console_redraw_last"("Current Step: [0 / 0]")
         "alxos_console_msg"("0%")
         "alxos_console_msg"("Opening "+Format:upper())

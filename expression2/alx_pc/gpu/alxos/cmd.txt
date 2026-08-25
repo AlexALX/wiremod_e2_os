@@ -76,7 +76,7 @@ function alxos_console_listcurdir() {
 
 function alxos_show_cursor() {
     CmdCursor = !CmdCursor
-    local Cursor = GpuData[3,number]
+    local Cursor = GpuData[3,number]    
     EGP:egpSetText(Cursor,(CmdCursor ? "_" : ""))
     timer("cursor_draw",500)    
 }
@@ -523,11 +523,12 @@ function alxos_console_run(Command:string) {
             alxos_console_msg("rm FileName - remove file or folder")
             alxos_console_msg("fput FileName content - write to file with content")
             alxos_console_msg("fget FileName - read first 48 bytes from file")
-            alxos_console_msg("start FileName.e2e - run E2 executable")
+            alxos_console_msg("open FileName.e2e - run E2 executable")
             alxos_console_msg(" e2r, e2p, e2z also supported by this command")
             alxos_console_msg("open FileName.jpg - load image on Digital Screen")
             alxos_console_msg(" Supported images: jpg, gif, bmp, png")
             alxos_console_msg("open FileName.zip - open zip")
+            alxos_console_msg(" Open command can open any supported file in OS")
             alxos_console_command()
         break
         case "volumes",
@@ -714,43 +715,6 @@ function alxos_console_run(Command:string) {
                 dsSendDirect("fs_removefile",CmdFS["hdd_io",wirelink]:entity(),table(entity(),CmdFS["fs_str_id",string],table(CmdFS,File["cluster",number],File["data_sector",number])))
             }       
         break
-        case "start",
-        case "run",
-            if (Arg=="") {
-                alxos_console_err("Please enter file name.")
-                return   
-            }
-        
-            local File = table()
-        
-            for(I=0,CmdDir[3,table]:count()) {
-                local Entry = CmdDir[3,table][I,table]
-                local FullName = Entry["name",string]+(Entry["ext",string]!="" ? "."+Entry["ext",string] : "")
-                if (FullName==Arg) {
-                    File = Entry
-                    break
-                }
-            }
-            
-            if (!File:count()) {
-                alxos_console_err("File with this name not exists.")
-                return
-            }
-            
-            local Ext = File["ext",string]:lower()
-            
-            if (alxos_wm1_isdir(File) | Ext!="e2e" & Ext!="e2r" & Ext!="e2p" & Ext!="e2z") {
-                alxos_console_err("This is not E2 executable file.")
-                return
-            }
-            
-            KeyHandler = ""
-            if (Ext=="e2e") {
-                dsSendDirect("alxos_execute",E2_CPU,table(entity(),CmdFS,File))
-            } else {
-                dsSendDirect("alxos_openfile",E2_CPU,table(entity(),File))    
-            }
-        break
         case "version",
         case "ver",
             alxos_console_msg("ALX Wiremod E2 OS - Console v1.1")
@@ -790,6 +754,11 @@ function alxos_console_run(Command:string) {
             
             if (!File:count()) {
                 alxos_console_err("File with this name not exists.")
+                return
+            }
+            
+            if (alxos_wm1_isdir(File)) {
+                alxos_console_err("This is folder!")
                 return
             }
             
@@ -848,6 +817,8 @@ function alxos_console_run(Command:string) {
         break
         case "open",
         case "openfile",
+        case "start",
+        case "run",
             if (Arg=="") {
                 alxos_console_err("Please enter file name.")
                 return   
@@ -871,13 +842,17 @@ function alxos_console_run(Command:string) {
             
             local Ext = File["ext",string]:lower()
             
-            if (alxos_wm1_isdir(File) | Ext!="jpg" & Ext!="gif" & Ext!="bmp" & Ext!="png" & Ext!="zip") {
-                alxos_console_err("File format "+Ext+" not supported.")
+            if (alxos_wm1_isdir(File)) {
+                alxos_console_err("This is directory.")
                 return
             }
-            
+
             KeyHandler = ""
-            dsSendDirect("alxos_openfile",E2_CPU,table(entity(),File))
+            if (Ext=="e2e") {
+                dsSendDirect("alxos_execute",E2_CPU,table(entity(),CmdFS,File))
+            } else {
+                dsSendDirect("alxos_openfile",E2_CPU,table(entity(),File))    
+            }
         break
         default,
             if (Command!="") {
@@ -900,10 +875,10 @@ function alxos_console_inputkey(Key:string,Pressed) {
     
     if (Key=="enter") {
         local Result = CmdInputFunc(GpuData[-4,string])[number]
-        
+        #[
         if (Result) {
-            alxos_console_noinput() 
-        }
+            alxos_console_noinput()
+        } ]#
     } elseif (Key=="f8") {
         CmdInputFunc("_EXIT_")[number]
         alxos_console_handlers()
@@ -1021,6 +996,7 @@ function alxos_console_ds(Name:string) {
     } elseif (Name=="alxos_runprog") {
         stoptimer("cursor_draw")
         local Info = dsGetTable()
+        
         local TInfo = table(Info[2,table],CmdFS,CmdAllFs,CmdPath,CmdDir)
         "alxos_execute"(Info[1,string],TInfo)
     } elseif (Name=="alxos_fail") {

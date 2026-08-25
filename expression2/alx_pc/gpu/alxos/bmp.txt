@@ -187,7 +187,9 @@ function alxos_bmp_postinit() {
     }
         
     if (GpuData["lastProg",string]=="alxos_console") {
-        "alxos_console_msg"("Opening file... Press ENTER or F8 to cancel")
+        if (FInfo["content",string]=="") {
+            "alxos_console_msg"("Opening file... Press ENTER or F8 to cancel")
+        }
         "alxos_console_msg"("0%")
         "alxos_console_move"()
     } else {

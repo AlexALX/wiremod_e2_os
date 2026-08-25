@@ -38,7 +38,19 @@ ALXOS_PROGS["alxos_explorer",number] = 1
 function alxos_explorer(Args:table) {
     #include "alx_pc/gpu/alxos/explorer"
     alxos_explorer_init(Args)
-}   
+}
+
+ALXOS_PROGS["alxos_explorer_reader",number] = 1
+function alxos_explorer_reader(Args:table) {
+    #include "alx_pc/gpu/alxos/reader"
+    alxos_explorer_reader_init(Args)
+}
+
+ALXOS_PROGS["alxos_explorer_soundplay",number] = 1
+function alxos_explorer_soundplay(Args:table) {
+    #include "alx_pc/gpu/alxos/soundplay"
+    alxos_explorer_soundplay(Args)
+}
 
 ALXOS_PROGS["alxos_bmp_reader",number] = 1
 function alxos_bmp_reader(Args:table) {

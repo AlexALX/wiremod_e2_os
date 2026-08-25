@@ -1,0 +1,147 @@
+#include "alx_pc/gpu/alxos/_main_"
+
+function alxos_explorer_stopsound() {
+    if (dsClkName()=="keyboard" & GpuData["lastProg",string]!="alxos_console") {
+        "alxos_explorer_closedialog"()
+    }
+    dsSendDirect("stopgmsound",Devices["spu",entity],table(0,0))  
+    #alxos_explorer_listcurdir()
+}
+
+function alxos_explorer_soundplay_conf(Arr:array) {
+    ExplorerCurTask = "sound"
+    
+    if (GpuData["lastProg",string]=="alxos_console") {
+        "alxos_console_msg"("Playing sound file, press ENTER or F8 to stop.")
+        "alxos_console_move"()
+    } else {
+        local Parent = "alxos_explorer_dialog"("Playing sound",400,60,"ok","alxos_explorer_stopsound")[number]
+        
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Playing sound file, press OK to stop.",alxos_dlgPos(0,-12))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpAlign(LAST_I,1)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    }
+
+    #ifdef soundDuration(string)
+        local Dur = soundDuration(Arr[2,string])
+        if (Arr[3,string]=="1") { Dur = 0 } # loop
+        dsSendDirect("playgmsound",Devices["spu",entity],table(0,Dur,Arr[2,string]))
+    #endif
+}
+
+function alxos_explorer_soundplay_conf() {
+    local Act = (DialogData[-5,number]==1 ? 1 : 0 )
+    if (Act) {
+        alxos_explorer_soundplay_conf(DialogData[100,array])
+    } else {
+        "alxos_explorer_closedialog"()
+    }   
+}
+
+function alxos_explorer_soundplay_ds(Data:string) {
+    local Arr = Data:explode("|")
+    ExplorerDsH = ""
+    
+    local LastProg = GpuData["lastProg",string]
+    
+    if (Arr:count()<2 | Arr[1,string]!="GMS") {
+        local Msg = "This is not Garry's Mod Sound file!"
+        if (LastProg=="alxos_console") {
+            "alxos_console_err"(Msg)
+            "alxos_console_handlers"()
+        } else {
+            "alxos_explorer_error"(Msg,400)
+        }
+    #ifdef soundDuration(string)
+    } elseif (!soundDuration(Arr[2,string])) {
+        #alxos_explorer_error("Sound file not found on server!",400)    
+        
+        if (LastProg=="alxos_console") {
+            "alxos_console_msg"("Warning: Sound file not found on server.")
+            alxos_explorer_soundplay_conf(Arr)   
+            return  
+        }
+        
+        local Parent = "alxos_explorer_dialog"("Warning",340,80,"yesno","alxos_explorer_soundplay_conf")[number]
+        local Entries = table()
+        
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Sound file not found on server!",alxos_dlgPos(0,-22))
+        EGP:egpAlign(LAST_I,1)
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+        
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Do you want try to play it anyway?",alxos_dlgPos(0,-2))
+        EGP:egpAlign(LAST_I,1)
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+        
+        DialogData[100,array] = Arr
+        
+    #endif
+    } else {
+        alxos_explorer_soundplay_conf(Arr)
+    }
+}
+
+# this is for console only
+function alxos_explorer_soundplay_key(Key:string, Pressed) {
+    if (!Pressed) { return } 
+    
+    if (Key=="enter" | Key=="f8") {
+        local ExplorerFS = "alxos_explorer_getfs"()[table]
+        dsSendDirect("clear",ExplorerFS["hdd_io",wirelink]:entity(),1)
+        
+        alxos_explorer_stopsound()
+        "alxos_console_command"()
+        "alxos_console_handlers"()
+    }
+}
+
+function alxos_explorer_soundplay(Info:table) {
+    #ifndef soundDuration(string)
+        local Msg = "E2 Sound extension is not enabled!"
+        if (CurrentProg=="alxos_console") {
+            "alxos_console_err"(Msg)
+        } else {
+            "alxos_explorer_error"(Msg,360)
+        }
+        if (1) { return }
+    #endif 
+    
+    if (!Devices["spu",entity]:isValid()) {
+        local Msg = "No sound card detected!"
+        if (CurrentProg=="alxos_console") {
+            "alxos_console_err"(Msg)
+        } else {
+            "alxos_explorer_error"(Msg,260)
+        }
+        return
+    }
+    
+    GpuData["lastProg",string] = CurrentProg    
+    "alxos_explorer_handlers"()
+    
+    if (GpuData["lastProg",string]=="alxos_console") {
+        "alxos_console_msg"("Opening file...")
+        "alxos_console_move"()
+        
+        KeyHandler = "alxos_explorer_soundplay_key"
+    } else {
+        local Parent = "alxos_explorer_dialog"("Opening file",400,60,"none","alxos_explorer_listcurdir")[number]
+        
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-12))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpAlign(LAST_I,1)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    }
+    
+    local ExplorerFS = "alxos_explorer_getfs"()[table]
+    
+    ExplorerDsH = "alxos_explorer_soundplay_ds"
+    dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(ExplorerFS,Info[1,table],0,0)))
+}

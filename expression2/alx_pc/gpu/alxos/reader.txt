@@ -1,0 +1,309 @@
+#[
+	ALX Wiremod E2 OS
+	Created by AlexALX
+	-------------------
+	Explorer GUI
+]#
+
+#include "alx_pc/gpu/alxos/_main_"
+
+function alxos_explorer_read_mem(FInfo:table, Start:number) {
+    local FullStr = FInfo["content",string]
+    local TotalLength = FullStr:length()
+        
+    if (Start >= TotalLength) {
+        "alxos_explorer_reader"("")
+        return
+    }
+
+    local CurrentLines = GpuData[10,number]
+
+    local LinesNeeded = 24 - CurrentLines
+    if (LinesNeeded <= 0) { LinesNeeded = 1 }
+
+    local CurrentPos = Start + 1 
+    local LinesFound = 0
+    local EndPos = CurrentPos
+ 
+    while (CurrentPos <= TotalLength & LinesFound <= LinesNeeded) {
+        local NextNL = FullStr:find(NL, CurrentPos)
+        if (NextNL > 0) {
+            LinesFound++
+            CurrentPos = NextNL + 1
+            EndPos = NextNL
+        } else {
+            EndPos = TotalLength
+            break
+        }
+    }
+    local Chunk = FullStr:sub(Start + 1, EndPos)
+    GpuData[16,number] = EndPos
+
+    "alxos_explorer_reader"(Chunk)
+}
+
+function alxos_explorer_reader_close() {    
+    if (GpuData["lastProg",string]=="alxos_console") {
+        local ExplorerFS = "alxos_explorer_getfs"()[table]
+        local ExplorerPath = "alxos_explorer_getpath"()[table]
+        local ExplorerDir = "alxos_explorer_getdir"()[table]
+        "alxos_execute"("alxos_console",table(table(),ExplorerFS,AllFs,ExplorerPath,ExplorerDir))
+    } else {
+        "alxos_explorer_listcurdir"()
+        "alxos_explorer_handlers"()
+    }
+}
+
+function alxos_explorer_reader_init(Info:table) {
+    local ZipAdded = GpuData["zipAdded",number]
+    
+    local FInfo = Info[1,table]
+    
+    egpClear()
+    
+    GpuData["lastProg",string] = CurrentProg
+    
+    "alxos_explorer_bg"()
+    "alxos_explorer_handlers"()
+    
+    GpuData["zipAdded",number] = ZipAdded
+    
+    ExplorerFile = FInfo["name",string]+(FInfo["ext",string]!="" ? "."+FInfo["ext",string] : "")
+    "alxos_explorer_ft"(array("Quit")) #"Edit"
+    
+    local LAST_SI = GpuData[100,number]
+    if (LAST_SI>0) { LAST_I = LAST_SI } else { GpuData[100,number] = LAST_I }
+
+    local Parent = "alxos_explorer_dialog"("Opening file",400,80,"progress","alxos_explorer_reader_close")[number]
+
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    local ExplorerFS = "alxos_explorer_getfs"()[table]
+    
+    ExplorerDsH = "alxos_explorer_reader"
+    ExplorerKeyH = "reader"
+    ExplorerCurTask = "reader"
+    GpuData[7,table] = FInfo
+    local End = ExplorerFS["bytes_in_sector",number]*ExplorerFS["sectors_in_cluster",number]
+    if (ExplorerFS["fs_str_id",string]=="WCD") {
+        End = 512   
+    }
+    GpuData[8,number] = End
+    GpuData[12,number] = 0
+    GpuData[13,number] = 1
+    GpuData[14,table] = table()
+    GpuData[15,number] = 1
+    
+    if (FInfo["content",string] != "") {
+        alxos_explorer_read_mem(FInfo, 0)
+        return    
+    }
+    
+    dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(ExplorerFS,FInfo,0,End)))        
+}
+
+function alxos_explorer_reader_move(Key:string) {
+    local Start = GpuData[9,string]:length()
+    local Offset = GpuData[12,number]
+    local PosTbl = GpuData[14,table]
+    local CurPos = GpuData[15,number]
+    
+    #print(Start+" | "+Offset)  
+
+    if (Key=="down") {
+        #GpuData[13,number] = Start
+        PosTbl[CurPos,number] = Offset #array(Start,Offset)
+        Start += Offset  
+        CurPos++
+    } else {
+        if (Offset<=0) { return }
+        #Start = 0 #Offset-GpuData[13,number]
+        # sorry i'm lazy to do this correct, just move to start
+        #if (Start<0) { Start = 0 }
+        CurPos--
+        #local Item = PosTbl[CurPos,array]
+        Start = PosTbl[CurPos,number] #Item[1,number]
+        #Offset = Item[2,number]
+    }
+    
+    local Lines = GpuData[11,table]
+    for(I=1,Lines:count()) {
+        local ID = Lines[I,array][1,number]
+        if (I==1) { LAST_Y = EGP:egpPos(ID):y() }
+        EGP:egpRemove(ID)   
+    }
+    
+    local LAST_SI = GpuData[100,number]
+    if (LAST_SI>0) { LAST_I = LAST_SI } else { GpuData[100,number] = LAST_I }
+    
+    GpuData[-101,number] = 1
+    
+    local Parent = "alxos_explorer_dialog"("Opening file",400,80,"progress","alxos_explorer_reader_close")[number]
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    local FInfo = GpuData[7,table]
+    
+    local ExplorerFS = "alxos_explorer_getfs"()[table]
+    
+    ExplorerDsH = "alxos_explorer_reader"
+    ExplorerKeyH = "reader"
+    local End = ExplorerFS["bytes_in_sector",number]*ExplorerFS["sectors_in_cluster",number]
+    if (ExplorerFS["fs_str_id",string]=="WCD") {
+        End = 512   
+    }
+    GpuData[8,number] = End
+    GpuData[9,string] = ""
+    GpuData[10,number] = 0
+    GpuData[11,table] = table()
+    GpuData[12,number] = Start
+    #GpuData[13,number] = 1
+    GpuData[14,table] = PosTbl
+    GpuData[15,number] = CurPos
+    
+    if (FInfo["content",string] != "") {
+        alxos_explorer_read_mem(FInfo, Start)
+        return
+    }
+    
+    dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(ExplorerFS,FInfo,Start,End)))     
+}
+
+function number alxos_explorer_reader_cmd(Args:table) {
+    local Data = Args[2,string]
+    local Last = Args[3,number]
+    local Max = Args[4,number]
+    local TotalLines = Args[5,number]
+    local CurStr = ""
+    local Lines = Args[6,table]
+    while(perf()) {
+        local Find = Data:find(NL,Last)
+        if (Find>0) {
+            CurStr = Data:sub(Last,Find)
+            Last = Find+1
+        } else {
+            CurStr = Data:sub(Last,Data:length()) #Data:sub(Last,Max)#:left(65)
+            Last = Max
+        }       
+        
+        Lines:pushArray(array(LAST_I,CurStr))
+        local St = GpuData[13,number]
+        local Ed = St+48
+        
+        EGP:egpText(LAST_I,CurStr:sub(St,Ed),vec2(10,LAST_Y))
+        EGP:egpFont(LAST_I,"Courier New") # monowidth font, sorry not cross-platform :(
+        EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ LAST_Y += 19
+        
+        TotalLines++ 
+        if (TotalLines>23 | Last>=Max) { 
+            GpuData[11,table] = Lines
+            ExplorerDsH = "" 
+            ExplorerKeyH = "readermove"  
+            return 0 
+        } 
+    }
+    Args[5,number] = TotalLines
+    Args[3,number] = Last
+    runCmd("alxos_explorer_reader_cmd",1,Args)
+    return 1
+}
+
+function alxos_explorer_reader(Data:string) { 
+    local ExplorerFS = "alxos_explorer_getfs"()[table]
+    
+    local FInfo = GpuData[7,table] 
+    local Count = GpuData[10,number]+(Data:explode(NL):count()-1)
+    local Offset = GpuData[12,number]
+    if (Count<=24 & FInfo["size",number]>GpuData[8,number]+Offset) {
+        local Start = GpuData[8,number]
+        local End = ExplorerFS["bytes_in_sector",number]*ExplorerFS["sectors_in_cluster",number]
+        if (ExplorerFS["fs_str_id",string]=="WCD") {
+            End = 512   
+        }
+        GpuData[8,number] = Start+End
+        local Str = GpuData[9,string]
+        GpuData[9,string] = Str+Data
+        if (GpuData[10,number]!=Count) {
+            local PercID = DialogData[-4,number]
+            local BoxID = DialogData[-5,number]
+            local BoxW = DialogData[-6,number]
+            local CalcP = round(Count/24*100)
+            BoxW = ceil(BoxW/100*CalcP)
+            EGP:egpSize(BoxID,vec2(BoxW,20))
+            EGP:egpSetText(PercID,CalcP+"%")
+        }
+        GpuData[10,number] = Count
+        
+        if (FInfo["content",string] != "") {
+            alxos_explorer_read_mem(FInfo, GpuData[16,number])
+            return
+        }
+        
+        #print(Start+Offset+" | "+End)
+        dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(ExplorerFS,FInfo,Start+Offset+1,End)))      
+    } else {
+        "alxos_explorer_closedialog"()
+    
+        local Str = GpuData[9,string]+Data
+        # fix for lines
+        if (Count>24) {
+            local Tbl = Str:explode(NL)
+            local MTbl = Tbl:count()
+            local Rm = Count-23
+            for (I=1,Rm) {
+                Tbl:pop()  
+            }
+            Str = Tbl:concat(NL)
+            GpuData[10,number] = 24
+        }
+        GpuData[9,string] = Str+NL        
+        alxos_explorer_reader_cmd(table(FInfo,Str,0,Str:length(),0,table()))
+    }
+}
+
+function alxos_explorer_reader_key(Key:string, Pressed) {
+    if (!Pressed) { return }
+    
+    local ExplorerFS = "alxos_explorer_getfs"()[table]
+    
+    if (Key=="f8") {
+        dsSendDirect("clear",ExplorerFS["hdd_io",wirelink]:entity(),1)
+        alxos_explorer_reader_close()
+    }
+    if (ExplorerKeyH=="readermove") {
+        if (Key=="right" | Key=="left") {
+            #[ Old code - without monowidth font
+            local Lines = GpuData[11,table]
+            local VEC = vec2(400,0)   
+            local FPos = EGP:egpPos(Lines[1,number])
+            if (Key=="right") { VEC *= -1 }
+            elseif (FPos:x()>0) { VEC = vec2(0,VEC:y()) }            
+            for(I=1,Lines:count()) {
+                local ID = Lines[I,number]
+                EGP:egpPos(ID,EGP:egpPos(ID)+VEC)   
+            }  ]#
+            local Lines = GpuData[11,table]
+            local St = GpuData[13,number]
+            local AddMax = 48
+            local Max = 30
+            local Ed = St+Max
+            if (Key=="left") { St -= Max Ed = St+AddMax }
+            else { St += Max Ed += AddMax }
+            if (St<=1) { St = 1 Ed = St+AddMax }
+            GpuData[13,number] = St
+            for(I=1,Lines:count()) {
+                local Item = Lines[I,array]
+                EGP:egpText(Item[1,number],Item[2,string]:sub(St,Ed),EGP:egpPos(Item[1,number]))   
+            }              
+        } elseif (Key=="up" | Key=="down") {
+            "alxos_explorer_reader_move"(Key)
+        }
+    }    
+}

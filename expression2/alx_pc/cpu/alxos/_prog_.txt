@@ -35,6 +35,16 @@ function alxos_explorer(FInfo:table) {
     dsSendDirect("alxos_runprog",E2_GPU,table("alxos_explorer",SysFs,AllFs))
 }
 
+ALXOS_PROGS["alxos_explorer_reader",number] = 1
+function alxos_explorer_reader(FInfo:table) {
+    dsSendDirect("alxos_runprog",E2_GPU,table("alxos_explorer_reader",FInfo))
+}
+
+ALXOS_PROGS["alxos_explorer_soundplay",number] = 1
+function alxos_explorer_soundplay(FInfo:table) {
+    dsSendDirect("alxos_runprog",E2_GPU,table("alxos_explorer_soundplay",FInfo))
+}
+
 ALXOS_PROGS["alxos_txt_reader",number] = 1
 function alxos_txt_reader(FInfo:table) {
     dsSendDirect("alxos_runprog",E2_GPU,table("alxos_explorer_reader",FInfo))

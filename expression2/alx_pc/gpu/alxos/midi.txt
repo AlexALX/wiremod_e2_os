@@ -18,6 +18,8 @@ function alxos_midi_init(Args:table) {
     GpuData[1,table] = Args[1,table]
     GpuData[2,table] = Args[2,table]
     
+    GpuData["lastProg",string] = CurrentProg
+    
     dsSendDirect("findMidiPlayer",Devices["spu",entity],1)
     
     GpuData["midiStart",number] = 0
