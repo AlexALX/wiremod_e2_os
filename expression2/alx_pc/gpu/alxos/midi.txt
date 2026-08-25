@@ -873,7 +873,8 @@ function alxos_midi_setmode(Mode:string,Index:number) {
     GpuPersistData["MidiMode",string] = Mode
     
     if (GpuData["lastProg",string]=="alxos_console") {
-        "alxos_console_redraw_msg"(2, "Current Mode: "+Mode:sub(1,1):upper()+Mode:sub(2))
+        local Index = DialogData["WarningShownIndex",number]
+        "alxos_console_redraw_msg"(Index+2, "Current Mode: "+Mode:sub(1,1):upper()+Mode:sub(2))
     } else {
         for (I=4,6) {
             local Col = vec4(168,168,168,255)
