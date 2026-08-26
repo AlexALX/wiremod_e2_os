@@ -1,6 +1,6 @@
 @name Test Remote E2R Prog
 @persist Devices:table TickQuota:number CurrentFS:table AllFs:table LastProgram:string
-@persist EGP:wirelink DS:wirelink
+@persist EGP:wirelink DS:wirelink CS:wirelink
 @persist ExitProg:function ExecutorID:number
 
 #[
@@ -48,6 +48,7 @@ event remote(Sender:entity, Player:entity, Payload:table) {
     
     EGP = Devices["GPU_Screens",table]["EGP_WL",wirelink]
     DS = Devices["GPU_Screens",table]["DS_WL",wirelink]
+    CS = Devices["GPU_Screens",table]["CS_WL",wirelink]
     
     # we must clear it always! since in isolated mode it will override EGP IDs!
     EGP:egpClear()
@@ -88,5 +89,8 @@ if (dsClk()) {
     } elseif (Name=="DS_Connect") {
         # update DS connection if its changed
         DS = Devices["GPU_Screens",table]["DS_WL",wirelink]   
+    } elseif (Name=="CS_Connect") {
+        # update CS connection if its changed
+        CS = Devices["GPU_Screens",table]["CS_WL",wirelink]   
     }
 }

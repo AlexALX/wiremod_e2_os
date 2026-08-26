@@ -236,9 +236,9 @@ if (dsClk()) {
     } elseif (Name=="executorKey") {
         local Executor = getentity(ExecutorID)
         dsSendDirect("executorKey", Executor, dsGetTable())    
-    } elseif (Name=="DS_Connect") {
+    } elseif (Name=="DS_Connect" | Name=="CS_Connect") {
         local Executor = getentity(ExecutorID)
-        dsSendDirect("DS_Connect", Executor, dsGetNumber())  
+        dsSendDirect(Name, Executor, dsGetNumber())  
     }
 }
 

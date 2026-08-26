@@ -1,5 +1,5 @@
 @persist Devices:table TickQuota:number CurrentFS:table AllFs:table Assets:table LastProgram:string
-@persist EGP:wirelink DS:wirelink
+@persist EGP:wirelink DS:wirelink CS:wirelink
 
 function drawExampleText() {
     # we must clear it always! since in isolated mode it will override EGP IDs!

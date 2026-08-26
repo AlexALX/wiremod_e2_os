@@ -166,6 +166,7 @@ function number alxos_executor_clear() {
     dsSendDirect("SHUTDOWN",Executor[3,entity],0)
 
     DSEvent = function() {}
+    CSEvent = function() {}
     
     if (GpuData["lastProg", string]=="alxos_console") {
         local CmdPath = "alxos_console_getpath"()[table]
@@ -184,6 +185,7 @@ function alxos_executor_end() {
     dsSendDirect("clear",ExplorerFS["hdd_io",wirelink]:entity(),1)
     
     DSEvent = function() {}
+    CSEvent = function() {}
 
     local Executor = alxos_findExecutor()
     dsSendDirect("SHUTDOWN",Executor[3,entity],0)
@@ -191,6 +193,7 @@ function alxos_executor_end() {
 
 function number alxos_executor_close() {
     DSEvent = function() {}
+    CSEvent = function() {}
     
     if (GpuData["lastProg", string]=="alxos_console") {
         local ExplorerFS = GpuData[1,table]
@@ -215,6 +218,11 @@ function alxos_executor_run(Code:string) {
     DSEvent = function() {
         local Executor = alxos_findExecutor()
         dsSendDirect("DS_Connect",Executor[3,entity],1)  
+    }
+    
+    CSEvent = function() {
+        local Executor = alxos_findExecutor()
+        dsSendDirect("CS_Connect",Executor[3,entity],1)  
     }
     
     local Info = table()

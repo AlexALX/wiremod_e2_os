@@ -67,6 +67,7 @@ event remote(Sender:entity, Player:entity, Payload:table) {
     
     EGP = Devices["GPU_Screens",table]["EGP_WL",wirelink]
     DS = Devices["GPU_Screens",table]["DS_WL",wirelink]
+    CS = Devices["GPU_Screens",table]["CS_WL",wirelink]
     
     drawExampleText()
 }
@@ -95,5 +96,8 @@ if (dsClk()) {
     } elseif (Name=="DS_Connect") {
         # update DS connection if its changed
         DS = Devices["GPU_Screens",table]["DS_WL",wirelink]   
+    } elseif (Name=="CS_Connect") {
+        # update CS connection if its changed
+        CS = Devices["GPU_Screens",table]["CS_WL",wirelink]   
     }
 }
