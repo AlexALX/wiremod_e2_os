@@ -40,12 +40,13 @@
     4. Run file, you should see test messages on EGP.
 ]#
 
-# Add this ONLY if you want to make it work as .e2p or .e2z
-# in .e2r ANY include will make error!
-#include "alx_pc/remote/e2p_include"
-# Note: this file should not be added into zip archive, its added automatically by remote executor
-
 if (first()|duped()) {  
+    # this is automatically added to any executables 
+    # and REQUIRED to be included
+    #include "alx_pc/remote/e2_include"
+    # Note: this file should not be added into zip archive, its added automatically by remote executor
+    # in .e2r ANY other include will make error!
+    
     #include "alx_pc/remote/includes/example_e2z"
 }
 

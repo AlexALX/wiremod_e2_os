@@ -2,15 +2,14 @@
 @inputs InA Board:wirelink ExecutorID:number
 @outputs EntID:number
 @persist BIOS:entity Device_Name:string RemoteInfo:table
-@persist Devices:table Init Caller:entity CodePrepend:string CodeAppend:string CodeExecute:string CodeInclude:string
+@persist Devices:table Init Caller:entity CodePrepend:string CodeAppend:string CodeInclude:string
 
 #[
     ALX Wiremod E2 PC
     Created by AlexALX
     -------------------
     This device allow to execute e2 code via remoteupload extension from raw code
-    Currently support are limited to just code with no includes (or must exists locally)
-    And is totally isolated - no way to call gui directly.
+    Programs is totally isolated in this mode
     File formats:
     - .e2r contains program code directly
     - .e2p path to expression2 chip (relative to garrysmod/data/expression2), must exists locally
@@ -38,40 +37,22 @@ Caller = noentity()
 EntID = entity():id()
 
 # This code needs always be added to executor chip so will be proper sync
-CodePrepend = "@inputs ExecutorID:number\r\n@outputs RemoteEntID:number\r\n@persist ExecutorID:number IsDirectCode:number\r\n"
+CodePrepend = "@inputs ExecutorID:number\n@outputs RemoteEntID:number\n@persist ExecutorID:number\n"
 CodeAppend = "
 if (first()|duped()) {
     dsSetScope(2)
     RemoteEntID = entity():id()
-    IsDirectCode = 1
-    
-    ExitProg = function() {
-        stopAllTimers()
-        dsSendDirect(\"exitProg\", entity(ExecutorID), 1)
-        exit()     
-    }
 }
-"
-
-# this code needs to run on program to properly init
-CodeExecute = "
-function dsInitProg() {
-    dsSendDirect(\"initExecutor\", entity(ExecutorID), table(wirelink()))        
-}
-
-if (first()) {
-    dsInitProg()
-} 
 "
 
 CodeInclude = "
-@name E2P/E2Z Include (REQUIRED)
+@name E2 Executable Include (REQUIRED)
 @inputs ExecutorID:number
 @outputs RemoteEntID:number
-@persist IsDirectCode:number ExitProg:function
+@persist IsDirectCode:number
 
 #[
-    If you want create .e2p or .e2z file you MUST include this file always
+    If you want create any executable file you MUST include this file always
     Or it will not properly init with executor and shutdown your code!
 
     Note: this file should not be added into e2z zip archive, its added automatically by remote executor.
@@ -80,7 +61,6 @@ CodeInclude = "
 if (first()|duped()) {
     dsSetScope(2)
     RemoteEntID = entity():id()
-    IsDirectCode = 0
 
     function dsInitProg() {
         dsSendDirect(\"initExecutor\", entity(ExecutorID), table(wirelink()))
@@ -98,17 +78,11 @@ if (first()|duped()) {
         exit()
     }
     
-    # just for unify
-    ExitProg = function() { 
-        exitProg() 
-    }
-    
     if (first()) {
         dsInitProg()
     } 
 
 }
-
 "
 
 function clearMemory() {
@@ -194,15 +168,18 @@ if (dsClk()) {
         
         #ifdef entity:remoteSetCode(string)
         
-        if (Type=="e2z") {
+        if (Type=="e2r") {
+            # just make sure code will not break remote exexutor
+            Code = CodePrepend + Code + CodeAppend
+        }
+
+        if (Type=="e2z" | Type=="e2r") {
             local Includes = FInfo["includes",table]
             
             # auto append it to file
-            Includes["alx_pc/remote/e2p_include",string] = CodeInclude
+            Includes["alx_pc/remote/e2_include",string] = CodeInclude
             
             Executor:remoteSetCode(Code, Includes)
-        } elseif (Type=="e2r") {      
-            Executor:remoteSetCode(CodePrepend + Code + CodeAppend + CodeExecute)
         } elseif (Type=="e2p") {
             Executor:remoteUpload(Code)
         }
