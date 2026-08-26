@@ -129,6 +129,13 @@ function initbios() {
     EGP:egpText(I,"Digital Screen - "+Status,vec2(X,Y))
     EGP:egpSize(I,Sz) I++ Y+=Sz
     
+    if (!CS:entity():isValid()) {
+        Status = "Not connected"
+    } else { Status = "Connected" }
+    
+    EGP:egpText(I,"Console Screen - "+Status,vec2(X,Y))
+    EGP:egpSize(I,Sz) I++ Y+=Sz
+    
     if (Keyboard[1,entity]==noentity()) {
         ERR_C = 4
         EGP:egpText(I,"Keyboard - Not connected",vec2(X,Y))

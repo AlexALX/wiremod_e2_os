@@ -78,6 +78,10 @@ function alxos_img_postinit() {
     DS[1048569] = 2
     DS[1048575] = 1
     
+    if (GpuData["lastProg",string]=="alxos_console") {
+        "alxos_hide_cursor"()
+    }
+    
     if (FInfo["content",string]) {
         "alxos_img_draw"(FInfo["content",string])
         return
@@ -381,7 +385,8 @@ function alxos_img_warning(Warning:string) {
         "alxos_console_msg"(Warning)
         "alxos_console_move"()
         
-        DialogData["WarningShownIndex",number] = LAST_I-CUR_I
+        local IsConsole = "alxos_console_isconsole"()[number]
+        DialogData["WarningShownIndex",number] = (IsConsole ? Warning:explode("\n"):count() : LAST_I-CUR_I)
         return
     }
 

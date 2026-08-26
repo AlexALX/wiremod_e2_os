@@ -15,11 +15,19 @@ if (first()|duped()) {
 
 if (~Ent|first()|duped()|~InG) {
     EntID = entity():id()
+    # EGP
     Ent:egpClear()
+    
+    # Digital Screen
     Ent[1048574] = 0
     Ent[1048575] = 1
+    
+    # Console Screen
+    Ent[2041] = 0
+    Ent[2046] = 0
 }
 
 if (dsClk("wirelink") & InG==dsGetEntity():id()) {
     dsSendDirect("wirelink",dsGetEntity(),table(entity():id(),Ent))    
 }
+

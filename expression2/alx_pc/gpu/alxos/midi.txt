@@ -79,7 +79,8 @@ function alxos_midi_postinit() {
     GpuData[5,number] = 0
     
     if (GpuData["lastProg",string]=="alxos_console") {
-        KeyHandler = "alxos_midi_key"    
+        KeyHandler = "alxos_midi_key"
+        "alxos_hide_cursor"()
     }
     
     if (FInfo["content",string]) {
@@ -410,7 +411,8 @@ function alxos_midi_warning(Warning:string) {
         "alxos_console_msg"(Warning)
         "alxos_console_move"()
         
-        DialogData["WarningShownIndex",number] = LAST_I-CUR_I
+        local IsConsole = "alxos_console_isconsole"()[number]
+        DialogData["WarningShownIndex",number] = (IsConsole ? Warning:explode("\n"):count() : LAST_I-CUR_I)
         return
     }
 

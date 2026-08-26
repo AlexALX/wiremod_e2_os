@@ -32,12 +32,14 @@ Device_Name = "ALX GhostForce X1"
 
 BIOS_X = 10
 BIOS_SZ = 24
+ScreenSockets = 3
 
 BOOT_HDD = table()
 
 EgpCleanHandler = ""
 PlugHandler = ""
 DSEvent = function() {}
+CSEvent = function() {}
 
 Screens = table()
 
@@ -58,6 +60,7 @@ function initGpu() {
         dsSendDirect("init",BIOS,"gpu")
         egpClear()
         dsClear()
+        csClear()
     }
     GpuData = table()
     GpuPersistData = table()
@@ -83,6 +86,7 @@ function gpuShutdown() {
     PlugHandler = ""
     egpClear()
     dsClear()
+    csClear()
 }
 
 function pcie_init() {
@@ -92,7 +96,9 @@ function pcie_init() {
     EGP_ID = -1
     DS = nowirelink()
     DS_ID = -1
-    for (I=0,1) {
+    CS = nowirelink()
+    CS_ID = -1
+    for (I=0,ScreenSockets-1) {
         dsSendDirect("wirelink",entity(ioGetInputNumber("ScreenSockG_"+I)),entity())    
     }
 }
@@ -105,10 +111,12 @@ function shutdown() {
     EGP_ID = -1
     DS = nowirelink()
     DS_ID = -1
+    CS = nowirelink()
+    CS_ID = -1
 }
 
 function number findscreen(ID) {
-    for (I=0,1) {
+    for (I=0,ScreenSockets-1) {
         if (ID==ioGetInputNumber("ScreenSockG_"+I)) {
             return I    
         }
@@ -121,8 +129,9 @@ function screen_connect() {
     local ID = Info[1,number]
     local WL = Info[2,wirelink]    
     local WLI = WL:entity():id()
-    if (WL) {                
-        if (!EGP:entity():isValid() & WL:entity():type()=="gmod_wire_egp") {
+    if (WL) {
+        local Type = WL:entity():type()             
+        if (!EGP:entity():isValid() & Type=="gmod_wire_egp") {
             EGP = WL
             EGP_ID = WLI
             Screens[WLI,number] = findscreen(ID)
@@ -130,9 +139,15 @@ function screen_connect() {
             if (GpuData["BSOD",array]:count()) {
                 alxos_bsod(GpuData["BSOD",array])    
             }
+        } elseif (!CS:entity():isValid() & Type=="gmod_wire_consolescreen") {            
+            CS = WL
+            CS_ID = WLI
+            Screens[WLI,number] = findscreen(ID)
+            Screens["CS_WL",wirelink] = WL
+            CSEvent()
         } elseif (!DS:entity():isValid()) {
             local ScreenName = gpuScreenName(WL)            
-            if (WL:entity():type()=="gmod_wire_digitalscreen" | ScreenName!="") {
+            if (Type=="gmod_wire_digitalscreen" | ScreenName!="") {
                 DS = WL
                 DS_ID = WLI
                 Screens[WLI,number] = findscreen(ID)
@@ -140,7 +155,7 @@ function screen_connect() {
                 DSEvent()
             }
         }
-    }    
+    }
 }
 
 }
@@ -183,13 +198,25 @@ if (inputClk()) {
                     Screens[EGP_ID,number] = 0
                 }
                 Screens["EGP_WL",wirelink] = EGP
-            } elseif (!DS:entity():id() | Screens[DS:entity():id(),number]==ID) {
+                exit()
+            } 
+            
+            if (Screens[DS:entity():id(),number]==ID) {
                 DS = nowirelink()
                 if (DS_ID>0) {
                     Screens[DS_ID,number] = 0
                 }
                 Screens["DS_WL",wirelink] = DS
                 DSEvent()
+            }
+
+            if (Screens[CS:entity():id(),number]==ID) {
+                CS = nowirelink()
+                if (CS_ID>0) {
+                    Screens[CS_ID,number] = 0
+                }
+                Screens["CS_WL",wirelink] = CS
+                CSEvent()
             }
         }
     }    

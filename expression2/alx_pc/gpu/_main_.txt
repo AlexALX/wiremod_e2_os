@@ -1,11 +1,11 @@
 @name Main GPU func
-@inputs Board:wirelink InA ScreenSockG_0 ScreenSockG_1
+@inputs Board:wirelink InA ScreenSockG_0 ScreenSockG_1 ScreenSockG_2
 @outputs EntID
-@persist E2_CPU:entity E2_SPU:entity BIOS:entity HDD_IO:table HDDS:table Screens:table
+@persist E2_CPU:entity E2_SPU:entity BIOS:entity HDD_IO:table HDDS:table Screens:table ScreenSockets:number
 @persist BIOS_INIT KeyHandler:string DsHandler:string ChatHandler:string ChatPlayer:entity GpuData:table GpuPersistData:table BOOT_HDD:table
 @persist LAST_I LAST_Y BIOS_X BIOS_SZ ERR_N ERR_C Keyboard:table ShutHandler:string PlugHandler:string
 @persist FS_TYPES:table EgpCleanHandler:string Init Device_Name:string Devices:table SysFS:table
-@persist EGP:wirelink EGP_ID:number DS:wirelink DS_ID:number DSEvent:function
+@persist EGP:wirelink EGP_ID:number DS:wirelink DS_ID:number DSEvent:function CS:wirelink CS_ID:number CSEvent:function
 
 #[
 	ALX Wiremod E2 PC
@@ -47,6 +47,11 @@ function dsClear() {
     DS[1048575] = 1
 }
 
+function csClear() {
+    CS[2041] = 1
+    CS[2046] = 0
+}
+
 function reboot() {
     dsSendDirect("REBOOT",BIOS,0)   
 }
@@ -57,17 +62,17 @@ function hddload(Num) {
 
 function number gpuScreenSize(DS:wirelink) {
     if (DS:entity():type()=="gmod_wire_digitalscreen") {
-        return 512    
+        return 512
     }
 
     local ScreenName = DS:entity():getName()
     if (ScreenName=="Quad Digital Screen") {
-        return 1024    
+        return 1024
     } elseif (ScreenName=="ZGPU Screen Renderer") {
-        return 512    
+        return 512
     }
     
-    return 0      
+    return 0
 }
 
 function string gpuScreenName(DS:wirelink) {

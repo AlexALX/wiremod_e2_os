@@ -126,6 +126,11 @@ function bios_init() {
             EGP:egpText(LAST_I,"Digital Screen - "+Status,vec2(30,Y))
             LAST_I++ Y+=20
             
+            if (!CS:entity():isValid()) { Status = "Not connected" } else { Status = "Connected" }
+            
+            EGP:egpText(LAST_I,"Console Screen - "+Status,vec2(30,Y))
+            LAST_I++ Y+=20
+            
             if (!Keyboard) { Status = "Not connected" } else { Status = "Connected" }
             EGP:egpText(LAST_I,"Keyboard - "+Status,vec2(30,Y))
             LAST_I++ Y+=40

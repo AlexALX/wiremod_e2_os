@@ -2401,6 +2401,11 @@ function alxos_explorer_sysinfo(Info:table) {
     EGP:egpText(LAST_I,"Digital Screen - "+Status,vec2(30,Y))
     EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ Y+=20
     
+    if (!CS:entity():isValid()) { Status = "Not connected" } else { Status = "Connected" }
+    
+    EGP:egpText(LAST_I,"Console Screen - "+Status,vec2(30,Y))
+    EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ Y+=20
+    
     if (Keyboard[1,entity]==noentity()) {
         EGP:egpText(LAST_I,"Keyboard - Not connected",vec2(30,Y))
         EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ Y+=20

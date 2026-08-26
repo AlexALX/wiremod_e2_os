@@ -46,6 +46,10 @@ function alxos_zip_init(Args:table) {
     
     GpuData["chunk_read", number] = 0
     
+    if (CurrentProg=="alxos_console") {
+        "alxos_hide_cursor"()    
+    }
+    
     # process zip in zip
     if (FInfo["content",string]) {        
         zipInit(FInfo["content",string], 0)
@@ -348,6 +352,33 @@ function alxos_zip_consoleinput() {
     }, "^[0-9]$")
 }
 
+function number alxos_zip_files_draw() {
+    local ZipDrawIdx = GpuData["ZipDrawIdx",number]
+    local ZipMenuTree = GpuData["ZipEntries",table]
+    
+    local Max = ZipMenuTree:count()
+    
+    while(perf(75)) {
+        if (ZipDrawIdx > Max) { break }
+        
+        local Entry = ZipMenuTree[ZipDrawIdx, table]        
+        "alxos_console_msg"("["+ZipDrawIdx+"] "+Entry["name",string] + " - " + "alxos_nicesize"(Entry["size",number])[string])
+        ZipDrawIdx++
+    }
+    
+    GpuData["ZipDrawIdx", number] = ZipDrawIdx
+    
+    if (ZipDrawIdx <= Max) {
+        runCmd("alxos_zip_files_draw",1)
+        return 1
+    } else {
+        "alxos_console_msg"("Press F8 to cancel")
+        GpuData["ZipEntries",table] = ZipMenuTree
+        "alxos_zip_consoleinput"()
+    }
+    return 0
+}
+
 function alxos_zip_files() {
     local MenuTree = table()
     local Files = Zip["files",table]
@@ -357,20 +388,16 @@ function alxos_zip_files() {
         
         "alxos_console_msg"("Zip files:")
         
-        local Count = 0
         foreach (Index:number, Entry:table = Files) {
             if (Entry["size",number]==0) { continue }
 
             MenuTree:pushTable(Entry)
-            Count++
-            "alxos_console_msg"("["+Count+"] "+Entry["name",string] + " - " + alxos_nicesize(Entry["size",number]))
         }
 
-        "alxos_console_msg"("Press F8 to cancel")
-        alxos_zip_consoleinput()
-
+        GpuData["ZipDrawIdx",number] = 1
         GpuData["ZipEntries",table] = MenuTree
         
+        runCmd("alxos_zip_files_draw",1)        
         return
     }
 
