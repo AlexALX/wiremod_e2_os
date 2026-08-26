@@ -167,13 +167,11 @@ if (dsClk()) {
         local Executor = getentity(ExecutorID)
         
         #ifdef entity:remoteSetCode(string)
-        
-        if (Type=="e2r") {
-            # just make sure code will not break remote exexutor
-            Code = CodePrepend + Code + CodeAppend
-        }
 
         if (Type=="e2z" | Type=="e2r") {
+            # just make sure code will not break remote executor
+            Code = CodePrepend + Code + CodeAppend
+            
             local Includes = FInfo["includes",table]
             
             # auto append it to file
