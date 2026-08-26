@@ -1,7 +1,7 @@
 @name Remote Executor
 @inputs InA Board:wirelink ExecutorID:number
 @outputs EntID:number
-@persist BIOS:entity Device_Name:string RemoteInfo:table
+@persist BIOS:entity Device_Name:string RemoteInfo:table Executor:entity
 @persist Devices:table Init Caller:entity CodePrepend:string CodeAppend:string CodeInclude:string
 
 #[
@@ -35,6 +35,7 @@ Init = 0
 Device_Name = "Remote Executor"
 Caller = noentity()
 EntID = entity():id()
+Executor = getentity(ExecutorID)
 
 # This code needs always be added to executor chip so will be proper sync
 CodePrepend = "@inputs ExecutorID:number\n@outputs RemoteEntID:number\n@persist ExecutorID:number\n"
@@ -91,7 +92,7 @@ function clearMemory() {
 
 function setNoCode() {
     #ifdef entity:remoteSetCode(string)
-    getentity(ExecutorID):remoteSetCode(CodePrepend + CodeAppend)
+    Executor:remoteSetCode(CodePrepend + CodeAppend)
     #endif
     
     clearMemory()
@@ -164,8 +165,6 @@ if (dsClk()) {
         Init = 1
         Caller = dsGetSender()
         
-        local Executor = getentity(ExecutorID)
-        
         #ifdef entity:remoteSetCode(string)
 
         if (Type=="e2z" | Type=="e2r") {
@@ -199,8 +198,6 @@ if (dsClk()) {
         stopCmd()
         dsSendDirect("initExecutor", Caller, dsGetTable())  
     } elseif (Name=="executeInitDone") {
-        local Executor = getentity(ExecutorID)
-        
         RemoteInfo["Assets",table] = RemoteInfo["FInfo",table]["assets",table]
         RemoteInfo:remove("FInfo")
              
@@ -209,14 +206,17 @@ if (dsClk()) {
         # clear memory now
         clearMemory()
     } elseif (Name=="executorKey") {
-        local Executor = getentity(ExecutorID)
         dsSendDirect("executorKey", Executor, dsGetTable())    
     } elseif (Name=="DS_Connect" | Name=="CS_Connect") {
-        local Executor = getentity(ExecutorID)
         dsSendDirect(Name, Executor, dsGetNumber())  
     }
 }
 
 if (clk("cmd")) {
     cmdClk()
+}
+
+# failsafe to prevent break
+if (~ExecutorID & ExecutorID) {
+    Executor = getentity(ExecutorID)    
 }
