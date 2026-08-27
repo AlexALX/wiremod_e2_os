@@ -9,7 +9,9 @@
     Created by AlexALX
 ]#
 
-function alxos_pong_init(Args:table) {    
+function alxos_pong_init(Args:table) { 
+    if (alxos_noconsole()) { return }
+   
     KeyHandler = "alxos_pong_menu_key"
     DsHandler = ""
     ExplorerCurTask = "alxos_prog_pong"

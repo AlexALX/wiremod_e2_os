@@ -10,6 +10,8 @@
 ]#
 
 function alxos_bird_init(Args:table) {    
+    if (alxos_noconsole()) { return }
+
     KeyHandler = "alxos_bird_menu_key"
     DsHandler = ""
     ExplorerCurTask = "alxos_prog_bird"

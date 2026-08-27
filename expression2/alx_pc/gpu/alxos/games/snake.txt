@@ -9,7 +9,9 @@
     Created by AlexALX
 ]#
 
-function alxos_snake_init(Args:table) {    
+function alxos_snake_init(Args:table) { 
+    if (alxos_noconsole()) { return }
+    
     KeyHandler = "alxos_snake_menu_key"
     DsHandler = ""
     ExplorerCurTask = "alxos_prog_snake"
