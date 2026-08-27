@@ -39,7 +39,7 @@ This project pushes **Expression2** to its absolute limits, implementing complex
 * **Midi player** with 3 play modes (synth, instrumental, addon).
 * Expression2 **ZIP Reader** for ALX PC.
 * Few programs: Console, Burning software, file manager, network chat, partitions manager. 
-* Console program has support for drawing on the Wiremod Console Screen.
+* Console program has support for drawing on the Wiremod Console Screen and Digital Screen.
 * Few **Mini-Games**: Flappy Bird, Pong and Snake.
 * Expression2 code executor (view e2 remoteupload extension), with zipped **e2z executable** support.
 * Simple directory listing/file managing interface (DOS style).
