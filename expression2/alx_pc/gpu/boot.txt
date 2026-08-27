@@ -335,6 +335,14 @@ function boot() {
     if (!BootHDD:count()|!HDD_IO:count()) {
         initDrawLine("No bootable device")
         initDrawLine("Press any key to reboot.")
+        
+        if (!EGP:entity():isValid()) {
+            initDrawLine("")    
+            initDrawLine("Warning:")    
+            initDrawLine("Changing bootable device")    
+            initDrawLine("Supported only on EGP")    
+            initDrawLine("Inside BIOS")
+        }
 
         KeyHandler = "reboot"
     } else {
