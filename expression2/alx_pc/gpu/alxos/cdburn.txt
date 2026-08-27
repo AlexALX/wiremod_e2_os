@@ -1936,7 +1936,9 @@ function alxos_burner_start_key(Key:string,Pressed) {
     }
 }
 
-function alxos_burner_init(Args:table) {    
+function alxos_burner_init(Args:table) {  
+    if (alxos_noconsole()) { return }
+
     egpClear()    
     BurnerFS = Args[2,table]
     BurnerAllFs = Args[3,table]

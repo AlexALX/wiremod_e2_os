@@ -257,7 +257,7 @@ function alxos_midi_play(Data:string) {
     ))
     
     if (GpuData["lastProg",string]=="alxos_console") {
-        "alxos_console_redraw_last"("Current Step: [0 / 3]")
+        "alxos_console_redraw_last"("Current Step: [0 / 3]",1)
         "alxos_console_msg"("0%")
         "alxos_console_msg"("Opening Midi")
         "alxos_console_msg"("0%")
@@ -790,7 +790,7 @@ function alxos_midi_progress() {
             Update = 0
         }
         
-        "alxos_console_redraw_msg"(3,"Current Step: ["+Step+" / 3]")
+        "alxos_console_redraw_msg"(3,"Current Step: ["+Step+" / 3]",1)
         "alxos_console_redraw_msg"(2,CalcP+"%")
         if (Update) {
             "alxos_console_redraw_msg"(1,CurTask)
@@ -876,7 +876,7 @@ function alxos_midi_setmode(Mode:string,Index:number) {
     
     if (GpuData["lastProg",string]=="alxos_console") {
         local Index = DialogData["WarningShownIndex",number]
-        "alxos_console_redraw_msg"(Index+2, "Current Mode: "+Mode:sub(1,1):upper()+Mode:sub(2))
+        "alxos_console_redraw_msg"(Index+2, "Current Mode: "+Mode:sub(1,1):upper()+Mode:sub(2),1)
     } else {
         for (I=4,6) {
             local Col = vec4(168,168,168,255)

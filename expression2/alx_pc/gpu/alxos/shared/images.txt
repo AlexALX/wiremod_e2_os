@@ -74,9 +74,9 @@ function alxos_img_postinit() {
     local ExplorerFS = GpuData[1,table]
     local FInfo = GpuData[2,table]
     
-    DS[1048574] = 0
-    DS[1048569] = 2
-    DS[1048575] = 1
+    #DS[1048574] = 0
+    #DS[1048569] = 2
+    #DS[1048575] = 1
     
     if (GpuData["lastProg",string]=="alxos_console") {
         "alxos_hide_cursor"()
@@ -313,10 +313,10 @@ function number alxos_img_finish(Err:string) {
             local Progress = IMGAccelerator["Progress",table]
             
             local Index = DialogData["WarningShownIndex",number]
-            "alxos_console_redraw_msg"(Index+3,"Current Step: ["+Progress["stepTotal",number]+" / "+Progress["stepTotal",number]+"]")
-            "alxos_console_redraw_msg"(Index+2,"100%")
-            "alxos_console_redraw_msg"(Index+1,"Done")
-            "alxos_console_redraw_msg"(Index,"100%")
+            "alxos_console_redraw_msg"(Index+3,"Current Step: ["+Progress["stepTotal",number]+" / "+Progress["stepTotal",number]+"]",1)
+            "alxos_console_redraw_msg"(Index+2,"100%",1)
+            "alxos_console_redraw_msg"(Index+1,"Done",1)
+            "alxos_console_redraw_msg"(Index,"100%",1)
 
             local RenderTime = Progress["renderTime",number]
             "alxos_console_msg"("Opening "+Format:upper()+" file success finished.\nRender time: "+RenderTime+"s.")
@@ -446,7 +446,7 @@ function alxos_img_progress() {
     if (GpuData["lastProg",string]=="alxos_console") {
         local Index = DialogData["WarningShownIndex",number]
         
-        "alxos_console_redraw_msg"(Index+3,"Current Step: ["+Progress["step",number]+" / "+Progress["stepTotal",number]+"]")
+        "alxos_console_redraw_msg"(Index+3,"Current Step: ["+Progress["step",number]+" / "+Progress["stepTotal",number]+"]",1)
         "alxos_console_redraw_msg"(Index+2,CalcP+"%")
         "alxos_console_redraw_msg"(Index+1,Progress["progressTask",string])
         "alxos_console_redraw_msg"(Index+0,ProgressText)

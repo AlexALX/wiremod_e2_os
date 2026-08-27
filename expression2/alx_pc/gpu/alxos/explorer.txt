@@ -2643,6 +2643,8 @@ function number alxos_debug_cdburner() {
     
 function alxos_explorer_init(Args:table) {
     egpClear()
+    
+    local LastProg = CurrentProg
 
     if (Args:count()) {
         local Info = Args
@@ -2660,6 +2662,17 @@ function alxos_explorer_init(Args:table) {
     ExplorerKeyH = ""
     DsHandler = "alxos_explorer_ds"    
     ExplorerPath = table("C:")
+    
+    if (!EGP:entity():isValid()) {
+        if (CS:entity():isValid() | DS:entity():isValid()) {
+            if (LastProg=="alxos_console") {
+                alxos_noconsole()
+            } else {
+                "alxos_execute"("alxos_console",table(table(),ExplorerFS,ExplorerAllFs,ExplorerPath)) 
+            }
+        }
+        return
+    }
     
     # THIS CODE IS ONLY FOR DEBUG PURPOSES
     if (DEBUG==2) {

@@ -23,7 +23,7 @@
     1 short with different frequencies - CPU error
     1 long 3 short - GPU error
     1 long 2 short - GPU EGP limits error
-    3 long - no EGP connected
+    3 long - no Screen connected
     2 long - Keyboard error
     1 very long - Null Byte error
     2 short - bad sound card

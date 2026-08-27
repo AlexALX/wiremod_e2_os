@@ -1,0 +1,51 @@
+@persist InitDrawLine:function InitMaxLines:number InitDrawMode:string InitLines:number
+
+#include "alx_pc/gpu/_main_"
+#include "alx_pc/standalone/ds_gfx/_init_"
+#include "alx_pc/standalone/ds_gfx/font_5x7"
+
+function initDrawFunc() {
+    if (EGP:entity():isValid()) {
+        InitDrawLine = function(Msg:string) {
+            EGP:egpText(LAST_I,Msg,vec2(BIOS_X,LAST_Y))
+            EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++
+            LAST_Y += BIOS_SZ
+            InitLines++
+        }
+        InitMaxLines = 25
+        InitDrawMode = "egp"
+    } elseif (CS:entity():isValid()) {
+        InitDrawLine = function(Msg:string) {
+            csScreenWrite(0,InitLines,Msg,999)
+            InitLines++
+        }
+        InitMaxLines = 17
+        InitDrawMode = "console"
+    } elseif (DS:entity():isValid()) {
+        dsInit(DS, 256, 256)
+        dsSetFont(dsFont5x7())
+        InitDrawLine = function(Msg:string) {
+            local Lines = Msg:explode("\n"):count()
+            dsDrawTextStart(0,LAST_Y,Msg)
+            LAST_Y += DsFontLineHeight*Lines
+            InitLines += Lines
+        }
+        InitMaxLines = ceil(256 / DsFontLineHeight)
+        InitDrawMode = "ds"
+    }
+}
+
+function initDrawLine(Msg:string) {
+    InitDrawLine(Msg)    
+}
+
+function initClear() {
+    egpClear()
+    csClear()
+    dsClear()
+    dsStopQueues()
+    
+    LAST_I = 1
+    LAST_Y = 0
+    InitLines = 0
+}

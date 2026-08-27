@@ -1000,6 +1000,8 @@ function alxos_nwchat_ds(Name:string) {
 }
 
 function alxos_nwchat_init(Args:table) {
+    if (alxos_noconsole()) { return }
+    
     egpClear()
     
     alxos_nwchat_bg()

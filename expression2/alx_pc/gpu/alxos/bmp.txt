@@ -170,9 +170,9 @@ function alxos_bmp_postinit() {
     #KeyHandler = "alxos_bmp_key"
     ExplorerCurTask = "bmp"
     
-    DS[1048574] = 0
-    DS[1048569] = 2
-    DS[1048575] = 1
+    #DS[1048574] = 0
+    #DS[1048569] = 2
+    #DS[1048575] = 1
     
     DSEvent = function() {
         bmpSetDS(DS)    
@@ -242,7 +242,7 @@ function number alxos_bmp_finish(Err:string) {
             "alxos_console_err"(Err)
         } else {
             local Index = DialogData["WarningShownIndex",number]
-            "alxos_console_redraw_msg"(Index,"100%")
+            "alxos_console_redraw_msg"(Index,"100%",1)
             "alxos_console_msg"("Opening BMP file success finished.\nRender time: "+round(BmpRenderTime,2)+"s.")
         }
         

@@ -52,6 +52,29 @@ function csClear() {
     CS[2046] = 0
 }
 
+# write to console screen
+function csScreenWrite(X:number, Y:number, Str:string, ColorParam:number) {       
+    local StartAddr = Y * 60 + X * 2
+    local StrArr = Str:explode("")
+    
+    local MaxY = Y * 60 + 60
+    
+    for(I = 1, StrArr:count()) {        
+        local CharCode = toByte(StrArr[I,string])
+        
+        CS[StartAddr] = CharCode
+        CS[StartAddr + 1] = ColorParam
+        
+        StartAddr += 2
+        
+        if (StartAddr >= MaxY) { break }
+    }
+}
+
+function csScreenMove(LinesToShift:number) {
+    CS[2038] = LinesToShift
+}
+
 function reboot() {
     dsSendDirect("REBOOT",BIOS,0)   
 }

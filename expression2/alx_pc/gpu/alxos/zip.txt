@@ -162,9 +162,9 @@ function alxos_zip_executor_run() {
     CurrentProg = GpuData["lastProg",string]
     
     if (GpuData["lastProg",string]=="alxos_console") {
-        "alxos_console_redraw_msg"(2,"100%")
-        "alxos_console_redraw_msg"(0,"100%")
-    }        
+        "alxos_console_redraw_msg"(2,"100%",1)
+        "alxos_console_redraw_msg"(0,"100%",1)
+    } 
     
     dsSendDirect("alxos_openfile",E2_CPU,table(entity(),FileData))
 }
@@ -384,7 +384,7 @@ function alxos_zip_files() {
     local Files = Zip["files",table]
     
     if (GpuData["lastProg",string]=="alxos_console") {
-        "alxos_console_redraw_last"("100%")
+        "alxos_console_redraw_last"("100%",1)
         
         "alxos_console_msg"("Zip files:")
         
@@ -703,7 +703,7 @@ function alxos_zip_openfile() {
     FileData["content",string] = Zip["fileData",string]
     
     if (CurrentProg=="alxos_console") {
-        "alxos_console_redraw_msg"(0,"100%")
+        "alxos_console_redraw_msg"(0,"100%",1)
         "alxos_console_msg"("Opening file "+Zip["fileName",string])
         "alxos_console_move"()
     }

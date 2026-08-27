@@ -1,62 +1,86 @@
 #include "alx_pc/standalone/ds_gfx/_shared_"
 
-function dsDrawChar(X:number, Y:number, Char:string, Color:vector)
+function dsDrawChar(X:number, Y:number, Ascii:number, ColorNum:number)
 {
-    if (Char == "") {
-        return
-    }
-
-    local Ascii = toByte(Char)
-
-    if (Ascii < 32 | Ascii > 126) {
-        return
-    }
+    if (Ascii==0) { return }
     
     local Glyph = DsFont[Ascii - 31, array]
-    
-    if (!Glyph:count()) {
-        return
+    if (!Glyph:count()) { return }
+
+    local Height = DsFontHeight 
+
+    # 5x7
+    if (DsFontWidth == 5) {
+        for (Row = 1, Height) {
+            local Bits = Glyph[Row, number]
+            if (Bits == 0) { continue }
+
+            if (Bits && 16) { dsDrawPixel(X,     Y + Row - 1, ColorNum) }
+            if (Bits && 8)  { dsDrawPixel(X + 1, Y + Row - 1, ColorNum) }
+            if (Bits && 4)  { dsDrawPixel(X + 2, Y + Row - 1, ColorNum) }
+            if (Bits && 2)  { dsDrawPixel(X + 3, Y + Row - 1, ColorNum) }
+            if (Bits && 1)  { dsDrawPixel(X + 4, Y + Row - 1, ColorNum) }
+        }
     }
+    # 8x8
+    elseif (DsFontWidth == 8) {
+        for (Row = 1, Height) {
+            local Bits = Glyph[Row, number]
+            if (Bits == 0) { continue }
 
-    for (Row = 1, DsFontHeight) {
-
-        local Bits = Glyph[Row, number]
-
-        local Mask = 1 << (DsFontWidth - 1)
-        
-        for (Col = 0, DsFontWidth - 1) {
-        
-            if (Bits && Mask) {
-                dsDrawPixel(X + Col, Y + Row - 1, Color)
+            if (Bits && 128) { dsDrawPixel(X,     Y + Row - 1, ColorNum) }
+            if (Bits && 64)  { dsDrawPixel(X + 1, Y + Row - 1, ColorNum) }
+            if (Bits && 32)  { dsDrawPixel(X + 2, Y + Row - 1, ColorNum) }
+            if (Bits && 16)  { dsDrawPixel(X + 3, Y + Row - 1, ColorNum) }
+            if (Bits && 8)   { dsDrawPixel(X + 4, Y + Row - 1, ColorNum) }
+            if (Bits && 4)   { dsDrawPixel(X + 5, Y + Row - 1, ColorNum) }
+            if (Bits && 2)   { dsDrawPixel(X + 6, Y + Row - 1, ColorNum) }
+            if (Bits && 1)   { dsDrawPixel(X + 7, Y + Row - 1, ColorNum) }
+        }
+    }
+    # fallback to other format
+    else {
+        local InitialMask = 1 << (DsFontWidth - 1)
+        for (Row = 1, Height) {
+            local Bits = Glyph[Row, number]
+            if (Bits == 0) { continue }
+            local Mask = InitialMask
+            for (Col = 0, DsFontWidth - 1) {
+                if (Bits && Mask) {
+                    dsDrawPixel(X + Col, Y + Row - 1, ColorNum)
+                }
+                Mask = Mask >> 1
             }
-        
-            Mask = Mask >> 1
         }
     }
 }
 
-function dsDrawChar(X:number, Y:number, Char:string)
-{
-    dsDrawChar(X, Y, Char, vec(255))
+function dsDrawChar(X:number, Y:number, Ascii:number) {
+    dsDrawChar(X, Y, Ascii, 16777215) # 0xFFFFFF
 }
 
 function dsDrawText(X, Y, Text:string, Color:vector)
 {
     local StartX = X
+    
+    local ColorNum = floor(Color:x()) * 65536 + floor(Color:y()) * 256 + floor(Color:z())
 
-    foreach (K, Char:string = Text) {
+    for(I=1,Text:length()) {
+        local Char = toByte(Text,I)
 
-        if (Char == "\n") {
+        if (Char == 10) {
 
             X = StartX
-            Y += DsFontHeight + DsFontSpacing
+            Y += DsFontLineHeight
 
             continue
         }
 
-        dsDrawChar(X, Y, Char, Color)
+        dsDrawChar(X, Y, Char, ColorNum)
 
         X += DsFontWidth + DsFontSpacing
+        
+        if (X>DsWidth) { break }
     }
 }
 

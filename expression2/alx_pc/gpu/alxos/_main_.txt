@@ -9,6 +9,8 @@
 
 if (!ALXOS_INCLUDED) {
 #include "alx_pc/gpu/_main_"
+#include "alx_pc/standalone/ds_gfx/_init_"
+#include "alx_pc/standalone/ds_gfx/font_5x7"
 
 ALXOS_INCLUDED = 1
 
@@ -52,6 +54,7 @@ function alxos_clear() {
 
 function alxos_bsod(Type:array) {
     if (!Type[1,number]) { return }
+    
     egpClear()
     
     local Y = 10
@@ -74,12 +77,46 @@ function alxos_bsod(Type:array) {
         ERR = "EGP_SCREEN_UNPLUG"
     } elseif (Type[1,number]==4) {
         ERR = "E2_DEVICE_RESET"
+    } elseif (Type[1,number]==5) {
+        ERR = "DS_SCREEN_UNPLUG"
+    } elseif (Type[1,number]==6) {
+        ERR = "CS_SCREEN_UNPLUG"
     } else {
         if (Type[2,string]!="") { ERR = Type[2,string] }
         if (Type[3,string]!="") { STOP = Type[3,string] }
     }
 
     GpuData["BSOD",array] = array(Type[1,number],ERR,STOP)
+    
+    if (!EGP:entity():isValid()) {
+        if (CS:entity():isValid()) {
+            csClear()
+            csScreenWrite(0,0,"A problem has been detected",999)
+            csScreenWrite(0,1,"and ALX Wiremod E2 OS",999)
+            csScreenWrite(0,2,"has been shut down",999)
+            csScreenWrite(0,4,ERR,999)
+            csScreenWrite(0,5,"0x"+ID,999)
+            csScreenWrite(0,6,"("+Rand+", "+Rand2+")",999)
+            return
+        } elseif (DS:entity():isValid()) {
+            dsStopQueues()
+            dsClear()
+            dsInit(DS,256,256)
+            dsSetFont(dsFont5x7())
+            
+            if (Type[1,number]==4) {
+                # we can't use queue here, since chip will reset
+                dsDrawText(0,0,ERR)
+            } else {
+                dsDrawTextStart(0,0,"A problem has been detected")
+                dsDrawTextStart(0,8,"and ALX Wiremod E2 OS has been shut down")
+                dsDrawTextStart(0,24,ERR)
+                dsDrawTextStart(0,32,"0x"+ID)
+                dsDrawTextStart(0,40,"("+Rand+", "+Rand2+")")
+            }
+            return
+        }
+    }
 
     local Lines = array(
         "A problem has been detected and ALX Wiremod E2 OS has been shut down",
@@ -116,6 +153,18 @@ function alxos_bsod(Type:array) {
         } Y+=18
     }
 
+}
+
+function number alxos_noconsole() {
+    if (!EGP:entity():isValid()) {
+        if (CS:entity():isValid() | DS:entity():isValid()) {
+            "alxos_console_msg"("This program doesn't support\nconsole mode, connect EGP.") 
+            "alxos_console_command"()
+            "alxos_console_handlers"()
+        }
+        return 1
+    }
+    return 0
 }
 
 }

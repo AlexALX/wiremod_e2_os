@@ -118,7 +118,7 @@ function shutdown() {
 function number findscreen(ID) {
     for (I=0,ScreenSockets-1) {
         if (ID==ioGetInputNumber("ScreenSockG_"+I)) {
-            return I    
+            return I+1   
         }
     }
     return -1
@@ -136,9 +136,6 @@ function screen_connect() {
             EGP_ID = WLI
             Screens[WLI,number] = findscreen(ID)
             Screens["EGP_WL",wirelink] = WL
-            if (GpuData["BSOD",array]:count()) {
-                alxos_bsod(GpuData["BSOD",array])    
-            }
         } elseif (!CS:entity():isValid() & Type=="gmod_wire_consolescreen") {            
             CS = WL
             CS_ID = WLI
@@ -155,6 +152,11 @@ function screen_connect() {
                 DSEvent()
             }
         }
+        
+        if (GpuData["BSOD",array]:count()) {
+            alxos_bsod(GpuData["BSOD",array])    
+        }
+        
     }
 }
 
@@ -186,37 +188,56 @@ if (inputClk()) {
     local Name = inputClkName()
     if (Name:find("ScreenSockG")) {
         local Ent = entity(ioGetInputNumber(Name))
-        local ID = Name:right(1):toNumber()
+        local ID = Name:right(1):toNumber()+1
         if (Ent) {
             dsSendDirect("wirelink",Ent,entity())    
         } else {
-            if (!EGP:entity():id() | Screens[EGP:entity():id(),number]==ID) {
+            local BSOD = 3
+            
+            if (!EGP:entity():id() | Screens[EGP_ID,number]==ID) {
                 EGP = nowirelink()
-                stopAllTimers()
-                dsSendDirect("BSOD",BIOS,array(3))
                 if (EGP_ID>0) {
                     Screens[EGP_ID,number] = 0
                 }
                 Screens["EGP_WL",wirelink] = EGP
-                exit()
+                
+                if ((DS:entity():isValid() | CS:entity():isValid()) & CurrentProg=="alxos_console") {
+                    local IsConsole = "alxos_console_isconsole"()[number]
+                    if (IsConsole) { BSOD = 0 }
+                }
             } 
             
-            if (Screens[DS:entity():id(),number]==ID) {
+            if (Screens[DS_ID,number]==ID) {
                 DS = nowirelink()
                 if (DS_ID>0) {
                     Screens[DS_ID,number] = 0
                 }
                 Screens["DS_WL",wirelink] = DS
                 DSEvent()
+                
+                BSOD = 5
+                if (EGP:entity():isValid() | CS:entity():isValid()) {
+                    BSOD = 0
+                }
             }
 
-            if (Screens[CS:entity():id(),number]==ID) {
+            if (Screens[CS_ID,number]==ID) {
                 CS = nowirelink()
                 if (CS_ID>0) {
                     Screens[CS_ID,number] = 0
                 }
                 Screens["CS_WL",wirelink] = CS
                 CSEvent()
+                
+                BSOD = 6
+                if (EGP:entity():isValid() | DS:entity():isValid()) {
+                    BSOD = 0
+                }
+            }
+
+            if (BSOD) {
+                stopAllTimers()
+                dsSendDirect("BSOD",BIOS,array(BSOD))
             }
         }
     }    

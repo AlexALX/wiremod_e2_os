@@ -1,104 +1,165 @@
-@persist DSTextQueue:table DSCurrentStep:string DSLastStep:string DSCache:table
+@persist DSTextQueue:table DSCurrentStep:string DSLastStep:string DSCache:table DSDrawForce:number
 
 #include "alx_pc/standalone/ds_gfx/_shared_"
 #include "alx_pc/standalone/ds_gfx/text"
 
-function dsDrawTextStart(X:number, Y:number, Text:string)
+function dsDrawTextStart(X:number, Y:number, Text:string, Color:vector)
 {
     local DsText = table()
+    local CleanText = Text:replace("\r", "")
 
-    DsText["text", string] = Text:replace("\r", "")
+    local ColorNum = floor(Color:x()) * 65536 + floor(Color:y()) * 256 + floor(Color:z())
+
+    DsText["text", string] = CleanText
+    DsText["length", number] = CleanText:length()
     DsText["x", number] = X
     DsText["y", number] = Y
 
     DsText["startX", number] = X
     DsText["index", number] = 1
-
     DsText["type", string] = "normal"
+    
+    DsText["color", number] = ColorNum
     
     DSTextQueue:pushTable(DsText)
     DSCurrentStep = "executeQueue"
 }
 
+function dsDrawTextStart(X:number, Y:number, Text:string) {
+    dsDrawTextStart(X,Y,Text,vec(255))
+}
+
 function number dsDrawTextStep(DsText:table)
 {
     local Text = DsText["text", string]
+    local Length = DsText["length",number]
     local Index = DsText["index", number]
-
-    if (Index > Text:length()) {
-        return 1
-    }
-
-    local Char = Text:sub(Index, Index)
     
-    if (Char == "\n") {
+    local X = DsText["x", number]
+    local Y = DsText["y", number]
+    local StartX = DsText["startX", number]
+    local Color = DsText["color",number]
+    
+    while (perf(90)) {
 
-        DsText["x", number] = DsText["startX", number]
-        DsText["y", number] = DsText["y", number] + DsFontHeight + DsFontSpacing
-
-    } else {
-
-        dsDrawChar(
-            DsText["x", number],
-            DsText["y", number],
-            Char
-        )
-
-        DsText["x", number] = DsText["x", number] + DsFontWidth + DsFontSpacing
+        if (Index > Length) {
+            return 1
+        }
+    
+        local Char = toByte(Text, Index)
+        
+        if (Char == 10) {
+            X = StartX
+            Y += DsFontLineHeight
+        } else {
+            dsDrawChar(
+                X,
+                Y,
+                Char,
+                Color
+            )
+    
+            X += DsFontCharWidth
+        }
+        
+        Index++    
     }
 
-    DsText["index", number] = Index + 1
+    DsText["index", number] = Index
+    DsText["x", number] = X
+    DsText["y", number] = Y
 
     return 0
 }
 
-function dsDrawCachedTextStep(Item:table)
+function number dsDrawCachedTextStep(Item:table)
 {
     if (Item["clearLine", number] == 1) {
         dsTextClearLine(Item["y", number])
         Item["clearLine", number] = 0    
-    }    
+    }
     
     local Index = Item["index",number]
+    local Length = Item["length",number]
     local Text = Item["text",string]
-
-    if (Index > Text:length()) {
-        return 1
+    
+    local X = Item["x", number]
+    local Y = Item["y", number]
+    local Color = Item["color",number]
+    
+    while (perf(90)) {
+        if (Index > Length) {
+            return 1
+        }
+    
+        local Char = toByte(Text, Index)
+    
+        dsDrawChar(
+            X + (Index-1)*DsFontCharWidth,
+            Y,
+            Char,
+            Color
+        )
+        
+        Index++
     }
 
-    local Char = Text:sub(Index, Index)
-
-    dsDrawChar(
-        Item["x",number] + (Index-1)*(DsFontWidth+DsFontSpacing),
-        Item["y",number],
-        Char
-    )
-
-    Item["index",number] = Index + 1
+    Item["index",number] = Index
 
     return 0
 }
 
-function dsDrawCachedText(X:number, Y:number, Text:string)
+function dsDrawCachedText(X:number, Y:number, Text:string, Color:vector)
 {
     local Key = X + ":" + Y
     
-    if (DSCache[Key,string] == Text) {
+    local CachedText = DSCache[Key,table]
+    
+    local Force = DSDrawForce    
+    DSDrawForce = 0
+    
+    if (CachedText[1, string] == Text) {
         return
     }
     
-    DSCache[Key,string] = Text
+    if (CachedText[2, number] & CachedText[2, number] > curtime() & !Force) {
+        CachedText[1,string] = Text
+        
+        local ActiveItem = CachedText[3, table]
+        ActiveItem["text", string] = Text
+        ActiveItem["length", number] = Text:length()
+        return
+    }
+    
+    local ColorNum = floor(Color:x()) * 65536 + floor(Color:y()) * 256 + floor(Color:z())
+    
+    local Delay = 0
+    if (DsCacheDelay) {
+        Delay = curtime() + DsCacheDelay
+    }
     
     local Item = table()
     
     Item["x",number] = X
     Item["y",number] = Y
     Item["text",string] = Text
+    Item["length", number] = Text:length()
     Item["index",number] = 1
     Item["clearLine", number] = 1
+    Item["color", number] = ColorNum
+    
+    DSCache[Key,table] = table(Text, Delay, Item)
     
     DSTextQueue:pushTable(Item)
     DSCurrentStep = "executeQueue"
+}
+
+function dsDrawCachedText(X:number, Y:number, Text:string) {
+    dsDrawCachedText(X,Y,Text,vec(255))
+}
+
+function dsDrawCachedForce() {
+    DSDrawForce = 1
 }
 
 function dsClearCache() {
@@ -112,27 +173,38 @@ function dsStopQueues() {
     DSLastStep = ""  
 }
 
-event tick() {
-    if (DSCurrentStep) {
-        while (perf(90)) { 
-            if (DSTextQueue:count() <= 0) {
-                DSCurrentStep = ""
-                break
-            }
+function dsDrawProcess() {
+    if (DSCurrentStep=="") { return }
+    
+    local QueueCount = DSTextQueue:count()
+    local CheckedCount = 0
+    
+    while (perf(90) & CheckedCount < QueueCount) { 
+        if (DSTextQueue:count() <= 0) {
+            DSCurrentStep = ""
+            break
+        }
 
-            local CurrentItem = DSTextQueue[1, table]
-            
-            if (CurrentItem["type", string] == "normal") {
-                if (dsDrawTextStep(CurrentItem)) {
-                    DSLastStep = "drawText"
-                    DSTextQueue:remove(1)   
-                }
+        local CurrentItem = DSTextQueue[1, table]
+        
+        if (CurrentItem["type", string] == "normal") {
+            if (dsDrawTextStep(CurrentItem)) {
+                DSLastStep = "drawText"
+                DSTextQueue:remove(1)   
             } else {
-                if (dsDrawCachedTextStep(CurrentItem)) {
-                    DSLastStep = "drawCachedText"
-                    DSTextQueue:remove(1)   
-                }
-            }            
+                break    
+            }
+        } else {        
+            if (dsDrawCachedTextStep(CurrentItem)) {
+                DSLastStep = "drawCachedText"
+                DSTextQueue:remove(1)   
+            } else {
+                break    
+            }
         }
     }
+}
+
+event tick() {
+    dsDrawProcess()
 }

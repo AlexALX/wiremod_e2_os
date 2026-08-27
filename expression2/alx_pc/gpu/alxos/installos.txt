@@ -37,6 +37,15 @@ function number installfooter(Str:string) {
 }
 
 function number installos(Args:table) {
+    if (!EGP:entity():isValid()) {
+        if (CS:entity():isValid()) {
+            csClear()
+            csScreenWrite(0,0,"Installing OS is not supported",999)    
+            csScreenWrite(0,1,"in console mode.",999) 
+        }
+        return 0
+    }
+
     if (!checkPerf(8000)) {
         IO_Tmp = Args
         timer("installos",1)   
@@ -1470,6 +1479,7 @@ function installos_format() {
 }
 
 function alxos_partitions_init(Args:table) {
+    if ("alxos_noconsole"()[number]) { return }
     #installos(table("manager"))       
     runCmd("installos",1,table("manager"))
 }

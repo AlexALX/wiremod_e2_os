@@ -16,6 +16,7 @@ function dsInit(DS:wirelink, Width:number, Height:number) {
     DSWL = DS
     DsWidth = Width
     DsHeight = Height
+    DsCacheDelay = 0
     
     DSWL[1048569] = 2
     DSWL[1048574] = 0
@@ -32,4 +33,10 @@ function dsSetFont(Font:table)
     DsFontWidth = Font["width",number]
     DsFontHeight = Font["height",number]
     DsFontSpacing = Font["spacing",number]
+    DsFontLineHeight = DsFontHeight + DsFontSpacing
+    DsFontCharWidth = DsFontWidth + DsFontSpacing
+}
+
+function dsCacheDelay(Seconds:number) {
+    DsCacheDelay = Seconds    
 }

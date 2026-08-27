@@ -11,17 +11,45 @@
 ]#
 
 #include "alx_pc/gpu/alxos/_main_"
+#include "alx_pc/standalone/ds_gfx/font_5x7"
+
+# custom drew flag from image loaders
+function alxos_console_ds_drew() {
+    return DS[1048499]    
+}
 
 function alxos_toggle_cursor(Show:number) {
-    if (CmdScreen) { return }
-    local Cursor = GpuData[3,number]
-    EGP:egpSetText(Cursor,(Show ? "_" : ""))
+    if (CmdScreen==1) { return }
+    
+    CmdCursor = Show
+    
+    if (CmdScreen == 2) {
+        if (alxos_console_ds_drew()) { return }
+             
+        local Path = (KeyHandler == "alxos_console_inputkey" ? GpuData["inputMsg",string] : GpuData[-3,string])
+        local Cmd = GpuData[-4,string]
+        local FullLine = Path + Cmd
+        
+        local CursorX = FullLine:length() * DsFontCharWidth
+        local CursorY = (CmdLinesC-1) * DsFontLineHeight
+        
+        if (Show) {
+            dsDrawChar(CursorX, CursorY, 95, 11053224) # 0xA8A8A8
+        } else {
+            dsDrawChar(CursorX, CursorY, 95, 0)
+        }
+    } else {
+        local Cursor = GpuData[3,number]
+        EGP:egpSetText(Cursor,(Show ? "_" : ""))
+    }
 }
 
 function alxos_upd_cursor() {
-    if (CmdScreen) {
+    if (CmdScreen==1) {
         local XPos = (GpuData[-2, number] - BIOS_X) / 10
         CS[2045] = (CmdLinesC - 1) * 60 + XPos * 2
+    } elseif (CmdScreen==2) {
+        alxos_toggle_cursor(0)
     } else {
         local P = GpuData[3,number]
         local XPos = GpuData[-2,number]
@@ -30,35 +58,36 @@ function alxos_upd_cursor() {
 }
 
 function alxos_screen_write(X:number, Y:number, Str:string) {
-    Y = Y-1
-    
-    local StartAddr = Y * 60 + X * 2
-    local StrArr = Str:explode("")
-    local ColorParam = 666
-    
-    local MaxY = Y * 60 + 60
-    
-    for(I = 1, StrArr:count()) {        
-        local CharCode = toByte(StrArr[I,string])
-        
-        CS[StartAddr] = CharCode
-        CS[StartAddr + 1] = ColorParam
-        
-        StartAddr += 2
-        
-        if (StartAddr >= MaxY) { break }
-    }
+    csScreenWrite(X,Y-1,Str,666)
 }
-
 
 function alxos_console_move() {
     if (CmdLinesC>=CmdMaxLines) {
-        if (CmdScreen) {
-            local LinesToShift = CmdLinesC - CmdMaxLines
-            CS[2038] = LinesToShift
+        local LinesToShift = CmdLinesC - CmdMaxLines
+        
+        if (CmdScreen==1) {
+            csScreenMove(LinesToShift)
             CmdLinesC = CmdMaxLines
+        } elseif (CmdScreen==2) {
+            if (alxos_console_ds_drew()) { return }
+            
+            dsClear()
+            dsStopQueues()
+            
+            local NLines = array()
+            local NewIdx = 1
+             
+            for (I = (LinesToShift + 1), CmdLinesC) {
+                local Str = CmdLines[I, string]
+                NLines[NewIdx, string] = Str
+                dsDrawTextStart(0, (NewIdx - 1) * DsFontLineHeight, Str, vec(168))
+                NewIdx++
+            }
+            
+            CmdLines = NLines    
+            CmdLinesC = NewIdx-1   
         } else {        
-            local RM = CmdLinesC-CmdMaxLines 
+            local RM = LinesToShift
             local NLines = array()
             for (I=1,CmdLinesC) {
                 local ID = CmdLines[I,number]
@@ -86,7 +115,7 @@ function alxos_console_msg(Str:string) {
     #local Num = GpuData[2,number]
     local Arr = Str:explode(NL)
     
-    if (CmdScreen) {
+    if (CmdScreen==1) {
         for (I=1,Arr:count()) {
             alxos_screen_write(0, CmdLinesC, Arr[I, string])
             CmdLinesC++
@@ -94,6 +123,15 @@ function alxos_console_msg(Str:string) {
         }
         
         alxos_upd_cursor()
+    } elseif (CmdScreen==2) {
+        for (I=1,Arr:count()) {
+            CmdLines[CmdLinesC,string] = Arr[I, string]
+            if (!alxos_console_ds_drew()) {
+                dsDrawTextStart(0, (CmdLinesC-1)*DsFontLineHeight, Arr[I, string], vec(168))
+            }
+            CmdLinesC++
+        }
+        #alxos_console_move()
     } else {
         for (I=1,Arr:count()) {
             #GpuData[1,table][Num,array] = array(LAST_I,Arr[I,string])
@@ -109,8 +147,14 @@ function alxos_console_msg(Str:string) {
 }
 
 function alxos_console_rawmsg(Str:string) {
-    if (CmdScreen) {
+    if (CmdScreen==1) {
         alxos_screen_write(0, CmdLinesC, Str)
+        alxos_console_move()
+    } elseif (CmdScreen==2) {
+        CmdLines[CmdLinesC,string] = Str
+        if (!alxos_console_ds_drew()) {
+            dsDrawTextStart(0, (CmdLinesC-1)*DsFontLineHeight, Str, vec(168))
+        }
         alxos_console_move()
     } else {
         CmdLines[CmdLinesC,number] = LAST_I
@@ -138,19 +182,19 @@ function alxos_console_listcurdir() {
 }
 
 function alxos_show_cursor() {
-    if (CmdScreen) {
+    if (CmdScreen==1) {
         CS[2046] = 1
     } else {
-        CmdCursor = !CmdCursor
-        local Cursor = GpuData[3,number]    
-        EGP:egpSetText(Cursor,(CmdCursor ? "_" : ""))
-        timer("cursor_draw",500)    
+        alxos_toggle_cursor(!CmdCursor) 
+        timer("cursor_draw",500)
     }
 }
 
 function alxos_hide_cursor() {
-    if (CmdScreen) {
+    if (CmdScreen==1) {
         CS[2046] = 0  
+    } elseif (CmdScreen==2) {
+        alxos_toggle_cursor(0)
     } else {
         CmdCursor = 0
         local Cursor = GpuData[3,number]
@@ -160,8 +204,11 @@ function alxos_hide_cursor() {
 }
 
 function alxos_draw_cursor() {
-    if (CmdScreen) {
+    if (CmdScreen==1) {
         CS[2046] = 1 
+    } elseif (CmdScreen==2) {
+        registerTimers("cursor_draw","alxos_show_cursor")
+        timer("cursor_draw",500)
     } else {
         GpuData[3,number] = LAST_I
         local PathX = GpuData[-2,number]
@@ -183,10 +230,18 @@ function alxos_console_command() {
     GpuData[-3,string] = Path
     GpuData[-4,string] = ""
     
-    if (CmdScreen) {
+    if (CmdScreen==1) {
         alxos_screen_write(0, CmdLinesC, Path)
         alxos_upd_cursor()
-    } else {    
+        alxos_show_cursor()
+    } elseif (CmdScreen==2) {
+        CmdLines[CmdLinesC,string] = Path
+        if (!alxos_console_ds_drew()) {
+            dsDrawTextStart(0, (CmdLinesC-1)*DsFontLineHeight, Path, vec(168))
+        }
+        alxos_upd_cursor()
+        alxos_show_cursor()
+    } else {
         CmdLines[CmdLinesC,number] = LAST_I
         EGP:egpText(LAST_I,Path,vec2(BIOS_X,LAST_Y))
         EGP:egpFont(LAST_I,"Courier New")
@@ -209,6 +264,7 @@ function alxos_console_input(Msg:string, Func:function, RE:string) {
     GpuData[-1,number] = LAST_I
     GpuData[-2,number] = BIOS_X + Msg:length()*10
     GpuData["inputLen",number] = Msg:length()
+    GpuData["inputMsg",string] = Msg
     GpuData[-4,string] = ""
     
     alxos_console_move()
@@ -239,8 +295,13 @@ function alxos_console_err(Err:string) {
 }
 
 function alxos_console_cls_safe() {
-    if (CmdScreen) {
+    if (CmdScreen==1) {
         CS[2041] = 1
+    } elseif (CmdScreen==2) {
+        dsClear()
+        dsStopQueues()
+        dsInit(DS,256,256)
+        dsCacheDelay(1.5)
     } else {
         LAST_I = 1
         LAST_Y = 0
@@ -258,46 +319,87 @@ function alxos_console_cls() {
     alxos_draw_cursor()
 }
 
-function alxos_console_screen_vars(Console:number) {
-    if (Console) {
+function alxos_console_screen_vars(Screen:number) {
+    CmdHeader = "ALX Wiremod E2 OS - Console v1.1\n(c) 2018-2026 by AlexALX"
+    
+    CSEvent = function() {}
+    DSEvent = function() {}
+    
+    if (Screen==1) {
         CmdMaxLines = 17
         CS[2043] = 0.5
         CS[2044] = 0.2
 
         CmdHeader = "ALX Wiremod E2 OS Console v1.1\n(c) 2018-2026 by AlexALX"
-    } else {
-        CmdMaxLines = 25
-        CmdHeader = "ALX Wiremod E2 OS - Console v1.1\n(c) 2018-2026 by AlexALX"
-    }
-}
-
-function alxos_console_screen(Console:number) {
-    if (Console) {
-        if (!CS:entity():isValid()) {
-            alxos_console_msg("Console screen is not connected!")
-            alxos_console_command()
-            return
-        }
         
         CSEvent = function() {
-            CmdScreen = 0
-            alxos_console_screen_vars(0)
+            if (EGP:entity():isValid()) {
+                CmdScreen = 0
+            } else {
+                CmdScreen = 2
+            }
+            
+            alxos_console_screen_vars(CmdScreen)
             alxos_console_cls_safe()
             alxos_console_msg("Console screen was disconnected!")
             alxos_console_command()
             alxos_draw_cursor()
             CSEvent = function() {}
+        }        
+    } elseif (Screen==2) {
+        dsInit(DS, 256, 256)
+        dsSetFont(dsFont5x7())
+        dsCacheDelay(1.5)
+        CmdMaxLines = 31
+        
+        DSEvent = function() {
+            if (EGP:entity():isValid()) {
+                CmdScreen = 0
+            } else {
+                CmdScreen = 1    
+            }
+            alxos_console_screen_vars(CmdScreen)
+            alxos_console_cls_safe()
+            alxos_console_msg("Digital screen was disconnected!")
+            alxos_console_command()
+            alxos_draw_cursor()
+            DSEvent = function() {}
         }
     } else {
-        CSEvent = function() {}
+        CmdMaxLines = 25
+    }
+}
+
+function alxos_console_screen(Screen:number) {
+    if (Screen==1) {
+        if (!CS:entity():isValid()) {
+            alxos_console_msg("Console screen is not connected!")
+            alxos_console_command()
+            return
+        }
+    } elseif (Screen==2) {
+        if (!DS:entity():isValid()) {
+            alxos_console_msg("Digital screen is not connected!")
+            alxos_console_command()
+            return
+        }
+    } else {
+        if (!EGP:entity():isValid()) {
+            alxos_console_msg("EGP screen is not connected!")
+            alxos_console_command()
+            return
+        }
     }
     
-    CmdScreen = Console
+    CmdScreen = Screen
     
-    alxos_console_screen_vars(Console)
+    alxos_console_screen_vars(Screen)
         
     egpClear()
     csClear()
+    dsClear()
+    dsStopQueues()
+
     alxos_console_cls_safe()
     alxos_console_msg(CmdHeader)
     alxos_console_command()
@@ -558,20 +660,44 @@ function alxos_console_delpre(Name:string) {
 
 # redraw last msg
 function alxos_console_redraw_last(Msg:string) {
-    if (CmdScreen) {
+    if (CmdScreen==1) {
         alxos_screen_write(0, CmdLinesC-1, Msg+" ":repeat(30-Msg:length()))
+    } elseif (CmdScreen==2) {
+        CmdLines[CmdLinesC-1, string] = Msg
+        if (!alxos_console_ds_drew()) {
+            dsDrawCachedText(0, (CmdLinesC-2)*DsFontLineHeight, Msg, vec(168))
+        }
     } else {
         EGP:egpSetText(LAST_I-1,Msg)
     }
 }
 
+function alxos_console_redraw_last(Msg:string, Force:number) {
+    if (CmdScreen==2) {
+        dsDrawCachedForce()    
+    }
+    alxos_console_redraw_last(Msg)
+}
+
 # redraw msg by index (0 - last, 1 - 2 msgs before, and so)
 function alxos_console_redraw_msg(Index, Msg:string) {
-    if (CmdScreen) {
+    if (CmdScreen==1) {
         alxos_screen_write(0, CmdLinesC-1-Index, Msg+" ":repeat(30-Msg:length()))
+    } elseif (CmdScreen==2) {
+        CmdLines[CmdLinesC-1-Index, string] = Msg
+        if (!alxos_console_ds_drew()) {
+            dsDrawCachedText(0, (CmdLinesC-2-Index)*DsFontLineHeight, Msg, vec(168))
+        }
     } else {
         EGP:egpSetText(LAST_I-1-Index,Msg)
     }
+}
+
+function alxos_console_redraw_msg(Index, Msg:string, Force:number) {
+    if (CmdScreen==2) {
+        dsDrawCachedForce()    
+    }
+    alxos_console_redraw_msg(Index, Msg)
 }
 
 function alxos_console_delpost(Name:string) {
@@ -642,16 +768,19 @@ function alxos_console_run(Command:string) {
     }
     GpuData[100,number] = 0
 
-    switch (Cmd) {
+    switch (Cmd:lower()) {
         case "help",
             if (Arg!="") {
                 alxos_console_err("Invalid command arguments.")
                 return   
             }
             alxos_console_msg("Available commands:")
-            alxos_console_msg("help - display help information")
+            if (CmdScreen!=1) {
+                alxos_console_msg("help - display help information")
+            }
             alxos_console_msg("cls - clear console")
             alxos_console_msg("cs - draw on console screen")
+            alxos_console_msg("ds - draw on digital screen")
             alxos_console_msg("egp - draw on egp screen")
             alxos_console_msg("reboot - reboot PC")
             alxos_console_msg("shutdown - turn off PC")
@@ -665,7 +794,7 @@ function alxos_console_run(Command:string) {
             alxos_console_msg("fput FileName content - write to file with content")
             alxos_console_msg("fget FileName - read first 48 bytes from file")
             alxos_console_msg("open FileName.e2e - run E2 executable")
-            if (!CmdScreen) {
+            if (CmdScreen!=1) {
                 alxos_console_msg(" e2r, e2p, e2z also supported by this command")
                 alxos_console_msg("open FileName.jpg - load image on Digital Screen")
                 alxos_console_msg(" Supported images: jpg, gif, bmp, png")
@@ -1002,6 +1131,10 @@ function alxos_console_run(Command:string) {
         case "cs",
             alxos_console_screen(1)
         break
+        case "digitalscreen",
+        case "ds",
+            alxos_console_screen(2)
+        break
         case "egpscreen",
         case "egp",
             alxos_console_screen(0)
@@ -1033,6 +1166,11 @@ function alxos_console_inputkey(Key:string,Pressed) {
     
     if (Key=="enter") {
         if (CmdScreen) {
+            if (CmdScreen == 2) {
+                alxos_toggle_cursor(0)
+                CmdLines[CmdLinesC, string] = GpuData["inputMsg",string]+GpuData[-4,string]
+            }
+            
             CmdLinesC++
         }
         
@@ -1053,8 +1191,12 @@ function alxos_console_inputkey(Key:string,Pressed) {
         local I = GpuData[-1,number]
         local Cmd = GpuData[-4,string]
     
-        if (CmdScreen) {
+        if (CmdScreen==1) {
             alxos_screen_write(MsgLen, CmdLinesC, " ":repeat(Cmd:length())) 
+        } elseif (CmdScreen==2) {
+            local FullCmd = GpuData["inputMsg",string]
+            dsTextClearLine((CmdLinesC-1)*DsFontLineHeight)
+            dsDrawTextStart(0, (CmdLinesC-1)*DsFontLineHeight, FullCmd, vec(168))
         } else {
             EGP:egpSetText(I,"")
         }
@@ -1066,8 +1208,12 @@ function alxos_console_inputkey(Key:string,Pressed) {
         local Cmd = GpuData[-4,string]
         if (Cmd=="") { return }        
         Cmd = Cmd:sub(0,Cmd:length()-1)
-        if (CmdScreen) {
+        if (CmdScreen==1) {
             alxos_screen_write(MsgLen, CmdLinesC, Cmd + " ") 
+        } elseif (CmdScreen==2) {
+            local FullCmd = GpuData["inputMsg",string]
+            dsTextClearLine((CmdLinesC-1)*DsFontLineHeight)
+            dsDrawTextStart(0, (CmdLinesC-1)*DsFontLineHeight, FullCmd + Cmd, vec(168))
         } else {
             EGP:egpSetText(I,Cmd)
         }
@@ -1082,8 +1228,11 @@ function alxos_console_inputkey(Key:string,Pressed) {
             local I = GpuData[-1,number]
             local Cmd = GpuData[-4,string]
             Cmd += Char
-            if (CmdScreen) {
+            if (CmdScreen==1) {
                 alxos_screen_write(MsgLen, CmdLinesC, Cmd)
+            } elseif (CmdScreen==2) {      
+                alxos_toggle_cursor(0)        
+                dsDrawTextStart(MsgLen*DsFontCharWidth, (CmdLinesC-1)*DsFontLineHeight, Cmd, vec(168))
             } else {
                 EGP:egpSetText(I,Cmd)
             }
@@ -1097,8 +1246,20 @@ function alxos_console_inputkey(Key:string,Pressed) {
 function alxos_console_key(Key:string,Pressed) {
     if (!Pressed) { return } 
     
+    if (alxos_console_ds_drew()) {
+        if (Key=="enter" | Key=="f8") {
+            alxos_console_cls()
+        }
+        return
+    }
+    
     if (Key=="enter") {
         if (CmdScreen) {
+            if (CmdScreen == 2) {                
+                alxos_toggle_cursor(0)
+                CmdLines[CmdLinesC, string] = GpuData[-3,string] + GpuData[-4,string]
+            }
+            
             CmdLinesC++
         }
         alxos_console_run(GpuData[-4,string])
@@ -1113,7 +1274,7 @@ function alxos_console_key(Key:string,Pressed) {
                 Ind++
             }
             
-            local Max = CmdHistory:count() 
+            local Max = CmdHistory:count()
             
             if (Ind<1) {
                 Ind = Max  
@@ -1127,10 +1288,12 @@ function alxos_console_key(Key:string,Pressed) {
             local Path = GpuData[-3,string]
             local Cmd = CmdHistory[Ind,string]
         
-            if (CmdScreen) {
+            if (CmdScreen==1) {
                 local Msg = Path + Cmd
-                
                 alxos_screen_write(0, CmdLinesC, Msg + " ":repeat(30-Msg:length()))
+            } elseif (CmdScreen==2) {
+                dsTextClearLine((CmdLinesC-1)*DsFontLineHeight)
+                dsDrawTextStart(0, (CmdLinesC-1)*DsFontLineHeight, Path + Cmd, vec(168))
             } else {
                 EGP:egpSetText(I,Path+Cmd)    
             }
@@ -1143,8 +1306,11 @@ function alxos_console_key(Key:string,Pressed) {
         local Path = GpuData[-3,string]
         local Cmd = GpuData[-4,string]
         
-        if (CmdScreen) { 
+        if (CmdScreen==1) { 
             alxos_screen_write(0, CmdLinesC, Path + " ":repeat(Cmd:length())) 
+        } elseif (CmdScreen==2) {
+            dsTextClearLine((CmdLinesC-1)*DsFontLineHeight)
+            dsDrawTextStart(0, (CmdLinesC-1)*DsFontLineHeight, Path + Cmd, vec(168))
         } else {
             EGP:egpSetText(I,Path)
         }
@@ -1157,8 +1323,11 @@ function alxos_console_key(Key:string,Pressed) {
         local Cmd = GpuData[-4,string]
         if (Cmd=="") { return }
         Cmd = Cmd:sub(0,Cmd:length()-1)
-        if (CmdScreen) {
+        if (CmdScreen==1) {
             alxos_screen_write(0, CmdLinesC, Path + Cmd + " ")
+        } elseif (CmdScreen==2) {
+            dsTextClearLine((CmdLinesC-1)*DsFontLineHeight)
+            dsDrawTextStart(0, (CmdLinesC-1)*DsFontLineHeight, Path + Cmd, vec(168))
         } else {
             EGP:egpSetText(I,Path+Cmd)
         }
@@ -1175,8 +1344,11 @@ function alxos_console_key(Key:string,Pressed) {
             local Path = GpuData[-3,string]
             local Cmd = GpuData[-4,string]
             Cmd += Char
-            if (CmdScreen) {
+            if (CmdScreen==1) {
                 alxos_screen_write(0, CmdLinesC, Path + Cmd)
+            } elseif (CmdScreen==2) {
+                alxos_toggle_cursor(0)
+                dsDrawTextStart(0, (CmdLinesC-1)*DsFontLineHeight, Path + Cmd, vec(168))
             } else {
                 EGP:egpSetText(I,Path+Cmd)
             }
@@ -1242,7 +1414,20 @@ function alxos_console_init(Args:table) {
         CmdDir[2,number] = 0
     }
     
-    CSEvent = function() {}    
+    if (
+        (CmdScreen==0 & !EGP:entity():isValid()) |
+        (CmdScreen==1 & !CS:entity():isValid()) |
+        (CmdScreen==2 & !DS:entity():isValid())
+    ) {
+        if (EGP:entity():isValid()) {
+            CmdScreen = 0
+        } elseif (CS:entity():isValid()) {
+            CmdScreen = 1
+        } elseif (DS:entity():isValid()) {
+            CmdScreen = 2
+        }
+    }
+    
     alxos_console_screen_vars(CmdScreen)
     
     CmdCopy = table()
@@ -1260,6 +1445,10 @@ function alxos_console_init(Args:table) {
     GpuData[2,number] = 0
     
     alxos_console_msg(CmdHeader)
+    if (!EGP:entity():isValid()) {
+        alxos_console_msg("Warning: EGP is not connected.")
+    }
+    alxos_console_command()  
     
     CmdDsH = "alxos_console_postinit"
     alxos_console_listdir(CmdFS,CmdDir[1,number],CmdDir[2,number])       
