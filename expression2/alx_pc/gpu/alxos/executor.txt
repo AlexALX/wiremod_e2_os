@@ -338,8 +338,7 @@ function alxos_executor_ds(Name:string) {
         
         if (AppManifest:count()) {
             local ScreenModes = AppManifest["screen_modes", table]
-            
-            local ErrorMsg = ""            
+
             if (ScreenModes["egp",number]==1 & !EGP:entity():isValid()) {
                 ErrorMsg = "This program doesn't support\nexecuting without EGP\nScreen connected."
             } elseif (ScreenModes["console",number]==1 & !CS:entity():isValid()) {
