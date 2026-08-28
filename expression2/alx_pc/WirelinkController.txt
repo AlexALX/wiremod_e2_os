@@ -14,8 +14,8 @@ if (first()|duped()) {
 }
 
 if (~Ent) {
-    wirelinkClearScreen()
     Screen = Ent
+    wirelinkClearScreen()
 }
 
 if (~InG) {
