@@ -159,7 +159,7 @@ event input(InputName:string) {
         displayProgressStart()
     } elseif (InputName=="Error" & Error) {
         displayError(Error)    
-    } elseif (InputName == "Progress") {
+    } elseif (InputName == "Progress" & Progress:count()) {
         displayProgress()
     } elseif (InputName == "Warning" & Warning) {
         displayWarning(Warning)           

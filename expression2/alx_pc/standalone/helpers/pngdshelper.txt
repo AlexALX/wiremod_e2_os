@@ -144,14 +144,14 @@ Created by AlexALX (c) 2026
     displayMode()
 }
 
-event input(InputName:string) {    
+event input(InputName:string) {
     if (InputName=="DS" & DS!=nowirelink()) {
         displayMode()
     } elseif (InputName=="Processing" & Processing) {
         displayProgressStart()
     } elseif (InputName=="Error" & Error) {
         displayError(Error)    
-    } elseif (InputName == "Progress") {
+    } elseif (InputName == "Progress" & Progress:count()) {
         displayProgress()
     } elseif (InputName == "Warning" & Warning) {
         displayWarning(Warning)           
