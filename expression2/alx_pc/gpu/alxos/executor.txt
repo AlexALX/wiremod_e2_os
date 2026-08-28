@@ -20,6 +20,15 @@ function array alxos_findExecutor() {
     return array()
 }
 
+function alxos_executor_error(ErrorMsg:string, Width) {
+    if (GpuData["lastProg", string]=="alxos_console") {
+        "alxos_console_handlers"()
+        "alxos_console_err"(ErrorMsg)
+    } else {        
+        "alxos_explorer_error"(ErrorMsg,Width)
+    }
+}
+
 function alxos_executor_init(Args:table) {
     #ifndef entity:remoteSetCode(string)
         if (1) {
@@ -28,14 +37,7 @@ function alxos_executor_init(Args:table) {
                 "You can enable it in server console:\n"+
                 "wire_expression2_extension_enable remoteupload"
             
-            if (CurrentProg=="alxos_console") {
-                "alxos_console_err"(Error)
-            } else {
-                "alxos_explorer_error"(
-                    Error,
-                    500
-                )
-            }
+            alxos_executor_error(Error,500)
             return
         }
     #endif
@@ -44,14 +46,7 @@ function alxos_executor_init(Args:table) {
     if (!Executor:count()) {
         local Error = "Remote Executor not found, please insert PCI card and reboot."
         
-        if (CurrentProg=="alxos_console") {
-            "alxos_console_err"(Error)
-        } else {
-            "alxos_explorer_error"(
-                Error,
-                500
-            )
-        }
+        alxos_executor_error(Error,500)
         return
     }    
     
@@ -82,7 +77,8 @@ function alxos_executor_init(Args:table) {
     
     GpuData["lastProg", string] = CurrentProg
     
-    if (CurrentProg=="alxos_console") {                
+    if (CurrentProg=="alxos_console") {
+        "alxos_hide_cursor"()                
         "alxos_console_msg"("Opening file... Press ENTER or F8 to cancel")
         "alxos_console_msg"("0%")
         "alxos_console_move"()
@@ -102,9 +98,68 @@ function alxos_executor_init(Args:table) {
     runCmd("alxos_executor_progress",1)
 }
 
+function alxos_executor_manifest() {
+    local AppManifest = GpuData["AppManifest",table]
+    
+    if (GpuData["lastProg", string]=="alxos_console") {
+        if (AppManifest:count()) {
+            "alxos_console_msg"(AppManifest["name",string])
+            "alxos_console_msg"("Author: "+AppManifest["author",string])
+            "alxos_console_msg"("Version: "+AppManifest["version",string])
+        } else {
+            "alxos_console_msg"("Warning: no AppManifest.")
+        }
+        
+        "alxos_console_msg"("Executing in a second... press ENTER to abort")
+        "alxos_console_move"()
+    } else {
+        local Height = (AppManifest:count() ? 125 : 85)
+        
+        local Info = table()
+        Info["OK",array] = array("Abort",50,0)
+        
+        local Parent = "alxos_explorer_dialog"("App Manifest",400,Height,"ok","alxos_executor_clear",Info)[number]
+    
+        local LAST_Y = 20
+        
+        if (AppManifest:count()) {
+    
+            DialogData[-10,table]:pushNumber(LAST_I)
+            EGP:egpText(LAST_I,AppManifest["name",string],vec2(20,LAST_Y))
+            EGP:egpParent(LAST_I,Parent)
+            EGP:egpColor(LAST_I,0,0,0,255) LAST_I++ LAST_Y+=20
+            
+            DialogData[-10,table]:pushNumber(LAST_I)
+            EGP:egpText(LAST_I,"Author: "+AppManifest["author",string],vec2(20,LAST_Y))
+            EGP:egpParent(LAST_I,Parent)
+            EGP:egpColor(LAST_I,0,0,0,255) LAST_I++ LAST_Y+=20
+            
+            DialogData[-10,table]:pushNumber(LAST_I)
+            EGP:egpText(LAST_I,"Version: "+AppManifest["version",string],vec2(20,LAST_Y))
+            EGP:egpParent(LAST_I,Parent)
+            EGP:egpColor(LAST_I,0,0,0,255) LAST_I++ LAST_Y+=20
+        
+        } else {
+            DialogData[-10,table]:pushNumber(LAST_I)
+            EGP:egpText(LAST_I,"Warning: no AppManifest.",vec2(20,LAST_Y))
+            EGP:egpParent(LAST_I,Parent)
+            EGP:egpColor(LAST_I,0,0,0,255) LAST_I++ LAST_Y+=20
+        }
+        
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Executing in a second...",vec2(20,LAST_Y))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++ LAST_Y+=20
+    }
+
+    stopCmd()
+    runCmd("alxos_executor_done",1200,1)
+}
+
 function alxos_executor_done() {
     if (GpuData["lastProg", string]=="alxos_console") {
-        "alxos_console_msg"("Code is executing... Press F8 to cancel")
+        "alxos_hide_cursor"()
+        "alxos_console_redraw_last"("Code is executing... Press F8 to cancel",1)
         "alxos_console_move"()
     } else {
         local Parent = "alxos_explorer_dialog"("Code Executed",400,60,"","")[number]
@@ -165,6 +220,7 @@ function number alxos_executor_clear() {
     local Executor = alxos_findExecutor()
     dsSendDirect("SHUTDOWN",Executor[3,entity],0)
 
+    EGPEvent = function() {}
     DSEvent = function() {}
     CSEvent = function() {}
     
@@ -184,6 +240,7 @@ function alxos_executor_end() {
     local ExplorerFS = GpuData[1,table]
     dsSendDirect("clear",ExplorerFS["hdd_io",wirelink]:entity(),1)
     
+    EGPEvent = function() {}
     DSEvent = function() {}
     CSEvent = function() {}
 
@@ -215,14 +272,19 @@ function alxos_executor_run(Code:string) {
     
     FInfo["content",string] = Code
     
+    EGPEvent = function() {
+        local Executor = alxos_findExecutor()
+        dsSendDirect("ScreenConnect",Executor[3,entity],"EGP")  
+    }
+    
     DSEvent = function() {
         local Executor = alxos_findExecutor()
-        dsSendDirect("DS_Connect",Executor[3,entity],1)  
+        dsSendDirect("ScreenConnect",Executor[3,entity],"DS")  
     }
     
     CSEvent = function() {
         local Executor = alxos_findExecutor()
-        dsSendDirect("CS_Connect",Executor[3,entity],1)  
+        dsSendDirect("ScreenConnect",Executor[3,entity],"CS")  
     }
     
     local Info = table()
@@ -233,10 +295,19 @@ function alxos_executor_run(Code:string) {
     Info["FInfo",table] = FInfo
     Info["LastProgram",string] = GpuData["lastProg",string]
     
-    if (GpuData["lastProg", string]=="alxos_console") {
-        "alxos_console_redraw_last"("100%")
+    local PercID = DialogData[-4,number]
+    local BoxID = DialogData[-5,number]
+    local BoxW = DialogData[-6,number]
+    local CalcP = 100
+        
+    if (GpuData["lastProg",string]=="alxos_console") {            
+        "alxos_console_redraw_last"(CalcP+"%")
+    } else {
+        EGP:egpSize(BoxID,vec2(BoxW,20))
+        EGP:egpSetText(PercID,CalcP+"%")
     }
-
+    
+    stopCmd()
     dsSendDirect("executeCode",Executor[3,entity],Info)
 }
 
@@ -257,18 +328,43 @@ function alxos_executor_ds(Name:string) {
             ErrorMsg = "Remote Executor ExecutorID is invalid!\nPlease check wire inputs on pci card e2 chips."    
         }
         
-        if (GpuData["lastProg", string]=="alxos_console") {
-            "alxos_console_handlers"()
-            "alxos_console_err"(ErrorMsg)
-        } else {        
-            "alxos_explorer_error"(ErrorMsg,420)
-        }    
-    } elseif (Name=="initExecutor") {    
-        local Info = dsGetTable()        
+        alxos_executor_error(ErrorMsg,420)
+    } elseif (Name=="initExecutor") {
+        local Info = dsGetTable()
+        
+        local AppManifest = Info[2,table]
+        
+        local ErrorMsg = ""
+        
+        if (AppManifest:count()) {
+            local ScreenModes = AppManifest["screen_modes", table]
+            
+            local ErrorMsg = ""            
+            if (ScreenModes["egp",number]==1 & !EGP:entity():isValid()) {
+                ErrorMsg = "This program doesn't support\nexecuting without EGP\nScreen connected."
+            } elseif (ScreenModes["console",number]==1 & !CS:entity():isValid()) {
+                ErrorMsg = "This program doesn't support\nexecuting without Console\nScreen connected."
+            } elseif (ScreenModes["digital",number]==1 & !DS:entity():isValid()) {
+                ErrorMsg = "This program doesn't support\nexecuting without Digital\nScreen connected."
+            }
+        } else {
+            # if no manifest provided - assume its legacy EGP only
+            if (!EGP:entity():isValid()) {
+                ErrorMsg = "This program doesn't support\nexecuting without EGP\nScreen connected."   
+            }
+        }
+    
+        if (ErrorMsg) {
+            alxos_executor_error(ErrorMsg,420)
+            alxos_executor_end()
+            return
+        }
+
         GpuData["ExecutorWirelink",wirelink] = Info[1,wirelink]
         GpuData["ExecInit",number] = 1
+        GpuData["AppManifest",table] = AppManifest
         
-        alxos_executor_done()
+        alxos_executor_manifest()
     } elseif (Name=="exitProg") {    
         alxos_executor_end()
         alxos_executor_close()

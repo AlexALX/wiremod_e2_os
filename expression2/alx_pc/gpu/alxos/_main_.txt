@@ -101,10 +101,10 @@ function alxos_bsod(Type:array) {
         } elseif (DS:entity():isValid()) {
             dsStopQueues()
             dsClear()
-            dsInit(DS,256,256)
+            dsInit(DSContainer,256,256)
             dsSetFont(dsFont5x7())
             
-            if (Type[1,number]==4) {
+            if (last()) {
                 # we can't use queue here, since chip will reset
                 dsDrawText(0,0,ERR)
             } else {

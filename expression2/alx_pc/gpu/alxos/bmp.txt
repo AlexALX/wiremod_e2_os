@@ -174,10 +174,6 @@ function alxos_bmp_postinit() {
     #DS[1048569] = 2
     #DS[1048575] = 1
     
-    DSEvent = function() {
-        bmpSetDS(DS)    
-    }
-    
     if (!FInfo["content",string]) {        
         dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(
             ExplorerFS,FInfo,0,66
@@ -224,7 +220,7 @@ function alxos_bmp_postinit() {
     }
     
     bmpInit(Body, Size, GpuPersistData["bmpMaxSize",number], GpuPersistData["bmpNoKeepAR",number])
-    bmpSetDS(DS)
+    bmpSetDS(DSContainer)
     
     if (Body) {        
         GpuData["bmpFull",number] = 1

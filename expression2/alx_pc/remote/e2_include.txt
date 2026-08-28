@@ -2,6 +2,7 @@
 @inputs ExecutorID:number
 @outputs RemoteEntID:number
 @persist IsDirectCode:number
+@persist AppManifest:table
 
 #[
     If you want create any executable file you MUST include this file always
@@ -15,7 +16,7 @@ if (first()|duped()) {
     RemoteEntID = entity():id()
 
     function dsInitProg() {
-        dsSendDirect("initExecutor", entity(ExecutorID), table(wirelink()))
+        dsSendDirect("initExecutor", entity(ExecutorID), table(wirelink(), AppManifest))
     }
     
     function endProg() {

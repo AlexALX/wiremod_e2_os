@@ -9,8 +9,8 @@ if (first()|duped()) {
 }
 
 function bmpDsInit() {
-    local DS = BmpData["DS",wirelink]
-        
+    local DS = BmpData["DSContainer",table][1,wirelink]
+
     BmpDrew = 1
     
     DS[1048569] = 2

@@ -11,14 +11,26 @@
 function alxos_prog_zip_unplug() {
     stopAllTimers()
     ExplorerDsH = ""
-    "alxos_explorer_handlers"()
-    "alxos_explorer_msg"("Disk was unplugged.",200,"Information")
+    ShutHandler = "alxos_clear"
+    if (GpuData["lastProg",string]=="alxos_console") {
+        "alxos_console_err"("Disk was unplugged.")
+    } else {
+        "alxos_explorer_handlers"()
+        "alxos_explorer_msg"("Disk was unplugged.",200,"Information")
+    }
+    Zip = table()
+}
+
+function alxos_zip_shutdown(Arr:array) {
+    Zip = table()
+    alxos_clear(Arr)
 }
 
 function alxos_zip_init(Args:table) {
 
     KeyHandler = "alxos_zip_key"
     DsHandler = "alxos_zip_ds"
+    ShutHandler = "alxos_zip_shutdown"
     
     local FInfo = Args[1,table]
     local ExplorerFS = Args[2,table]
@@ -592,6 +604,8 @@ function number alxos_zip_clear() {
         return 0
     }
     
+    ShutHandler = "alxos_clear"
+    
     local ExplorerFS = GpuData[1,table]
     dsSendDirect("clear",ExplorerFS["hdd_io",wirelink]:entity(),1)
 
@@ -612,6 +626,8 @@ function number alxos_zip_clear() {
 function number alxos_zip_close() {
     Zip = table()
     
+    ShutHandler = "alxos_clear"
+    
     if (GpuData["lastProg",string]=="alxos_console") {
         local ExplorerFS = GpuData[1,table]
         local CmdPath = "alxos_console_getpath"()[table]
@@ -625,6 +641,8 @@ function number alxos_zip_close() {
 }
 
 function number alxos_zip_finish(Err:string) {
+    ShutHandler = "alxos_clear"
+    
     if (GpuData["lastProg",string]=="alxos_console") {
         if (Err) {
             "alxos_console_handlers"()

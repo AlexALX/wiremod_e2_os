@@ -15,8 +15,24 @@
 ]#
 
 if (first()|duped()) {
+    
+    # app manifest
+    AppManifest = table()
+    AppManifest["name", string] = "Test Program"
+    AppManifest["version", string] = "1.0"
+    AppManifest["author", string] = "AlexALX"
+    
+    # Supported screens, for example:
+    # if program is running without EGP connected
+    # and your program require EGP - it should be canceled
+    local Screens = table()
+    Screens["egp",number] = 1
+    Screens["console",number] = 0
+    Screens["digital",number] = 0
+    AppManifest["screen_modes", table] = Screens
+    
     # this is automatically added to any executables 
-    # and REQUIRED to be included
+    # and REQUIRED to be included, after AppManifest and inside first() check!
     #include "alx_pc/remote/e2_include"
     
     # in .e2r ANY other include will make error!
@@ -85,11 +101,16 @@ if (dsClk()) {
         # Handle key press
         local Info = dsGetTable()
         dsKeyPressed(Info[1,string], Info[2,number])
-    } elseif (Name=="DS_Connect") {
-        # update DS connection if its changed
+    } elseif (Name=="ScreenConnect") {
+        # update connection if its changed
+        local Type = dsGetString()
+        if (Type=="EGP") {
+            EGP = Devices["GPU_Screens",table]["EGP_WL",wirelink]   
+        } elseif (Type=="DS") {
+            DS = Devices["GPU_Screens",table]["DS_WL",wirelink]  
+        } elseif (Type=="CS") {
+            CS = Devices["GPU_Screens",table]["CS_WL",wirelink]   
+        }
         DS = Devices["GPU_Screens",table]["DS_WL",wirelink]   
-    } elseif (Name=="CS_Connect") {
-        # update CS connection if its changed
-        CS = Devices["GPU_Screens",table]["CS_WL",wirelink]   
     }
 }

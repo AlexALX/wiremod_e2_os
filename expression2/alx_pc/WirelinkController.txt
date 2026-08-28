@@ -1,6 +1,5 @@
 @name Wirelink Screen Controller
-@inputs Ent:wirelink InG
-@outputs EntID
+@inputs Ent:wirelink
 
 #[
     ALX Wiremod E2 PC
@@ -10,24 +9,19 @@
 ]#
 
 if (first()|duped()) {
-    dsSetScope(2) # allow signals from any e2 in mp    
+    Screen = Ent
+    #include "alx_pc/shared/wirelinkcontroller"
 }
 
-if (~Ent|first()|duped()|~InG) {
-    EntID = entity():id()
-    # EGP
-    Ent:egpClear()
-    
-    # Digital Screen
-    Ent[1048574] = 0
-    Ent[1048575] = 1
-    
-    # Console Screen
-    Ent[2041] = 0
-    Ent[2046] = 0
+if (~Ent) {
+    wirelinkClearScreen()
+    Screen = Ent
+}
+
+if (~InG) {
+    wirelinkClearScreen()
 }
 
 if (dsClk("wirelink") & InG==dsGetEntity():id()) {
-    dsSendDirect("wirelink",dsGetEntity(),table(entity():id(),Ent))    
+    wirelinkInit()  
 }
-

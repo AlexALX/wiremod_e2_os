@@ -7,8 +7,12 @@ function bmpInitCallback(Func:function) {
     BmpCustomInit = 1
 }
 
+function bmpSetDS(DSCont:table) {
+    BmpData["DSContainer",table] = DSCont
+}
+
 function bmpSetDS(DS:wirelink) {
-    BmpData["DS",wirelink] = DS    
+    BmpData["DSContainer",table] = table(DS)    
 }
 
 function bmpInit(Body:string, Size, SizeLimit, NoKeepAR) {

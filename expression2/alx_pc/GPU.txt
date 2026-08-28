@@ -38,10 +38,14 @@ BOOT_HDD = table()
 
 EgpCleanHandler = ""
 PlugHandler = ""
+EGPEvent = function() {}
 DSEvent = function() {}
 CSEvent = function() {}
 
 Screens = table()
+EGPContainer = table()
+DSContainer = table()
+CSContainer = table()
 
 function initGpu() {
     local Info = dsGetTable()
@@ -87,17 +91,27 @@ function gpuShutdown() {
     egpClear()
     dsClear()
     csClear()
+    EGPEvent = function() {}
+    DSEvent = function() {}
+    CSEvent = function() {}
+}
+
+function screenDataClear() {
+    Screens:clear()
+    EGP = nowirelink()
+    EGP_ID = -1
+    EGPContainer[1,wirelink] = EGP
+    DS = nowirelink()
+    DS_ID = -1
+    DSContainer[1,wirelink] = DS
+    CS = nowirelink()
+    CS_ID = -1
+    CSContainer[1,wirelink] = CS
 }
 
 function pcie_init() {
     dsSendDirect("pcie",BIOS,table("gpu",entity(),Device_Name))
-    Screens:clear()
-    EGP = nowirelink()
-    EGP_ID = -1
-    DS = nowirelink()
-    DS_ID = -1
-    CS = nowirelink()
-    CS_ID = -1
+    screenDataClear()
     for (I=0,ScreenSockets-1) {
         dsSendDirect("wirelink",entity(ioGetInputNumber("ScreenSockG_"+I)),entity())    
     }
@@ -106,19 +120,13 @@ function pcie_init() {
 function shutdown() {
     gpuShutdown()
     dsSendDirect("SHUTDOWN",BIOS,dsGetArray())
-    Screens:clear()
-    EGP = nowirelink()
-    EGP_ID = -1
-    DS = nowirelink()
-    DS_ID = -1
-    CS = nowirelink()
-    CS_ID = -1
+    screenDataClear()
 }
 
 function number findscreen(ID) {
     for (I=0,ScreenSockets-1) {
         if (ID==ioGetInputNumber("ScreenSockG_"+I)) {
-            return I+1   
+            return I+1
         }
     }
     return -1
@@ -134,11 +142,14 @@ function screen_connect() {
         if (!EGP:entity():isValid() & Type=="gmod_wire_egp") {
             EGP = WL
             EGP_ID = WLI
+            EGPContainer[1,wirelink] = WL
             Screens[WLI,number] = findscreen(ID)
             Screens["EGP_WL",wirelink] = WL
+            EGPEvent()
         } elseif (!CS:entity():isValid() & Type=="gmod_wire_consolescreen") {            
             CS = WL
             CS_ID = WLI
+            CSContainer[1,wirelink] = WL
             Screens[WLI,number] = findscreen(ID)
             Screens["CS_WL",wirelink] = WL
             CSEvent()
@@ -147,6 +158,7 @@ function screen_connect() {
             if (Type=="gmod_wire_digitalscreen" | ScreenName!="") {
                 DS = WL
                 DS_ID = WLI
+                DSContainer[1,wirelink] = WL
                 Screens[WLI,number] = findscreen(ID)
                 Screens["DS_WL",wirelink] = WL
                 DSEvent()
@@ -194,16 +206,20 @@ if (inputClk()) {
         } else {
             local BSOD = 3
             
-            if (!EGP:entity():id() | Screens[EGP_ID,number]==ID) {
+            if (Screens[EGP_ID,number]==ID) {
                 EGP = nowirelink()
                 if (EGP_ID>0) {
                     Screens[EGP_ID,number] = 0
                 }
+                EGP_ID = -1
+                EGPContainer[1,wirelink] = EGP
                 Screens["EGP_WL",wirelink] = EGP
+                EGPEvent()
                 
                 if ((DS:entity():isValid() | CS:entity():isValid()) & CurrentProg=="alxos_console") {
-                    local IsConsole = "alxos_console_isconsole"()[number]
-                    if (IsConsole) { BSOD = 0 }
+                    #local IsConsole = "alxos_console_isconsole"()[number]
+                    #if (IsConsole) { BSOD = 0 }
+                    BSOD = 0
                 }
             } 
             
@@ -212,6 +228,8 @@ if (inputClk()) {
                 if (DS_ID>0) {
                     Screens[DS_ID,number] = 0
                 }
+                DS_ID = -1
+                DSContainer[1,wirelink] = DS
                 Screens["DS_WL",wirelink] = DS
                 DSEvent()
                 
@@ -226,6 +244,8 @@ if (inputClk()) {
                 if (CS_ID>0) {
                     Screens[CS_ID,number] = 0
                 }
+                CS_ID = -1
+                CSContainer[1,wirelink] = CS
                 Screens["CS_WL",wirelink] = CS
                 CSEvent()
                 

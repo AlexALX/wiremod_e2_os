@@ -7,24 +7,32 @@ if (first() | duped()) {
     DsCurrentFont = table()
     DsText = table()
     
-    DSWL = nowirelink()
+    DSWLContainer = table()
     
     DSCache = table()
 }
 
-function dsInit(DS:wirelink, Width:number, Height:number) {
-    DSWL = DS
+# DS:table used for store reference without need track changes everywhere
+# used in GPU with DSContainer table
+function dsInit(DSTable:table, Width:number, Height:number) {
+    DSWLContainer = DSTable
     DsWidth = Width
     DsHeight = Height
     DsCacheDelay = 0
     
-    DSWL[1048569] = 2
-    DSWL[1048574] = 0
-    DSWL[1048575] = 1
-    DSWL[1048573] = Width
-    DSWL[1048572] = Height
+    local DS = DSTable[1,wirelink]
+    
+    DS[1048569] = 2
+    DS[1048574] = 0
+    DS[1048575] = 1
+    DS[1048573] = Width
+    DS[1048572] = Height
 
     dsStopQueues()
+}
+
+function dsInit(DS:wirelink, Width:number, Height:number) {
+    dsInit(table(DS), Width, Height)    
 }
 
 function dsSetFont(Font:table)

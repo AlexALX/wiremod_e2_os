@@ -1,44 +1,32 @@
 @name DS GFX Test
-@persist Done
 @inputs DS:wirelink
 @strict
 
+#include "alx_pc/standalone/ds_gfx/font_4x5"
 #include "alx_pc/standalone/ds_gfx/font_5x7"
 #include "alx_pc/standalone/ds_gfx/font_8x8"
-#include "alx_pc/standalone/ds_gfx/text"
-#include "alx_pc/standalone/ds_gfx/_shared_"
+#include "alx_pc/standalone/ds_gfx/_init_"
 
 if (first() | duped()) {
+    # change font name to what you want to test
+    local Font = dsFont4x5()
+    
+    local Width = (Font["width",number]+Font["spacing",number]) * 16
+    local Height = (Font["height",number]+Font["spacing",number]) * 10
 
-    Done = 0
-
-    dsInit(DS, 144, 80)
-    dsSetFont(dsFont8x8())
-
-    #dsInit(96, 48)
-    #dsSetFont(dsFont5x7())
+    dsInit(DS, Width, Height)
+    dsSetFont(Font)
 
     local Text = " !\"#$%&'()*+,-./\n"+
     "0123456789:;<=>?\n"+
     "@ABCDEFGHIJKLMNO\n"+
     "PQRSTUVWXYZ[\\]^_\n"+
     "`abcdefghijklmno\n"+
-    "pqrstuvwxyz{|}~"
+    "pqrstuvwxyz{|}~\n"+
+    "Lorem ipsum dolo\n"+
+    "r sit amet, con\n"+
+    "sectetur adipis\n"+
+    "cing elit, sed\n"
 
     dsDrawTextStart(0, 0, Text)
 }
-
-event tick() {
-    if (!Done) {
-        
-        while (perf(90)) {
-        
-            if (dsDrawTextStep()) {
-                Done = 1
-                break
-            }
-        }
-    }
-}
-
-

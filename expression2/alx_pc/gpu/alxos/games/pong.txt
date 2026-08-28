@@ -114,7 +114,7 @@ function alxos_pong_start_game(IsExternal:number) {
     } else {
         GpuData["Pong_ScrSize", number] = 20
         
-        dsInit(DS, 20, 20)
+        dsInit(DSContainer, 20, 20)
         dsSetFont(dsFont5x7())
         
         DialogData[-10, table]:pushNumber(LAST_I)
@@ -170,7 +170,7 @@ function alxos_pong_reset() {
         EGP:egpColor(PoolStart + 1, 255, 255, 255, 0)
         EGP:egpColor(PoolStart + 2, 255, 50, 50, 0)
     } else {
-        dsInit(DS, 20, 20)
+        dsInit(DSContainer, 20, 20)
         EGP:egpSetText(GpuData["Pong_ScoreID", number], "Score: 0")
         EGP:egpSetText(GpuData["Pong_InfoTextID", number], "Playing on External Screen")
         EGP:egpColor(GpuData["Pong_InfoTextID", number], 0, 0, 0, 255)
@@ -273,7 +273,7 @@ function alxos_pong_stop_game(Reason:string) {
         EGP:egpSetText(GameOverID, Reason)
         EGP:egpColor(GameOverID, 255, 0, 0, 255)
     } else {
-        dsInit(DS, 40, 40)
+        dsInit(DSContainer, 40, 40)
         dsDrawText(8, 2, "GAME\nOVER", vec(255, 0, 0))
         dsDrawText(5, 20, "Score", vec(255, 255, 255))
         

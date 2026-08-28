@@ -29,7 +29,7 @@ function dsDrawTextStart(X:number, Y:number, Text:string) {
     dsDrawTextStart(X,Y,Text,vec(255))
 }
 
-function number dsDrawTextStep(DsText:table)
+function number dsDrawTextStep(DS:wirelink, DsText:table)
 {
     local Text = DsText["text", string]
     local Length = DsText["length",number]
@@ -53,6 +53,7 @@ function number dsDrawTextStep(DsText:table)
             Y += DsFontLineHeight
         } else {
             dsDrawChar(
+                DS,
                 X,
                 Y,
                 Char,
@@ -72,7 +73,7 @@ function number dsDrawTextStep(DsText:table)
     return 0
 }
 
-function number dsDrawCachedTextStep(Item:table)
+function number dsDrawCachedTextStep(DS:wirelink, Item:table)
 {
     if (Item["clearLine", number] == 1) {
         dsTextClearLine(Item["y", number])
@@ -95,6 +96,7 @@ function number dsDrawCachedTextStep(Item:table)
         local Char = toByte(Text, Index)
     
         dsDrawChar(
+            DS,
             X + (Index-1)*DsFontCharWidth,
             Y,
             Char,
@@ -179,6 +181,8 @@ function dsDrawProcess() {
     local QueueCount = DSTextQueue:count()
     local CheckedCount = 0
     
+    local DS = DSWLContainer[1,wirelink]
+    
     while (perf(90) & CheckedCount < QueueCount) { 
         if (DSTextQueue:count() <= 0) {
             DSCurrentStep = ""
@@ -188,14 +192,14 @@ function dsDrawProcess() {
         local CurrentItem = DSTextQueue[1, table]
         
         if (CurrentItem["type", string] == "normal") {
-            if (dsDrawTextStep(CurrentItem)) {
+            if (dsDrawTextStep(DS, CurrentItem)) {
                 DSLastStep = "drawText"
                 DSTextQueue:remove(1)   
             } else {
                 break    
             }
         } else {        
-            if (dsDrawCachedTextStep(CurrentItem)) {
+            if (dsDrawCachedTextStep(DS, CurrentItem)) {
                 DSLastStep = "drawCachedText"
                 DSTextQueue:remove(1)   
             } else {

@@ -5,7 +5,9 @@
 @persist BIOS_INIT KeyHandler:string DsHandler:string ChatHandler:string ChatPlayer:entity GpuData:table GpuPersistData:table BOOT_HDD:table
 @persist LAST_I LAST_Y BIOS_X BIOS_SZ ERR_N ERR_C Keyboard:table ShutHandler:string PlugHandler:string
 @persist FS_TYPES:table EgpCleanHandler:string Init Device_Name:string Devices:table SysFS:table
-@persist EGP:wirelink EGP_ID:number DS:wirelink DS_ID:number DSEvent:function CS:wirelink CS_ID:number CSEvent:function
+@persist EGP:wirelink EGP_ID:number EGPEvent:function EGPContainer:table
+@persist DS:wirelink DS_ID:number DSEvent:function DSContainer:table
+@persist CS:wirelink CS_ID:number CSEvent:function CSContainer:table
 
 #[
 	ALX Wiremod E2 PC

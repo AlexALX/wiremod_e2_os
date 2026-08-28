@@ -51,6 +51,7 @@ CodeInclude = "
 @inputs ExecutorID:number
 @outputs RemoteEntID:number
 @persist IsDirectCode:number
+@persist AppManifest:table
 
 #[
     If you want create any executable file you MUST include this file always
@@ -64,7 +65,7 @@ if (first()|duped()) {
     RemoteEntID = entity():id()
 
     function dsInitProg() {
-        dsSendDirect(\"initExecutor\", entity(ExecutorID), table(wirelink()))
+        dsSendDirect(\"initExecutor\", entity(ExecutorID), table(wirelink(), AppManifest))
     }
     
     function endProg() {
@@ -182,7 +183,7 @@ if (dsClk()) {
         }
         #endif
         
-        runCmd("exec_timeout",1000,1)
+        runCmd("exec_timeout",1500,1)
     } elseif (Name=="pci") {
         pci_init()
     } elseif (Name=="usbcontroller") {
@@ -196,7 +197,7 @@ if (dsClk()) {
         DsHandler(Name)
     } elseif (Name=="initExecutor") {        
         stopCmd()
-        dsSendDirect("initExecutor", Caller, dsGetTable())  
+        dsSendDirect("initExecutor", Caller, dsGetTable())
     } elseif (Name=="executeInitDone") {
         RemoteInfo["Assets",table] = RemoteInfo["FInfo",table]["assets",table]
         RemoteInfo:remove("FInfo")
@@ -207,8 +208,8 @@ if (dsClk()) {
         clearMemory()
     } elseif (Name=="executorKey") {
         dsSendDirect("executorKey", Executor, dsGetTable())    
-    } elseif (Name=="DS_Connect" | Name=="CS_Connect") {
-        dsSendDirect(Name, Executor, dsGetNumber())  
+    } elseif (Name=="ScreenConnect") {
+        dsSendDirect(Name, Executor, dsGetString())  
     }
 }
 

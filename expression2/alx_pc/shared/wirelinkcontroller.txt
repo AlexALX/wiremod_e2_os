@@ -1,0 +1,37 @@
+@name Wirelink Controller Include
+@inputs InG
+@outputs EntID
+@persist Screen:wirelink
+
+#[
+    ALX Wiremod E2 PC
+    Created by AlexALX
+    -------------------
+    Wirelink Controller Include for screens
+]#
+
+function wirelinkClearScreen() {
+    if (!Screen:entity():isValid()) { return }
+    
+    local Type = Screen:entity():type()
+    
+    if (Type=="gmod_wire_egp") {
+        Screen:egpClear()
+    } elseif (Type=="gmod_wire_digitalscreen") {
+        Screen[1048574] = 0
+        Screen[1048575] = 1
+    } elseif (Type=="gmod_wire_consolescreen") {
+        Screen[2041] = 0
+        Screen[2046] = 0
+    }
+}
+
+function wirelinkInit() {
+    dsSendDirect("wirelink",dsGetEntity(),table(entity():id(),Screen))  
+}
+
+if (first()|duped()) {
+    dsSetScope(2) # allow signals from any e2 in mp
+    EntID = entity():id()
+    wirelinkClearScreen()
+}

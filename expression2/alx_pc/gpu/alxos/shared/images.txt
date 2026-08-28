@@ -268,8 +268,6 @@ function alxos_img_stop() {
 
     local IMGAccelerator = alxos_img_findAccelerator()
     dsSendDirect("SHUTDOWN",IMGAccelerator[3,entity],0)
-    
-    DSEvent = function() {}
 }
 
 function number alxos_img_clear() {
@@ -291,7 +289,6 @@ function number alxos_img_clear() {
 }
 
 function number alxos_img_close() {
-    DSEvent = function() {}
     if (GpuData["lastProg",string]=="alxos_console") {
         "alxos_console_handlers"()
         "alxos_console_command"()
@@ -385,7 +382,7 @@ function alxos_img_warning(Warning:string) {
         "alxos_console_msg"(Warning)
         "alxos_console_move"()
         
-        local IsConsole = "alxos_console_isconsole"()[number]
+        local IsConsole = "alxos_console_screenmode"()[number]
         DialogData["WarningShownIndex",number] = (IsConsole ? Warning:explode("\n"):count() : LAST_I-CUR_I)
         return
     }

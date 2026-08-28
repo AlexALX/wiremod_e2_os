@@ -91,7 +91,7 @@ function alxos_snake_start_game(IsExternal:number) {
     } else {
         GpuData["Snake_ScrSize", number] = 20
         
-        dsInit(DS, 20, 20)
+        dsInit(DSContainer, 20, 20)
         dsSetFont(dsFont5x7())
         
         DialogData[-10, table]:pushNumber(LAST_I)
@@ -141,7 +141,7 @@ function alxos_snake_reset() {
         
         EGP:egpColor(GpuData["Snake_GameOverID", number], 255, 0, 0, 0)
     } else {
-        dsInit(DS, 20, 20)
+        dsInit(DSContainer, 20, 20)
         EGP:egpSetText(GpuData["Snake_ScoreID", number], "Score: 0")
         EGP:egpSetText(GpuData["Snake_InfoTextID", number], "Playing on External Screen")
         EGP:egpColor(GpuData["Snake_InfoTextID", number], 0, 0, 0, 255)
@@ -233,7 +233,7 @@ function alxos_snake_stop_game(Reason:string) {
         EGP:egpSetText(GameOverID, Reason)
         EGP:egpColor(GameOverID, 255, 0, 0, 255)
     } else {
-        dsInit(DS, 40, 40)
+        dsInit(DSContainer, 40, 40)
         dsDrawText(8, 2, "GAME\nOVER", vec(255, 0, 0))
         
         dsDrawText(5, 20, "Score", vec(255, 255, 255))

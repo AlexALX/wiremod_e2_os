@@ -1,6 +1,6 @@
 @name ZGPU Screen Renderer
 @inputs ZGPU:wirelink MemBus:wirelink
-@outputs VirtualScreen:wirelink
+@outputs VirtualScreen:wirelink DsImageDrew
 @persist ScrW ScrH 
 @persist DsBuffer:array DirtyRows:array BlockDraw
 @persist PtrAddress DataAddress MemSize # CacheFix LastPos
@@ -28,6 +28,27 @@ function dsClear() {
     #LastPos = 0
 }
 
+function dsHWClear() {
+    dsClear()
+    
+    UpdateQueue = array()
+    DsBuffer = array()
+    QueueWrite = 0
+    
+    local Ptr = ZGPU[PtrAddress]
+    
+    if (Ptr>MemSize) {
+        Ptr = 0
+        ZGPU[PtrAddress] = 0   
+    }
+    
+    # CMD_CLEAR_SCREEN
+    ZGPU[DataAddress + Ptr] = 2
+    ZGPU[PtrAddress] = Ptr + 1
+    
+    DsImageDrew = 0
+}
+
 if (first() | duped()) {
     ScrW = 512
     ScrH = 512
@@ -37,15 +58,20 @@ if (first() | duped()) {
     PtrAddress = 131072
     DataAddress = PtrAddress + 64
     
-    dsClear()
-    
     # ZGPU 1MB memsize needed for us
     # -4064 is for boundary
     MemSize = 1044512
+    
+    dsHWClear()
+    
+    Screen = VirtualScreen
+    #include "alx_pc/shared/wirelinkcontroller"
 }
 
-event writeCell(Address:number, Value:number) {    
-    if (Address < 1048500) {
+event writeCell(Address:number, Value:number) {
+    if (!perf(90)) { exit() } # bad way but what to do
+    
+    if (Address < 1048499) {
         # block draw for buffer
         # this fixes huge fps drop
         BlockDraw = 2
@@ -61,21 +87,11 @@ event writeCell(Address:number, Value:number) {
             UpdateQueue[QueueWrite, number] = GlobalY
         }
     } else {
-        if (Address == 1048574) {
-            UpdateQueue = array()
-            DsBuffer = array()
-            QueueWrite = 0
-            
-            local Ptr = ZGPU[PtrAddress]
-            
-            if (Ptr>MemSize) {
-                Ptr = 0
-                ZGPU[PtrAddress] = 0   
-            }
-
-            # CMD_CLEAR_SCREEN
-            ZGPU[DataAddress + Ptr] = 2
-            ZGPU[PtrAddress] = Ptr + 1
+        # special custom image drew flag
+        if (Address == 1048499) {
+            DsImageDrew = 1
+        } elseif (Address == 1048574) {
+            dsHWClear()
         } elseif (Address == 1048573) {            
             ScrW = Value
             dsClear()
@@ -218,3 +234,12 @@ event tick() {
     }    
 }
 
+event input(InputName:string) {
+    if (InputName=="InG") {
+        dsHWClear()    
+    } 
+}
+
+if (dsClk("wirelink") & InG==dsGetEntity():id()) {
+    wirelinkInit()  
+}

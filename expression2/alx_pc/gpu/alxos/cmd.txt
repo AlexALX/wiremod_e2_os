@@ -15,7 +15,12 @@
 
 # custom drew flag from image loaders
 function alxos_console_ds_drew() {
-    return DS[1048499]    
+    local Type = DS:entity():type()
+    
+    if (Type=="gmod_wire_expression2") {
+        return DS["DsImageDrew",number]    
+    }
+    return DS[1048499]
 }
 
 function alxos_toggle_cursor(Show:number) {
@@ -34,9 +39,9 @@ function alxos_toggle_cursor(Show:number) {
         local CursorY = (CmdLinesC-1) * DsFontLineHeight
         
         if (Show) {
-            dsDrawChar(CursorX, CursorY, 95, 11053224) # 0xA8A8A8
+            dsDrawChar(DS, CursorX, CursorY, 95, 11053224) # 0xA8A8A8
         } else {
-            dsDrawChar(CursorX, CursorY, 95, 0)
+            dsDrawChar(DS, CursorX, CursorY, 95, 0)
         }
     } else {
         local Cursor = GpuData[3,number]
@@ -300,7 +305,7 @@ function alxos_console_cls_safe() {
     } elseif (CmdScreen==2) {
         dsClear()
         dsStopQueues()
-        dsInit(DS,256,256)
+        dsInit(DSContainer,256,256)
         dsCacheDelay(1.5)
     } else {
         LAST_I = 1
@@ -319,11 +324,50 @@ function alxos_console_cls() {
     alxos_draw_cursor()
 }
 
+function alxos_console_reinit(Msg:string) {
+    alxos_console_cls_safe()
+    alxos_console_msg(Msg)
+    alxos_console_command()
+    alxos_draw_cursor()
+}
+
+function alxos_console_clear_events() {
+    EGPEvent = function() {}
+    CSEvent = function() {}
+    DSEvent = function() {}
+}
+
+function alxos_console_findscreen() {
+    if (EGP:entity():isValid()) {
+        return 0
+    } elseif (CS:entity():isValid()) {
+        return 1
+    } elseif (DS:entity():isValid()) {
+        return 2
+    }
+    return -1
+}
+
+function alxos_console_event(Msg:string, BSOD:number) {
+    if (CurrentProg!="alxos_console") {
+        alxos_console_clear_events()
+        alxos_bsod(array(BSOD))
+        return
+    }
+    
+    local Screen = alxos_console_findscreen()
+    if (Screen!=-1) {
+        CmdScreen = Screen    
+    }
+
+    "alxos_console_screen_vars"(CmdScreen)
+    alxos_console_reinit(Msg)
+}
+
 function alxos_console_screen_vars(Screen:number) {
     CmdHeader = "ALX Wiremod E2 OS - Console v1.1\n(c) 2018-2026 by AlexALX"
     
-    CSEvent = function() {}
-    DSEvent = function() {}
+    alxos_console_clear_events()
     
     if (Screen==1) {
         CmdMaxLines = 17
@@ -333,39 +377,21 @@ function alxos_console_screen_vars(Screen:number) {
         CmdHeader = "ALX Wiremod E2 OS Console v1.1\n(c) 2018-2026 by AlexALX"
         
         CSEvent = function() {
-            if (EGP:entity():isValid()) {
-                CmdScreen = 0
-            } else {
-                CmdScreen = 2
-            }
-            
-            alxos_console_screen_vars(CmdScreen)
-            alxos_console_cls_safe()
-            alxos_console_msg("Console screen was disconnected!")
-            alxos_console_command()
-            alxos_draw_cursor()
-            CSEvent = function() {}
+            alxos_console_event("Console screen was disconnected!",6)
         }        
     } elseif (Screen==2) {
-        dsInit(DS, 256, 256)
+        dsInit(DSContainer, 256, 256)
         dsSetFont(dsFont5x7())
         dsCacheDelay(1.5)
         CmdMaxLines = 31
         
-        DSEvent = function() {
-            if (EGP:entity():isValid()) {
-                CmdScreen = 0
-            } else {
-                CmdScreen = 1    
-            }
-            alxos_console_screen_vars(CmdScreen)
-            alxos_console_cls_safe()
-            alxos_console_msg("Digital screen was disconnected!")
-            alxos_console_command()
-            alxos_draw_cursor()
-            DSEvent = function() {}
+        DSEvent = function() {  
+            alxos_console_event("Digital screen was disconnected!",5)
         }
     } else {
+        EGPEvent = function() {
+            alxos_console_event("EGP screen was disconnected!",3)
+        }
         CmdMaxLines = 25
     }
 }
@@ -1148,7 +1174,7 @@ function alxos_console_run(Command:string) {
     }
 }
 
-function number alxos_console_isconsole() {
+function number alxos_console_screenmode() {
     return CmdScreen
 }
 
@@ -1287,18 +1313,18 @@ function alxos_console_key(Key:string,Pressed) {
             local I = GpuData[-1,number]
             local Path = GpuData[-3,string]
             local Cmd = CmdHistory[Ind,string]
+            local Msg = Path+Cmd
         
-            if (CmdScreen==1) {
-                local Msg = Path + Cmd
+            if (CmdScreen==1) {                
                 alxos_screen_write(0, CmdLinesC, Msg + " ":repeat(30-Msg:length()))
             } elseif (CmdScreen==2) {
                 dsTextClearLine((CmdLinesC-1)*DsFontLineHeight)
-                dsDrawTextStart(0, (CmdLinesC-1)*DsFontLineHeight, Path + Cmd, vec(168))
+                dsDrawTextStart(0, (CmdLinesC-1)*DsFontLineHeight, Msg, vec(168))
             } else {
-                EGP:egpSetText(I,Path+Cmd)    
+                EGP:egpSetText(I,Msg)
             }
             GpuData[-4,string] = Cmd
-            GpuData[-2,number] = (Path+Cmd):length()*10 + 10
+            GpuData[-2,number] = Msg:length()*10 + 10
             alxos_upd_cursor()
         }
     } elseif (Key=="delete") { 
@@ -1310,7 +1336,7 @@ function alxos_console_key(Key:string,Pressed) {
             alxos_screen_write(0, CmdLinesC, Path + " ":repeat(Cmd:length())) 
         } elseif (CmdScreen==2) {
             dsTextClearLine((CmdLinesC-1)*DsFontLineHeight)
-            dsDrawTextStart(0, (CmdLinesC-1)*DsFontLineHeight, Path + Cmd, vec(168))
+            dsDrawTextStart(0, (CmdLinesC-1)*DsFontLineHeight, Path, vec(168))
         } else {
             EGP:egpSetText(I,Path)
         }
@@ -1404,6 +1430,7 @@ function table alxos_console_getdir() {
 function alxos_console_init(Args:table) {
     egpClear()
     csClear()
+    dsClear()
     CmdFS = Args[2,table]
     CmdAllFs = Args[3,table]
     CmdPath = Args[4,table]
@@ -1448,7 +1475,7 @@ function alxos_console_init(Args:table) {
     if (!EGP:entity():isValid()) {
         alxos_console_msg("Warning: EGP is not connected.")
     }
-    alxos_console_command()  
+    #alxos_console_command()
     
     CmdDsH = "alxos_console_postinit"
     alxos_console_listdir(CmdFS,CmdDir[1,number],CmdDir[2,number])       

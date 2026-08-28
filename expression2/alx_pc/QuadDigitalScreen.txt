@@ -1,6 +1,6 @@
 @name Quad Digital Screen
 @inputs LinkTopLeft:wirelink LinkTopRight:wirelink LinkBottomLeft:wirelink LinkBottomRight:wirelink
-@outputs VirtualScreen:wirelink
+@outputs VirtualScreen:wirelink DsImageDrew
 @persist ScrW ScrH VirtW VirtH
 @persist DsBuffer:array DirtyRows:array UpdateQueue:array QueueCount BlockDraw
 @persist ClearRowsQueue:array ClearRowsCount ClearColsQueue:array ClearColsCount
@@ -25,7 +25,16 @@ function dsClear() {
     BlockDraw = 0
 }
 
-if (first() | duped()) {
+function dsHWClear() {  
+    dsClear()  
+    LinkTopLeft[1048574, number] = 0
+    LinkTopRight[1048574, number] = 0
+    LinkBottomLeft[1048574, number] = 0
+    LinkBottomRight[1048574, number] = 0   
+    DsImageDrew = 0
+}
+
+if (first() | duped()) {    
     ScrW = 512
     ScrH = 512
     
@@ -34,12 +43,16 @@ if (first() | duped()) {
         
     VirtualScreen = wirelink()
     
-    dsClear()
+    dsHWClear()
+    
+    Screen = VirtualScreen
+    #include "alx_pc/shared/wirelinkcontroller"
 }
 
 event writeCell(Address:number, Value:number) {
+    if (Address!=1048499 & !perf(90)) { exit() } # bad way but what to do
     
-    if (Address < 1048500) {
+    if (Address < 1048499) {
         # block draw for buffer
         # this fixes huge fps drop
         BlockDraw = 2 
@@ -55,13 +68,11 @@ event writeCell(Address:number, Value:number) {
             UpdateQueue[QueueCount, number] = GlobalY
         }
     } else {
-        if (Address == 1048574) {            
-            LinkTopLeft[1048574, number] = Value
-            LinkTopRight[1048574, number] = Value
-            LinkBottomLeft[1048574, number] = Value
-            LinkBottomRight[1048574, number] = Value
-
-            dsClear()
+        # special custom image drew flag
+        if (Address == 1048499) {
+            DsImageDrew = Value
+        } elseif (Address == 1048574) {
+            dsHWClear()
         } elseif (Address == 1048573) {
             VirtW = Value
             
@@ -178,4 +189,14 @@ event tick() {
             }
         }
     }
+}
+
+event input(InputName:string) {
+    if (InputName=="InG") {
+        dsHWClear()    
+    } 
+}
+
+if (dsClk("wirelink") & InG==dsGetEntity():id()) {
+    wirelinkInit()  
 }

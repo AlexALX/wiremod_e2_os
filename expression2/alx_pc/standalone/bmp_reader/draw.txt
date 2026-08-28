@@ -13,7 +13,7 @@ function bmpDrawInit() {
 
 function bmpDraw() {
     local FullData = BmpData["data",string]
-    local DS = BmpData["DS",wirelink]
+    local DS = BmpData["DSContainer",table][1,wirelink]
     local Size = BmpData[5,number]
 
     local X = BmpData[6,number]

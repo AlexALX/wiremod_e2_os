@@ -1,15 +1,15 @@
 @persist DsFont:table DsFontWidth:number DsFontHeight:number DsFontSpacing:number DsFontLineHeight:number DsFontCharWidth:number
 @persist DsWidth:number DsHeight:number
-@persist DsText:table DSWL:wirelink DsCacheDelay:number
+@persist DsText:table DsCacheDelay:number DSWLContainer:table
 
-function dsDrawPixel(X:number, Y:number, ColorNum:number)
+function dsDrawPixel(DS:wirelink, X:number, Y:number, ColorNum:number)
 {
     if (X < 0 | Y < 0 | X >= DsWidth | Y >= DsHeight) { return }
-    DSWL[X + Y * DsWidth] = ColorNum
+    DS[X + Y * DsWidth] = ColorNum
 }
 
-function dsDrawPixel(X:number, Y:number)
+function dsDrawPixel(DS:wirelink, X:number, Y:number)
 {
     if (X < 0 | Y < 0 | X >= DsWidth | Y >= DsHeight) { return }
-    DSWL[X + Y * DsWidth] = 16777215 # 0xFFFFFF
+    DS[X + Y * DsWidth] = 16777215 # 0xFFFFFF
 }

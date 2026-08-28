@@ -411,7 +411,7 @@ function alxos_midi_warning(Warning:string) {
         "alxos_console_msg"(Warning)
         "alxos_console_move"()
         
-        local IsConsole = "alxos_console_isconsole"()[number]
+        local IsConsole = "alxos_console_screenmode"()[number]
         DialogData["WarningShownIndex",number] = (IsConsole ? Warning:explode("\n"):count() : LAST_I-CUR_I)
         return
     }
