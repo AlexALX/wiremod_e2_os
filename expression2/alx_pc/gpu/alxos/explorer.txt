@@ -2512,7 +2512,7 @@ function alxos_explorer_key(Key:string,Pressed) {
             if (alxos_wm1_isdir(Entry)) {
                 alxos_explorer_key("enter",1)
             } else {
-                "alxos_explorer_reader_init"(Entry)
+                "alxos_execute"("alxos_explorer_reader",table(Entry))
             }
         } elseif (Key=="f2") {
             local Info = GpuData[6,table][Index,table]
@@ -2716,7 +2716,7 @@ function alxos_explorer_unplug() {
         } elseif (ExplorerCurTask=="listdir" | ExplorerCurTask=="chvolume") {
             alxos_explorer_msg("Disk was unplugged.",200,"Information")
         } elseif (
-            ExplorerCurTask=="paste" | ExplorerCurTask=="mkfile" | ExplorerCurTask=="reader" | ExplorerCurTask=="bmp" | 
+            ExplorerCurTask=="paste" | ExplorerCurTask=="mkfile" | ExplorerCurTask=="reader" | 
             ExplorerCurTask=="sound"
         ) {
             if (ExplorerCurTask=="sound") {

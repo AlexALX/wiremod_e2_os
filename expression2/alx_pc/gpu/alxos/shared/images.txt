@@ -53,6 +53,7 @@ function number alxos_img_init(Args:table, Format:string) {
 function alxos_prog_img_unplug() {
     stopAllTimers()
     ExplorerDsH = ""
+    ShutHandler = "alxos_clear"
     if (GpuData["lastProg",string]=="alxos_console") {
         "alxos_console_msg"("Disk was unplugged.")
         "alxos_console_command"()
@@ -263,6 +264,8 @@ function alxos_img_draw(Data:string) {
 }
 
 function alxos_img_stop() {
+    ShutHandler = "alxos_clear"
+    
     stoptimer("cmd")
     dsSendDirect("clear",GpuData[1,table]["hdd_io",wirelink]:entity(),1)
 
@@ -289,6 +292,7 @@ function number alxos_img_clear() {
 }
 
 function number alxos_img_close() {
+    ShutHandler = "alxos_clear"
     if (GpuData["lastProg",string]=="alxos_console") {
         "alxos_console_handlers"()
         "alxos_console_command"()
@@ -300,6 +304,8 @@ function number alxos_img_close() {
 }
 
 function number alxos_img_finish(Err:string) {
+    ShutHandler = "alxos_clear"
+    
     local Format = GpuData["Format",string]
     
     if (GpuData["lastProg",string]=="alxos_console") {

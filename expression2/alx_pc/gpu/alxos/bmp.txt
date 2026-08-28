@@ -17,6 +17,11 @@
 #include "alx_pc/gpu/alxos/shared/images"
 #include "alx_pc/standalone/bmp_reader/_init_"
 
+function alxos_bmp_shutdown(Arr:array) {
+    BmpData = table()
+    alxos_clear(Arr)
+}
+
 function alxos_bmp_init(Args:table) {
     if (!DS:entity():isValid()) {
         if (CurrentProg=="alxos_console") {
@@ -30,6 +35,7 @@ function alxos_bmp_init(Args:table) {
     GpuData["lastProg",string] = CurrentProg
     GpuData["BMPInit",number] = 1
     KeyHandler = "alxos_bmp_key"
+    ShutHandler = "alxos_bmp_shutdown"
     
     local FInfo = Args[1,table]
     local ExplorerFS = Args[2,table]
@@ -168,7 +174,7 @@ function alxos_bmp_postinit() {
     
     DsHandler = "alxos_bmp_ds"
     #KeyHandler = "alxos_bmp_key"
-    ExplorerCurTask = "bmp"
+    ExplorerCurTask = "alxos_prog_img"
     
     #DS[1048574] = 0
     #DS[1048569] = 2
@@ -233,6 +239,8 @@ function alxos_bmp_postinit() {
 }
 
 function number alxos_bmp_finish(Err:string) {
+    ShutHandler = "alxos_clear"
+    
     if (GpuData["lastProg",string]=="alxos_console") {
         if (Err) {
             "alxos_console_err"(Err)

@@ -45,6 +45,9 @@ function egpClear() {
 }
 
 function dsClear() {
+    # clear custom flag
+    DS[1048500] = 0
+    
     DS[1048574] = 0
     DS[1048575] = 1
 }

@@ -338,13 +338,54 @@ function alxos_executor_ds(Name:string) {
         
         if (AppManifest:count()) {
             local ScreenModes = AppManifest["screen_modes", table]
-
-            if (ScreenModes["egp",number]==1 & !EGP:entity():isValid()) {
-                ErrorMsg = "This program doesn't support\nexecuting without EGP\nScreen connected."
-            } elseif (ScreenModes["console",number]==1 & !CS:entity():isValid()) {
-                ErrorMsg = "This program doesn't support\nexecuting without Console\nScreen connected."
-            } elseif (ScreenModes["digital",number]==1 & !DS:entity():isValid()) {
-                ErrorMsg = "This program doesn't support\nexecuting without Digital\nScreen connected."
+            
+            local ScreenMode = ScreenModes["mode",string]
+            
+            if (ScreenMode=="any") {
+                local Supported = 0
+                local SupportedArr = array()
+                
+                if (ScreenModes["egp",number]==1) {
+                    if (EGP:entity():isValid()) {
+                        Supported = 1
+                    } else {
+                        SupportedArr:pushString("EGP")
+                    }
+                } 
+                
+                if (ScreenModes["console",number]==1) {
+                    if (CS:entity():isValid()) {
+                        Supported = 1
+                    } else {
+                        SupportedArr:pushString("Console")
+                    }
+                } 
+                
+                if (ScreenModes["digital",number]==1 & DS:entity():isValid()) {
+                    if (DS:entity():isValid()) {
+                        Supported = 1
+                    } else {
+                        SupportedArr:pushString("Digital")
+                    }
+                }
+                
+                if (!Supported) {
+                    if (SupportedArr:count()==1) {
+                        ErrorMsg = "This program doesn't support\nexecuting without "+SupportedArr[1,string]+"\nScreen connected."
+                    } else {
+                        ErrorMsg = "This program doesn't support\nexecuting without any of next\n"
+                            +"screens connected:\n"+SupportedArr:concat(", ")
+                    }
+                }
+                
+            } else {
+                if (ScreenModes["egp",number]==1 & !EGP:entity():isValid()) {
+                    ErrorMsg = "This program doesn't support\nexecuting without EGP\nScreen connected."
+                } elseif (ScreenModes["console",number]==1 & !CS:entity():isValid()) {
+                    ErrorMsg = "This program doesn't support\nexecuting without Console\nScreen connected."
+                } elseif (ScreenModes["digital",number]==1 & !DS:entity():isValid()) {
+                    ErrorMsg = "This program doesn't support\nexecuting without Digital\nScreen connected."
+                }
             }
         } else {
             # if no manifest provided - assume its legacy EGP only

@@ -50,9 +50,9 @@ if (first() | duped()) {
 }
 
 event writeCell(Address:number, Value:number) {
-    if (Address!=1048499 & !perf(90)) { exit() } # bad way but what to do
+    if (Address!=1048500 & !perf(90)) { exit() } # bad way but what to do
     
-    if (Address < 1048499) {
+    if (Address < 1048500) {
         # block draw for buffer
         # this fixes huge fps drop
         BlockDraw = 2 
@@ -69,7 +69,7 @@ event writeCell(Address:number, Value:number) {
         }
     } else {
         # special custom image drew flag
-        if (Address == 1048499) {
+        if (Address == 1048500) {
             DsImageDrew = Value
         } elseif (Address == 1048574) {
             dsHWClear()

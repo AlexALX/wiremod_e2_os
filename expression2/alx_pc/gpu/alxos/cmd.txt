@@ -15,12 +15,14 @@
 
 # custom drew flag from image loaders
 function alxos_console_ds_drew() {
+    if (CmdScreen!=2) { return 0 }
+    
     local Type = DS:entity():type()
     
     if (Type=="gmod_wire_expression2") {
         return DS["DsImageDrew",number]    
     }
-    return DS[1048499]
+    return DS[1048500]
 }
 
 function alxos_toggle_cursor(Show:number) {
