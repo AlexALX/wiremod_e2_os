@@ -29,9 +29,10 @@ if (first()|duped()) {
     AppManifest["version", string] = "1.0"
     AppManifest["author", string] = "AlexALX"
     
-    # Supported screens, for example:
-    # if program is running without EGP connected
+    # Required screens, for example:
+    # if alx os is running without EGP connected
     # and your program require EGP - it should be canceled
+    # if your program can work with different set of screens, keep 0
     local Screens = table()
     Screens["egp",number] = 1
     Screens["console",number] = 0
