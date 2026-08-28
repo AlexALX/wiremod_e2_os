@@ -301,7 +301,7 @@ function alxos_executor_run(Code:string) {
     local CalcP = 100
         
     if (GpuData["lastProg",string]=="alxos_console") {            
-        "alxos_console_redraw_last"(CalcP+"%")
+        "alxos_console_redraw_last"(CalcP+"%",1)
     } else {
         EGP:egpSize(BoxID,vec2(BoxW,20))
         EGP:egpSetText(PercID,CalcP+"%")

@@ -733,7 +733,7 @@ function alxos_console_delpost(Name:string) {
     stopCmd()
     
     #local PercID = CmdLines[CmdLinesC,number]
-    alxos_console_redraw_last("Removing file... 100%")
+    alxos_console_redraw_last("Removing file... 100%",1)
     
     alxos_console_err("File succesfully removed.")
     GpuData[-10,table] = table()
