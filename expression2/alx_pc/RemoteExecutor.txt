@@ -136,6 +136,8 @@ function number exec_timeout() {
 if (dupefinished()) {
     Board["A",number] = entity():id()
     BIOS = getentity(InA)
+    EntID = entity():id()
+    Executor = getentity(ExecutorID)
 }
 
 if (~InA) {

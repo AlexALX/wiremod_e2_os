@@ -42,6 +42,10 @@ function number gifDrawStep() {
         if (Gif["lastDisposal", number] == 2) {
             if (State["lastWidth", number] >= Width & State["lastHeight", number] >= Height) {
                 DS[1048574] = 1
+                
+                # special custom flag mean drew, used in console ds mode
+                DS[1048500] = 1
+                
                 Gif["drawCache",table][FrameProcessed,table]:pushArray(array(-1048574,1))
                 State["clearing", number] = 0
             } else {
@@ -55,12 +59,12 @@ function number gifDrawStep() {
             Gif["DS_Inited", number] = 1
             Progress["progressDrew",number] = 1
             
-            # special custom flag mean drew, used in console ds mode
-            DS[1048500] = 1
-            
             DS[1048569] = 2  
             DS[1048574] = 0  
             DS[1048575] = 1  
+            
+            # special custom flag mean drew, used in console ds mode
+            DS[1048500] = 1
             
             local MaxWidth = Gif["maxWidth",number]
             
