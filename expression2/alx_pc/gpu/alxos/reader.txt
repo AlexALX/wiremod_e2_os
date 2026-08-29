@@ -18,7 +18,7 @@ function alxos_explorer_read_mem(FInfo:table, Start:number) {
 
     local CurrentLines = GpuData[10,number]
 
-    local LinesNeeded = 24 - CurrentLines
+    local LinesNeeded = GpuData["maxLines",number] - CurrentLines
     if (LinesNeeded <= 0) { LinesNeeded = 1 }
 
     local CurrentPos = Start + 1 
@@ -59,7 +59,15 @@ function alxos_explorer_reader_init(Info:table) {
     
     local FInfo = Info[1,table]
     
-    egpClear()
+    if (CurrentProg!="alxos_console") {
+        egpClear()
+        GpuData["maxChars",number] = 48
+        GpuData["maxLines",number] = 24
+    } else {
+        varClear()
+        GpuData["maxChars",number] = "alxos_console_maxchars"()[number]
+        GpuData["maxLines",number] = "alxos_console_maxlines"()[number]
+    }
     
     GpuData["lastProg",string] = CurrentProg
     
@@ -141,15 +149,17 @@ function alxos_explorer_reader_move(Key:string) {
         #Offset = Item[2,number]
     }
     
-    local Lines = GpuData[11,table]
-    for(I=1,Lines:count()) {
-        local ID = Lines[I,array][1,number]
-        if (I==1) { LAST_Y = EGP:egpPos(ID):y() }
-        EGP:egpRemove(ID)   
+    if (GpuData["lastProg",string]!="alxos_console") {
+        local Lines = GpuData[11,table]
+        for(I=1,Lines:count()) {
+            local ID = Lines[I,array][1,number]
+            if (I==1) { LAST_Y = EGP:egpPos(ID):y() }
+            EGP:egpRemove(ID)   
+        }
+        
+        local LAST_SI = GpuData[100,number]
+        if (LAST_SI>0) { LAST_I = LAST_SI } else { GpuData[100,number] = LAST_I }
     }
-    
-    local LAST_SI = GpuData[100,number]
-    if (LAST_SI>0) { LAST_I = LAST_SI } else { GpuData[100,number] = LAST_I }
     
     GpuData[-101,number] = 1
     
@@ -202,7 +212,14 @@ function number alxos_explorer_reader_cmd(Args:table) {
     local TotalLines = Args[5,number]
     local CurStr = ""
     local Lines = Args[6,table]
-    while(perf()) {
+    
+    local MaxChars = GpuData["maxChars",number]
+    local MaxLines = GpuData["maxLines",number]-1
+    
+    local St = GpuData[13,number]
+    local Ed = St+MaxChars
+    
+    while(perf(90)) {
         local Find = Data:find(NL,Last)
         if (Find>0) {
             CurStr = Data:sub(Last,Find)
@@ -213,8 +230,6 @@ function number alxos_explorer_reader_cmd(Args:table) {
         }       
         
         Lines:pushArray(array(LAST_I,CurStr))
-        local St = GpuData[13,number]
-        local Ed = St+48
         
         if (GpuData["lastProg",string]=="alxos_console") {
             "alxos_console_rawmsg"(CurStr:sub(St,Ed))
@@ -225,7 +240,7 @@ function number alxos_explorer_reader_cmd(Args:table) {
         }
         
         TotalLines++ 
-        if (TotalLines>23 | Last>=Max) { 
+        if (TotalLines>MaxLines | Last>=Max) { 
             GpuData[11,table] = Lines
             ExplorerDsH = "" 
             ExplorerKeyH = "readermove"  
@@ -244,7 +259,10 @@ function alxos_explorer_reader(Data:string) {
     local FInfo = GpuData[7,table] 
     local Count = GpuData[10,number]+(Data:explode(NL):count()-1)
     local Offset = GpuData[12,number]
-    if (Count<=24 & FInfo["size",number]>GpuData[8,number]+Offset) {
+    
+    local MaxLines = GpuData["maxLines",number]
+    
+    if (Count<=MaxLines & FInfo["size",number]>GpuData[8,number]+Offset) {
         local Start = GpuData[8,number]
         local End = ExplorerFS["bytes_in_sector",number]*ExplorerFS["sectors_in_cluster",number]
         if (ExplorerFS["fs_str_id",string]=="WCD") {
@@ -257,7 +275,7 @@ function alxos_explorer_reader(Data:string) {
             local PercID = DialogData[-4,number]
             local BoxID = DialogData[-5,number]
             local BoxW = DialogData[-6,number]
-            local CalcP = round(Count/24*100)
+            local CalcP = round(Count/MaxLines*100)
             
             if (GpuData["lastProg",string]=="alxos_console") {
                 "alxos_console_redraw_last"(CalcP+"%")
@@ -286,19 +304,84 @@ function alxos_explorer_reader(Data:string) {
     
         local Str = GpuData[9,string]+Data
         # fix for lines
-        if (Count>24) {
+        if (Count>MaxLines) {
             local Tbl = Str:explode(NL)
             local MTbl = Tbl:count()
-            local Rm = Count-23
+            local Rm = Count-(MaxLines-1)
             for (I=1,Rm) {
-                Tbl:pop()  
+                Tbl:pop()
             }
             Str = Tbl:concat(NL)
-            GpuData[10,number] = 24
+            GpuData[10,number] = MaxLines
         }
         GpuData[9,string] = Str+NL        
         alxos_explorer_reader_cmd(table(FInfo,Str,0,Str:length(),0,table()))
     }
+}
+
+function alxos_explorer_reader_movex_cmd() {
+    local Lines = GpuData[11,table]
+    local St = GpuData[13,number]
+    local Ed = GpuData["ed",number]
+    local I = GpuData["lastLine",number]
+    local MaxLines = Lines:count()
+    
+    if (GpuData["lastProg",string]=="alxos_console") {
+        while(perf(90)) {
+            if (I>MaxLines) {
+                break    
+            }
+
+            local Item = Lines[I,array]
+            "alxos_console_rawmsg"(Item[2,string]:sub(St,Ed))
+            I++
+        }
+    } else {
+        while(perf(90)) { 
+            if (I>MaxLines) {
+                break
+            }
+
+            local Item = Lines[I,array]
+            EGP:egpText(Item[1,number],Item[2,string]:sub(St,Ed),EGP:egpPos(Item[1,number]))   
+            I++
+        }
+    }
+    GpuData["lastLine",number] = I
+    if (I<=MaxLines) {
+        runCmd("alxos_explorer_reader_movex_cmd",1)    
+    }    
+}
+
+function alxos_explorer_reader_movex(Key:string) {
+    #[ Old code - without monowidth font
+    local Lines = GpuData[11,table]
+    local VEC = vec2(400,0)   
+    local FPos = EGP:egpPos(Lines[1,number])
+    if (Key=="right") { VEC *= -1 }
+    elseif (FPos:x()>0) { VEC = vec2(0,VEC:y()) }            
+    for(I=1,Lines:count()) {
+        local ID = Lines[I,number]
+        EGP:egpPos(ID,EGP:egpPos(ID)+VEC)   
+    }  ]#
+    local Lines = GpuData[11,table]
+    local St = GpuData[13,number]
+    local AddMax = GpuData["maxChars",number]
+    local Max = 30
+    local Ed = St+Max
+    if (Key=="left") { St -= Max Ed = St+AddMax }
+    else { St += Max Ed += AddMax }
+    if (St<=1) { St = 1 Ed = St+AddMax }
+    GpuData[13,number] = St
+    GpuData["ed",number] = Ed
+    GpuData["lastLine",number] = 1
+    
+    if (GpuData["lastProg",string]=="alxos_console") {
+        "alxos_console_cls_safe"()
+        "alxos_console_msg"("Controls: Arrow Keys=Move, F8=Exit")  
+    }
+    
+    alxos_explorer_reader_movex_cmd() 
 }
 
 function alxos_explorer_reader_key(Key:string, Pressed) {
@@ -312,43 +395,9 @@ function alxos_explorer_reader_key(Key:string, Pressed) {
     }
     if (ExplorerKeyH=="readermove") {
         if (Key=="right" | Key=="left") {
-            #[ Old code - without monowidth font
-            local Lines = GpuData[11,table]
-            local VEC = vec2(400,0)   
-            local FPos = EGP:egpPos(Lines[1,number])
-            if (Key=="right") { VEC *= -1 }
-            elseif (FPos:x()>0) { VEC = vec2(0,VEC:y()) }            
-            for(I=1,Lines:count()) {
-                local ID = Lines[I,number]
-                EGP:egpPos(ID,EGP:egpPos(ID)+VEC)   
-            }  ]#
-            local Lines = GpuData[11,table]
-            local St = GpuData[13,number]
-            local AddMax = 48
-            local Max = 30
-            local Ed = St+Max
-            if (Key=="left") { St -= Max Ed = St+AddMax }
-            else { St += Max Ed += AddMax }
-            if (St<=1) { St = 1 Ed = St+AddMax }
-            GpuData[13,number] = St
-            
-            local IsConsole = GpuData["lastProg",string]=="alxos_console"
-            
-            if (GpuData["lastProg",string]=="alxos_console") {
-                "alxos_console_cls_safe"()
-                "alxos_console_msg"("Controls: Arrow Keys - Move, F8 - Exit")              
-                for(I=1,Lines:count()) {
-                    local Item = Lines[I,array]
-                    "alxos_console_rawmsg"(Item[2,string]:sub(St,Ed))
-                }
-            } else {            
-                for(I=1,Lines:count()) {
-                    local Item = Lines[I,array]
-                    EGP:egpText(Item[1,number],Item[2,string]:sub(St,Ed),EGP:egpPos(Item[1,number]))   
-                }
-            } 
+            alxos_explorer_reader_movex(Key)            
         } elseif (Key=="up" | Key=="down") {
-            "alxos_explorer_reader_move"(Key)
+            alxos_explorer_reader_move(Key)
         }
     }    
 }

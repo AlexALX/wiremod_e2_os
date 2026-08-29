@@ -11,6 +11,7 @@ if (!ALXOS_INCLUDED) {
 #include "alx_pc/gpu/_main_"
 #include "alx_pc/standalone/ds_gfx/_init_"
 #include "alx_pc/standalone/ds_gfx/font_5x7"
+#include "alx_pc/gpu/includes/consolescreen"
 
 ALXOS_INCLUDED = 1
 

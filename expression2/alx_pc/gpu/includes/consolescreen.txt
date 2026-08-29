@@ -1,0 +1,49 @@
+@persist CS:wirelink
+@persist CsShift:number CsLineAddr:number CsMaxLines:number CsMaxChars:number
+
+function csVars() {
+    if (CS:entity():type()=="gmod_wire_expression2") {
+        CsLineAddr = 120
+        CsMaxLines = 36
+        CsMaxChars = 60
+        CsShift = 2350
+    } else {
+        CsLineAddr = 60
+        CsMaxLines = 18
+        CsMaxChars = 30
+        CsShift = 0
+    }
+}
+
+function csClear() {
+    csVars()
+    CS[2041+CsShift] = 1
+    CS[2046+CsShift] = 0
+}
+
+# write to console screen
+function csScreenWrite(X:number, Y:number, Str:string, ColorParam:number) {       
+    local StartAddr = Y * CsLineAddr + X * 2
+    local StrArr = Str:explode("")
+    
+    local MaxY = Y * CsLineAddr + CsLineAddr
+    
+    for(I = 1, StrArr:count()) {        
+        local CharCode = toByte(StrArr[I,string])
+        
+        CS[StartAddr] = CharCode
+        CS[StartAddr + 1] = ColorParam
+        
+        StartAddr += 2
+        
+        if (StartAddr >= MaxY) { break }
+    }
+}
+
+function alxos_screen_clear_line(Line:number) {
+    CS[2039+CsShift] = Line-1
+}
+
+function csScreenMove(LinesToShift:number) {
+    CS[2038+CsShift] = LinesToShift
+}

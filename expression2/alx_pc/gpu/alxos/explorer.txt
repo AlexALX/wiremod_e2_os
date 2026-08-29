@@ -324,6 +324,11 @@ function alxos_explorer_handlers() {
 }
 
 function alxos_explorer_listcurdir() {
+    if (!perf(90)) {
+        runCmd("alxos_explorer_listcurdir",1)
+        return    
+    }
+    
     if (GpuData["zipAdded",number]>0) {
         for (I=1,GpuData["zipAdded",number]) {
             ExplorerPath:pop()   

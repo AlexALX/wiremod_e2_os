@@ -3,6 +3,7 @@
 #include "alx_pc/gpu/_main_"
 #include "alx_pc/standalone/ds_gfx/_init_"
 #include "alx_pc/standalone/ds_gfx/font_5x7"
+#include "alx_pc/gpu/includes/consolescreen"
 
 function initDrawFunc() {
     InitDrawLine = function(Msg:string) {}
@@ -20,7 +21,7 @@ function initDrawFunc() {
             csScreenWrite(0,InitLines,Msg,999)
             InitLines++
         }
-        InitMaxLines = 17
+        InitMaxLines = CsMaxLines-1
         InitDrawMode = "console"
     } elseif (DS:entity():isValid()) {    
         dsInit(DSContainer, 256, 256)

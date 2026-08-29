@@ -1,0 +1,214 @@
+@name Quad Console Screen
+@inputs LinkTopLeft:wirelink LinkTopRight:wirelink LinkBottomLeft:wirelink LinkBottomRight:wirelink
+@outputs VirtualScreen:wirelink
+@persist ScrW ScrH VirtW VirtH CsShift VRowOffset CsCursorVisible CsActiveScreen
+@persist CsBuffer:array
+@trigger none 
+@strict
+
+#[
+    ALX Wiremod E2 PC
+    Created by AlexALX (c) 2026
+]#
+
+function csClear() {
+    CsBuffer = array()
+    VRowOffset = 0
+}
+
+function csHWClear() {  
+    csClear()
+    CsCursorVisible = 0
+    CsActiveScreen = 1
+    LinkTopLeft[2041, number] = 1
+    LinkTopLeft[2046, number] = 0
+    LinkTopRight[2041, number] = 1
+    LinkTopRight[2046, number] = 0
+    LinkBottomLeft[2041, number] = 1
+    LinkBottomLeft[2046, number] = 0
+    LinkBottomRight[2041, number] = 1     
+    LinkBottomRight[2046, number] = 0 
+}
+
+if (first() | duped()) {    
+    ScrW = 60
+    ScrH = 18
+
+    VirtW = ScrW * 2
+    VirtH = ScrH * 2
+        
+    VirtualScreen = wirelink()
+    CsShift = 2350
+
+    csHWClear()
+    
+    Screen = VirtualScreen
+    #include "alx_pc/shared/wirelinkcontroller"
+}
+
+event writeCell(Address:number, Value:number) {
+    if (!perf(90)) { exit() } # bad way but what to do
+    
+    if (Address < 4320) {    
+        local MemX = Address % VirtW
+        local GlobalY = floor(Address / VirtW)
+
+        local StoreGY = (GlobalY + VRowOffset) % VirtH
+        CsBuffer[StoreGY * VirtW + MemX, number] = Value
+        
+        local LocalAddress = (GlobalY % ScrH) * ScrW + (MemX % ScrW)
+        
+        if (GlobalY < ScrH) {
+            if (MemX < ScrW) {
+                LinkTopLeft[LocalAddress] = Value
+            } else {
+                LinkTopRight[LocalAddress] = Value
+            }
+        } else {
+            if (MemX < ScrW) {
+                LinkBottomLeft[LocalAddress] = Value
+            } else {
+                LinkBottomRight[LocalAddress] = Value
+            }
+        }
+    } else {
+        Address = Address - CsShift
+        
+        if (Address == 2041) {
+            csHWClear()
+        } elseif (Address == 2038) {
+            local Lines = Value
+            if (Lines > 0 & Lines < VirtH) {
+                
+                for (Y = 0, Lines - 1) {
+                    local ClearGY = (Y + VRowOffset) % VirtH
+                    for (X = 0, VirtW - 1) {
+                        CsBuffer[ClearGY * VirtW + X, number] = 0
+                    }
+                }
+                
+                LinkTopLeft[2038, number] = Lines
+                LinkTopRight[2038, number] = Lines
+                LinkBottomLeft[2038, number] = Lines
+                LinkBottomRight[2038, number] = Lines
+                
+                local SourceGY = ScrH
+                local TargetRawY = ScrH - Lines
+                
+                for (Y = 0, Lines - 1) {
+                    local CurSrcGY = (SourceGY + Y + VRowOffset) % VirtH
+                    local CurDstRawY = TargetRawY + Y
+                    
+                    for (X = 0, VirtW - 1) {
+                        local SrcAddr = CurSrcGY * VirtW + X
+                        local V = CsBuffer[SrcAddr, number]
+                        local LA = (CurDstRawY * ScrW) + (X % ScrW)
+                        
+                        if (X < ScrW) { LinkTopLeft[LA] = V } 
+                        else { LinkTopRight[LA] = V }
+                    }
+                }
+                    
+                VRowOffset = (VRowOffset + Lines) % VirtH
+                
+            } elseif (Lines >= VirtH) {
+                csHWClear()  
+            }
+        } elseif (Address == 2039) {
+            local RowY = Value
+            
+            if (RowY < ScrH) {
+                LinkTopLeft[2039, number] = RowY
+                LinkTopRight[2039, number] = RowY
+            } else {
+                local LocalY = RowY - ScrH
+                LinkBottomLeft[2039, number] = LocalY
+                LinkBottomRight[2039, number] = LocalY
+            }
+        } elseif (Address == 2040) {
+            local ColX = Value
+            
+            if (ColX < ScrW) {
+                LinkTopLeft[2040, number] = ColX
+                LinkBottomLeft[2040, number] = ColX
+            } else {
+                local LocalX = ColX - ScrW
+                LinkTopRight[2040, number] = LocalX
+                LinkBottomRight[2040, number] = LocalX
+            }
+        } elseif (Address == 2045) {
+            local GlobalY = floor(Value / VirtW)
+            local MemX = Value % VirtW
+            local GlobalCol = floor(MemX / 2)
+            
+            local HalfScrW = floor(ScrW / 2)
+            local LocalX = GlobalCol % HalfScrW
+            local LocalY = GlobalY % ScrH
+            local LocalCursorValue = LocalY * ScrW + LocalX * 2
+            
+            LinkTopLeft[2046, number] = 0
+            LinkTopRight[2046, number] = 0
+            LinkBottomLeft[2046, number] = 0
+            LinkBottomRight[2046, number] = 0
+            
+            if (GlobalY < ScrH) {
+                if (GlobalCol < HalfScrW) {
+                    CsActiveScreen = 1
+                    LinkTopLeft[2045, number] = LocalCursorValue
+                    if (CsCursorVisible) { 
+                        LinkTopLeft[2046, number] = 1
+                    }
+                } else {
+                    CsActiveScreen = 2
+                    LinkTopRight[2045, number] = LocalCursorValue
+                    if (CsCursorVisible) { 
+                        LinkTopRight[2046, number] = 1
+                    }
+                }
+            } else {
+                if (GlobalCol < HalfScrW) {
+                    CsActiveScreen = 3
+                    LinkBottomLeft[2045, number] = LocalCursorValue
+                    if (CsCursorVisible) { 
+                        LinkBottomLeft[2046, number] = 1
+                    }
+                } else {
+                    CsActiveScreen = 4
+                    LinkBottomRight[2045, number] = LocalCursorValue
+                    if (CsCursorVisible) { 
+                        LinkBottomRight[2046, number] = 1
+                    }
+                }
+            }
+        } elseif (Address == 2046) {
+            CsCursorVisible = Value
+            
+            if (Value == 0) {
+                LinkTopLeft[2046, number] = 0
+                LinkTopRight[2046, number] = 0
+                LinkBottomLeft[2046, number] = 0
+                LinkBottomRight[2046, number] = 0
+            } else {
+                if (CsActiveScreen == 1) { LinkTopLeft[2046, number] = 1 }
+                elseif (CsActiveScreen == 2) { LinkTopRight[2046, number] = 1 }
+                elseif (CsActiveScreen == 3) { LinkBottomLeft[2046, number] = 1 }
+                elseif (CsActiveScreen == 4) { LinkBottomRight[2046, number] = 1 }    
+            }
+        } else {
+            LinkTopLeft[Address] = Value
+            LinkTopRight[Address] = Value
+            LinkBottomLeft[Address] = Value
+            LinkBottomRight[Address] = Value
+        }
+    }
+}
+
+event input(InputName:string) {
+    if (InputName=="InG") {
+        csHWClear()    
+    } 
+}
+
+if (dsClk("wirelink") & InG==dsGetEntity():id()) {
+    wirelinkInit()  
+}

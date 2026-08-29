@@ -138,7 +138,16 @@ function screen_connect() {
     local WL = Info[2,wirelink]    
     local WLI = WL:entity():id()
     if (WL) {
-        local Type = WL:entity():type()             
+        local Type = WL:entity():type()
+        if (Type=="gmod_wire_expression2") {
+            local ScreenType = gpuScreenType(WL)
+            if (ScreenType==2) {
+                Type = "gmod_wire_digitalscreen"
+            } elseif (ScreenType==1) {
+                Type = "gmod_wire_consolescreen"
+            }
+        }
+
         if (!EGP:entity():isValid() & Type=="gmod_wire_egp") {
             EGP = WL
             EGP_ID = WLI
@@ -146,23 +155,20 @@ function screen_connect() {
             Screens[WLI,number] = findscreen(ID)
             Screens["EGP_WL",wirelink] = WL
             EGPEvent()
-        } elseif (!CS:entity():isValid() & Type=="gmod_wire_consolescreen") {            
+        } elseif (!CS:entity():isValid() & Type=="gmod_wire_consolescreen") {       
             CS = WL
             CS_ID = WLI
             CSContainer[1,wirelink] = WL
             Screens[WLI,number] = findscreen(ID)
             Screens["CS_WL",wirelink] = WL
             CSEvent()
-        } elseif (!DS:entity():isValid()) {
-            local ScreenName = gpuScreenName(WL)            
-            if (Type=="gmod_wire_digitalscreen" | ScreenName!="") {
-                DS = WL
-                DS_ID = WLI
-                DSContainer[1,wirelink] = WL
-                Screens[WLI,number] = findscreen(ID)
-                Screens["DS_WL",wirelink] = WL
-                DSEvent()
-            }
+        } elseif (!DS:entity():isValid() & Type=="gmod_wire_digitalscreen") {
+            DS = WL
+            DS_ID = WLI
+            DSContainer[1,wirelink] = WL
+            Screens[WLI,number] = findscreen(ID)
+            Screens["DS_WL",wirelink] = WL
+            DSEvent()
         }
         
         if (GpuData["BSOD",array]:count()) {

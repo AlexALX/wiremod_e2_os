@@ -21,7 +21,7 @@ function wirelinkClearScreen() {
         Screen[1048574] = 0
         Screen[1048575] = 1
     } elseif (Type=="gmod_wire_consolescreen") {
-        Screen[2041] = 0
+        Screen[2041] = 1
         Screen[2046] = 0
     }
 }

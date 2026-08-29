@@ -28,7 +28,7 @@ function bootDrawFunc() {
             csScreenWrite(0,InitLines,Msg,666)
             InitLines++
         }
-        InitMaxLines = 17
+        InitMaxLines = CsMaxLines-1
         InitDrawMode = "console"
     } else {
         dsInit(DSContainer, 256, 256)
@@ -152,7 +152,7 @@ function alxos_msgup(Str:string) {
 
 function alxos_msgup_stage(Str:string) {
     if (InitDrawMode=="console") {
-        csScreenWrite(30-Str:length(),InitLines-1,Str,666)
+        csScreenWrite(CsMaxChars-Str:length(),InitLines-1,Str,666)
     } elseif (InitDrawMode=="ds") {
         dsDrawTextStart(256-Str:length()*DsFontCharWidth,(InitLines-1)*DsFontLineHeight,Str)
     } else {    

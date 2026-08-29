@@ -6,7 +6,7 @@
 
 function number bmpParseHeader() {
     local Data = BmpData["data",string]
-    local DS = BmpData["DS",wirelink]
+    local DS = BmpData["DSContainer",table][1,wirelink]
     
     BmpWarning = ""
     local Format = Data:sub(1,2)

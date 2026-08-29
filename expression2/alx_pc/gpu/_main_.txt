@@ -7,7 +7,7 @@
 @persist FS_TYPES:table EgpCleanHandler:string Init Device_Name:string Devices:table SysFS:table
 @persist EGP:wirelink EGP_ID:number EGPEvent:function EGPContainer:table
 @persist DS:wirelink DS_ID:number DSEvent:function DSContainer:table
-@persist CS:wirelink CS_ID:number CSEvent:function CSContainer:table
+@persist CS:wirelink CS_ID:number CSEvent:function CSContainer:table 
 
 #[
 	ALX Wiremod E2 PC
@@ -33,6 +33,12 @@ function err() {
     if (ERR_C!=-1) { exit() }
 }
 
+function varClear() {
+    LAST_I = 1 
+    LAST_Y = 0 
+    GpuData = table()
+}
+
 function egpClear() {
     EGP:egpClear()
     EGP:egpDrawTopLeft(1)
@@ -50,34 +56,6 @@ function dsClear() {
     
     DS[1048574] = 0
     DS[1048575] = 1
-}
-
-function csClear() {
-    CS[2041] = 1
-    CS[2046] = 0
-}
-
-# write to console screen
-function csScreenWrite(X:number, Y:number, Str:string, ColorParam:number) {       
-    local StartAddr = Y * 60 + X * 2
-    local StrArr = Str:explode("")
-    
-    local MaxY = Y * 60 + 60
-    
-    for(I = 1, StrArr:count()) {        
-        local CharCode = toByte(StrArr[I,string])
-        
-        CS[StartAddr] = CharCode
-        CS[StartAddr + 1] = ColorParam
-        
-        StartAddr += 2
-        
-        if (StartAddr >= MaxY) { break }
-    }
-}
-
-function csScreenMove(LinesToShift:number) {
-    CS[2038] = LinesToShift
 }
 
 function reboot() {
@@ -100,6 +78,16 @@ function number gpuScreenSize(DS:wirelink) {
         return 512
     }
     
+    return 0
+}
+
+function number gpuScreenType(WL:wirelink) {
+    local ScreenName = WL:entity():getName()
+    if (ScreenName=="Quad Digital Screen" | ScreenName=="ZGPU Screen Renderer") {
+        return 2    
+    } elseif (ScreenName=="Quad Console Screen") {
+        return 1    
+    }
     return 0
 }
 
