@@ -55,7 +55,7 @@ event writeCell(Address:number, Value:number) {
     if (Address < 1048500) {
         # block draw for buffer
         # this fixes huge fps drop
-        BlockDraw = 2 
+        BlockDraw = 2
         
         DsBuffer[Address, number] = Value
         
@@ -125,10 +125,10 @@ event tick() {
     # move to next tick
     if (BlockDraw>0) {
         BlockDraw--
-        exit()    
+        exit()
     }
     
-    while (ClearRowsCount > 0 & perf(95)) {
+    while (ClearRowsCount > 0 & perf(90)) {
         local RowY = ClearRowsQueue[ClearRowsCount, number]
         ClearRowsCount--
         
@@ -142,7 +142,7 @@ event tick() {
         }
     }
     
-    while (ClearColsCount > 0 & perf(95)) {
+    while (ClearColsCount > 0 & perf(90)) {
         local ColX = ClearColsQueue[ClearColsCount, number]
         ClearColsCount--
         

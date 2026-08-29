@@ -2408,6 +2408,11 @@ function alxos_explorer_sysinfo(Info:table) {
     
     if (!CS:entity():isValid()) { Status = "Not connected" } else { Status = "Connected" }
     
+    local ScreenName = gpuScreenName(CS)
+    if (ScreenName) {
+        Status += " ("+ScreenName+")"
+    }
+    
     EGP:egpText(LAST_I,"Console Screen - "+Status,vec2(30,Y))
     EGP:egpColor(LAST_I,128,255,255,255) LAST_I++ Y+=20
     

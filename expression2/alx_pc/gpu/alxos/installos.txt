@@ -9,6 +9,7 @@
 ]#
 
 #include "alx_pc/gpu/_main_"
+#include "alx_pc/gpu/_draw_"
 
 function installheader() {
     EGP:egpBox(LAST_I,vec2(0,0),vec2(512,512))
@@ -37,12 +38,20 @@ function number installfooter(Str:string) {
 }
 
 function number installos(Args:table) {
+    hddload(0)
+    
     if (!EGP:entity():isValid()) {
+        initDrawFunc()
+        InitLines = 0
         if (CS:entity():isValid()) {
             csClear()
-            csScreenWrite(0,0,"Installing OS is not supported",999)    
-            csScreenWrite(0,1,"in console mode.",999) 
+        } elseif (DS:entity():isValid()) {
+            dsClear()
         }
+        
+        initDrawLine("Installing OS is not supported")    
+        initDrawLine("in console mode.") 
+        initDrawLine("Please connect EGP Screen.") 
         return 0
     }
 
@@ -58,8 +67,7 @@ function number installos(Args:table) {
     if (Step=="welcome") {
         
     IO_IsManager = 0
-        
-    hddload(0)        
+              
     egpClear()
     KeyHandler = "installos_key"
     DsHandler = "installos_ds"

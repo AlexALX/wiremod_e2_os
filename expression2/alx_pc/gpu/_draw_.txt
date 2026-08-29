@@ -1,4 +1,5 @@
-@persist InitDrawLine:function InitMaxLines:number InitDrawMode:string InitLines:number
+@persist InitDrawLine:function InitClearLine:function InitDrawChar:function
+@persist InitMaxLines:number InitDrawMode:string InitLines:number InitMaxChars:number
 
 #include "alx_pc/gpu/_main_"
 #include "alx_pc/standalone/ds_gfx/_init_"
@@ -7,38 +8,68 @@
 
 function initDrawFunc() {
     InitDrawLine = function(Msg:string) {}
+    InitClearLine = function(Line:number) {}
+    InitDrawChar = function(X:number,Line:number,Char:string) {}
     if (EGP:entity():isValid()) {
         InitDrawLine = function(Msg:string) {
-            EGP:egpText(LAST_I,Msg,vec2(BIOS_X,LAST_Y))
+            local LocalY = BIOS_SZ*InitLines
+            EGP:egpText(LAST_I,Msg,vec2(BIOS_X,LocalY))
             EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++
-            LAST_Y += BIOS_SZ
+            #LAST_Y += BIOS_SZ
             InitLines++
         }
-        InitMaxLines = 25
+        InitMaxChars = 50
+        InitMaxLines = 20
         InitDrawMode = "egp"
     } elseif (CS:entity():isValid()) {
         InitDrawLine = function(Msg:string) {
             csScreenWrite(0,InitLines,Msg,999)
             InitLines++
         }
+        InitClearLine = function(Line:number) {
+            alxos_screen_clear_line(Line+1)
+        }
+        InitDrawChar = function(X:number,Line:number,Char:string) {
+            csScreenWrite(X,Line,Char,999)    
+        }
+        InitMaxChars = CsMaxChars
         InitMaxLines = CsMaxLines-1
         InitDrawMode = "console"
     } elseif (DS:entity():isValid()) {    
         dsInit(DSContainer, 256, 256)
         dsSetFont(dsFont5x7())
         InitDrawLine = function(Msg:string) {
+            local LAST_Y = DsFontLineHeight*InitLines
             local Lines = Msg:explode("\n"):count()
             dsDrawTextStart(0,LAST_Y,Msg)
-            LAST_Y += DsFontLineHeight*Lines
             InitLines += Lines
         }
-        InitMaxLines = ceil(256 / DsFontLineHeight)
+        InitClearLine = function(Line:number) {
+            dsTextClearLine(Line*DsFontLineHeight)
+        }
+        InitDrawChar = function(X:number,Line:number,Char:string) {
+            if (Char==" ") {
+                dsClearChar(DS,X*DsFontCharWidth,Line*DsFontLineHeight)
+            } else {            
+                dsDrawChar(DS,X*DsFontCharWidth,Line*DsFontLineHeight,toByte(Char))
+            }
+        }
+        InitMaxChars = 50
+        InitMaxLines = ceil(256 / DsFontLineHeight)-1
         InitDrawMode = "ds"
     }
 }
 
 function initDrawLine(Msg:string) {
     InitDrawLine(Msg)    
+}
+
+function initClearLine(Line:number) {
+    InitClearLine(Line)
+}
+
+function initDrawChar(X:number,Line:number,Char:string) {
+    InitDrawChar(X,Line,Char)    
 }
 
 function initClear() {

@@ -889,8 +889,20 @@ function alxos_console_run(Command:string) {
         case "quit",
             if (DEBUG) { DEBUG = 1 }
             stoptimer("cursor_draw")
+            egpClear()
             csClear()
-            "alxos_execute"("alxos_explorer")
+            dsClear()
+            
+            if (EGP:entity():isValid()) {
+                "alxos_execute"("alxos_explorer")
+            } else {
+                alxos_console_cls()
+                alxos_console_msg(CmdHeader)
+                if (!EGP:entity():isValid()) {
+                    alxos_console_msg("Warning: EGP is not connected.")
+                }
+                alxos_console_command()
+            }
         break
         case "shutdown",
             if (Arg!="") {

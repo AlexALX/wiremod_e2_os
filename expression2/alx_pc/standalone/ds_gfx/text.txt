@@ -59,6 +59,19 @@ function dsDrawChar(DS:wirelink, X:number, Y:number, Ascii:number) {
     dsDrawChar(DS, X, Y, Ascii, 16777215) # 0xFFFFFF
 }
 
+function dsClearChar(DS:wirelink, X:number, Y:number, ColorNum:number) {
+    local InitialMask = 1 << (DsFontWidth - 1)
+    for (Row = 1, DsFontHeight) {
+        for (Col = 0, DsFontWidth - 1) {
+            dsDrawPixel(DS, X + Col, Y + Row - 1, ColorNum)
+        }
+    }
+}
+
+function dsClearChar(DS:wirelink, X:number, Y:number) {
+    dsClearChar(DS, X, Y, 0)
+}
+
 function dsDrawText(X, Y, Text:string, Color:vector)
 {
     local DS = DSWLContainer[1,wirelink]

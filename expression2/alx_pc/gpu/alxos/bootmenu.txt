@@ -35,7 +35,7 @@ function bootDrawFunc() {
         dsSetFont(dsFont5x7())
         InitDrawLine = function(Msg:string) {
             local Lines = Msg:explode("\n"):count()
-            dsDrawTextStart(0,InitLines*DsFontLineHeight,Msg)
+            dsDrawTextStart(0,InitLines*DsFontLineHeight,Msg, vec(168))
             InitLines += Lines
         }
         InitMaxLines = ceil(256 / DsFontLineHeight)
@@ -154,7 +154,7 @@ function alxos_msgup_stage(Str:string) {
     if (InitDrawMode=="console") {
         csScreenWrite(CsMaxChars-Str:length(),InitLines-1,Str,666)
     } elseif (InitDrawMode=="ds") {
-        dsDrawTextStart(256-Str:length()*DsFontCharWidth,(InitLines-1)*DsFontLineHeight,Str)
+        dsDrawTextStart(256-Str:length()*DsFontCharWidth,(InitLines-1)*DsFontLineHeight,Str, vec(168))
     } else {    
         EGP:egpText(LAST_I,Str,vec2(512-BIOS_X,LAST_Y-20))
         EGP:egpAlign(LAST_I,2)

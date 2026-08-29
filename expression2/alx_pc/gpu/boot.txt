@@ -34,7 +34,7 @@ function initpost() {
 }
 
 function initbiospre() {
-    initDrawLine("Simple BIOS v1.2")
+    initDrawLine("Simple BIOS v1.3")
     runCmd("initbios",2000)
 }
 
@@ -114,6 +114,11 @@ function initbios() {
         Status = "Not connected"
     } else { Status = "Connected" }
     
+    local ScreenName = gpuScreenShortName(CS)
+    if (ScreenName) {
+        Status += " ("+ScreenName+")"
+    }
+    
     initDrawLine("Console Screen - "+Status)
     
     if (Keyboard[1,entity]==noentity()) {
@@ -136,10 +141,6 @@ function initbios() {
         err() 
     }
     
-    #Y+=Sz
-    #EGP:egpText(I,"Connected HDD's: ",vec2(X,Y))
-    #EGP:egpSize(I,Sz) I++ Y+=Sz
-    
     hddload(1) 
     DsHandler = "boot_ds"
     dsSendDirect("gethdds",BIOS,entity())
@@ -160,11 +161,10 @@ function inithdd() {
         
         local UsbDevices = table()
         
-        local II = 0
-        local MaxLines = InitMaxLines - InitLines
+        local MaxLines = InitMaxLines - 1
         
         for (H=1,Devices["hdd_io",table]:count()) {
-            if (II>MaxLines) { break } # gui limitation
+            if (InitLines>MaxLines) { break } # gui limitation
             local Inf = Devices["hdd_io",table][H,table]
             for(I=1,Inf[4,number]) {
                 local Item = Inf[5,table][I,table]
@@ -177,7 +177,7 @@ function inithdd() {
                     }
                     
                     initDrawLine(Name+H+": ")
-                    if (II>MaxLines) { break } # gui limitation
+                    if (InitLines>MaxLines) { break } # gui limitation
                 }
                 if (Item:count()) {
                     if (Item["usb",entity]) {
@@ -196,19 +196,17 @@ function inithdd() {
                 } else {
                     initDrawLine("HDD"+(I-1)+" - Not connected")
                 }
-                II++
-                if (II>MaxLines) { break } # gui limitation
+                if (InitLines>MaxLines) { break } # gui limitation
             }
         }
         
-        if (II<=MaxLines) {
+        if (InitLines<=MaxLines) {
             for(U=1,UsbDevices:count()) {
                 local Item = UsbDevices[U,table][2,table]
                 local Name = UsbDevices[U,table][1,string]
                 
                 initDrawLine(Name+(U-1)+" - Size "+(Item["size",number]*Item["sector_size",number])/1024+" KB")
-                II++
-                if (II>MaxLines) { break } # gui limitation   
+                if (InitLines>MaxLines) { break } # gui limitation   
             }
             
         }
@@ -217,13 +215,8 @@ function inithdd() {
     
     KeyHandler = "bios_key"
     
-    if (InitDrawMode=="egp") {
-        EGP:egpText(LAST_I,"Press DEL to enter SETUP.",vec2(X,512-Sz))
-        EGP:egpSize(LAST_I,Sz) LAST_I++
-    } elseif(InitDrawMode=="console") {
-        #InitLines = InitMaxLines
-        #initDrawLine("Press DEL to enter SETUP.")
-    }
+    InitLines = InitMaxLines
+    initDrawLine("Press DEL to enter SETUP.")
     
     #soundPlay(12,0.25,"synth/square_440.wav")
     ERR_C = -1
@@ -237,14 +230,11 @@ function inithdd() {
 
 function bios_key(Key:string,Pressed) {
     if (!Pressed) { return }
-    if (Key=="delete") {
-        if (InitDrawMode=="console") {
-            return    
-        }
-        
+    if (Key=="delete") {        
         #include "alx_pc/gpu/bios"
-        stoptimer("cmd")
-        bios_init()   
+        stopAllTimers()
+        hddload(0)
+        bios_init()
     }
 }
 
@@ -335,14 +325,6 @@ function boot() {
     if (!BootHDD:count()|!HDD_IO:count()) {
         initDrawLine("No bootable device")
         initDrawLine("Press any key to reboot.")
-        
-        if (!EGP:entity():isValid()) {
-            initDrawLine("")    
-            initDrawLine("Warning:")    
-            initDrawLine("Changing bootable device")    
-            initDrawLine("Supported only on EGP")    
-            initDrawLine("Inside BIOS")
-        }
 
         KeyHandler = "reboot"
     } else {

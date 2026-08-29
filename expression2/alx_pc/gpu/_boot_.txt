@@ -32,7 +32,7 @@ BOOT_FUNC["alxos_setup",number] = 1
 function alxos_setup(Name:string) {
     #include "alx_pc/gpu/alxos/installos"
     
-    LAST_Y+=BIOS_SZ
+    LAST_Y+=BIOS_SZ*3
     EGP:egpText(LAST_I,"Loading OS installation package...",vec2(BIOS_X,LAST_Y))
     EGP:egpSize(LAST_I,BIOS_SZ) LAST_I++ LAST_Y+=BIOS_SZ
     

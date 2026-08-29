@@ -68,6 +68,8 @@ if (clk("cd_newdisc")) {
 }
 
 if (tickClk()) {
+    if (!Started & !MoveTrack & LastPos>=0 & LastPosUp>=0 & !Hydraulics) { exit() }
+    
     local CurSpeedY = -Wheel:angVel()[2]
     CurSpeed = CurSpeedY/100
     if (Started) {
@@ -146,6 +148,7 @@ if (tickClk()) {
     #soundPitch(0,CurSpeedY/7)
     
     #StandEnt:propFreeze(DriveBase:isFrozen()) 
+    
     exit()
 }
 

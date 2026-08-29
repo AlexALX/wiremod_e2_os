@@ -48,8 +48,8 @@ if (first() | duped()) {
 
 event writeCell(Address:number, Value:number) {
     if (!perf(90)) { exit() } # bad way but what to do
-    
-    if (Address < 4320) {    
+
+    if (Address < 4320) {
         local MemX = Address % VirtW
         local GlobalY = floor(Address / VirtW)
 

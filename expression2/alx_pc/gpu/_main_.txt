@@ -91,22 +91,22 @@ function number gpuScreenType(WL:wirelink) {
     return 0
 }
 
-function string gpuScreenName(DS:wirelink) {
-    local ScreenName = DS:entity():getName()
+function string gpuScreenName(WL:wirelink) {
+    local ScreenName = WL:entity():getName()
     
-    if (ScreenName=="Quad Digital Screen" | ScreenName=="ZGPU Screen Renderer") {
+    if (ScreenName=="Quad Digital Screen" | ScreenName=="ZGPU Screen Renderer" | ScreenName=="Quad Console Screen") {
         return ScreenName        
     }
     return ""
 }
 
-function string gpuScreenShortName(DS:wirelink) {
-    local ScreenName = DS:entity():getName()
+function string gpuScreenShortName(WL:wirelink) {
+    local ScreenName = WL:entity():getName()
     
-    if (ScreenName=="Quad Digital Screen") {
+    if (ScreenName=="Quad Digital Screen" | ScreenName=="Quad Console Screen") {
         return "Quad"        
     } elseif (ScreenName=="ZGPU Screen Renderer") {
-        return "ZGPU"    
+        return "ZGPU"
     }
     return ""
 }
