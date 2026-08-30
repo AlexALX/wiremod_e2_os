@@ -75,10 +75,6 @@ function alxos_img_postinit() {
     local ExplorerFS = GpuData[1,table]
     local FInfo = GpuData[2,table]
     
-    #DS[1048574] = 0
-    #DS[1048569] = 2
-    #DS[1048575] = 1
-    
     if (GpuData["lastProg",string]=="alxos_console") {
         "alxos_hide_cursor"()
     }

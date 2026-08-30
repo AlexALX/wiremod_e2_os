@@ -235,8 +235,9 @@ function number gifDelay() {
     if (Gif["paused",number]) {
         
         if (Gif["looping",number] & Gif["frameProcessed",number]==0) {
+            local DsShift = DS["DsShifted",number]
             # Clear whole screen
-            DS[1048574] = 1
+            DS[1048574+DsShift] = 1
         }
         
         local WaitDuration = curtime() - Gif["pauseTime", number]

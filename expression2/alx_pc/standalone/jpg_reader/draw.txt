@@ -15,6 +15,9 @@ function number jpgDrawStep()
         
         if (!Jpg["DS_Inited",number]) {
             
+            # special edge 1024*1024 case
+            local DsShift = DS["DsShifted",number]
+            
             local ScreenWidth = Jpg["screenWidth",number]
             local ScreenHeight = Jpg["screenHeight",number]
             
@@ -22,26 +25,26 @@ function number jpgDrawStep()
             
             Progress["progressDrew",number] = 1
             
-            DS[1048569] = 2
-            DS[1048574] = 0
-            DS[1048575] = 1
+            DS[1048569+DsShift] = 2
+            DS[1048574+DsShift] = 0
+            DS[1048575+DsShift] = 1
             
             # special custom flag mean drew, used in console ds mode
-            DS[1048500] = 1
+            DS[1048500+DsShift] = 1
             
             if (!NoKeepAR) {
                 local SWH = (ScreenWidth>ScreenHeight ? ScreenWidth : ScreenHeight)
                 Jpg["Xadd",number] = (ScreenHeight>ScreenWidth ? floor((SWH-ScreenWidth)/2) : 0 )
                 Jpg["Yadd",number] = (ScreenWidth>ScreenHeight ? floor((SWH-ScreenHeight)/2) : 0 )
                 Jpg["posMul", number] = SWH  
-                DS[1048573] = SWH
-                DS[1048572] = SWH          
+                DS[1048573+DsShift] = SWH
+                DS[1048572+DsShift] = SWH          
             } else {
                 Jpg["Xadd",number] = 0
                 Jpg["Yadd",number] = 0
                 Jpg["posMul", number] = ScreenWidth
-                DS[1048573] = ScreenWidth
-                DS[1048572] = ScreenHeight
+                DS[1048573+DsShift] = ScreenWidth
+                DS[1048572+DsShift] = ScreenHeight
             }
         }
     }

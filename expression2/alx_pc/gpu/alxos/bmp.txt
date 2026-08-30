@@ -175,11 +175,7 @@ function alxos_bmp_postinit() {
     DsHandler = "alxos_bmp_ds"
     #KeyHandler = "alxos_bmp_key"
     ExplorerCurTask = "alxos_prog_img"
-    
-    #DS[1048574] = 0
-    #DS[1048569] = 2
-    #DS[1048575] = 1
-    
+
     if (!FInfo["content",string]) {        
         dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(
             ExplorerFS,FInfo,0,66

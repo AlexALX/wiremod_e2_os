@@ -1,7 +1,7 @@
 @name Quad Digital Screen
-@inputs LinkTopLeft:wirelink LinkTopRight:wirelink LinkBottomLeft:wirelink LinkBottomRight:wirelink
-@outputs VirtualScreen:wirelink DsImageDrew HitPerf
-@persist ScrW ScrH VirtW VirtH
+@inputs LinkTopLeft:wirelink LinkTopRight:wirelink LinkBottomLeft:wirelink LinkBottomRight:wirelink DsShift:number
+@outputs VirtualScreen:wirelink DsImageDrew HitPerf DsShifted:number
+@persist ScrW ScrH VirtW VirtH DsPixelAddr
 @persist DsBuffer:array DirtyRows:array UpdateQueue:array QueueCount BlockDraw
 @persist ClearRowsQueue:array ClearRowsCount ClearColsQueue:array ClearColsCount
 @trigger none 
@@ -11,6 +11,18 @@
     ALX Wiremod E2 PC
     Created by AlexALX (c) 2026
 ]#
+
+# When DsShift set then all commands must add this shift to its address!
+# This fixes edge 1024*1024 case
+# If you want to make it work as normal DS - set DsShift = 0, can work up to 1023*1023
+function dsShift() {
+    DsShifted = DsShift
+    if (DsShift) {
+        DsPixelAddr = 1048576
+    } else {
+        DsPixelAddr = 1048500
+    }
+}
 
 function dsClear() {
     DsBuffer = array()
@@ -23,6 +35,8 @@ function dsClear() {
     ClearColsQueue = array()
     ClearColsCount = 0
     BlockDraw = 0
+    
+    dsShift()
 }
 
 function dsHWClear() {  
@@ -47,6 +61,10 @@ if (first() | duped()) {
     
     Screen = VirtualScreen
     #include "alx_pc/shared/wirelinkcontroller"
+}
+
+if (dupefinished()) {
+    dsShift()    
 }
 
 event tick() {
@@ -124,7 +142,7 @@ event tick() {
 }
 
 event writeCell(Address:number, Value:number) {    
-    if (Address < 1048500) {
+    if (Address < DsPixelAddr) {
         # block draw for buffer
         # this fixes huge fps drop
         BlockDraw = 2
@@ -140,6 +158,8 @@ event writeCell(Address:number, Value:number) {
             UpdateQueue[QueueCount, number] = GlobalY
         }
     } else {
+        Address = Address - DsShift
+        
         # special custom image drew flag
         if (Address == 1048500) {
             DsImageDrew = Value
@@ -196,7 +216,9 @@ event writeCell(Address:number, Value:number) {
 event input(InputName:string) {
     if (InputName=="InG") {
         dsHWClear()    
-    } 
+    } elseif (InputName=="DsShift") {
+        dsShift() 
+    }
 }
 
 if (dsClk("wirelink") & InG==dsGetEntity():id()) {

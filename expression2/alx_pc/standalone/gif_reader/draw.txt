@@ -37,14 +37,17 @@ function number gifDrawStep() {
         State["lastHeight", number]   = Gif["lastHeight", number]
         State["lastX", number]        = Gif["lastX", number]
         State["lastY", number]        = Gif["lastY", number]
+        
+        # special edge 1024*1024 case
+        local DsShift = DS["DsShifted",number]
             
         State["clearIDX", number] = 0
         if (Gif["lastDisposal", number] == 2) {
-            if (State["lastWidth", number] >= Width & State["lastHeight", number] >= Height) {
-                DS[1048574] = 1
+            if (State["lastWidth", number] >= Width & State["lastHeight", number] >= Height) {                
+                DS[1048574+DsShift] = 1
                 
                 # special custom flag mean drew, used in console ds mode
-                DS[1048500] = 1
+                DS[1048500+DsShift] = 1
                 
                 Gif["drawCache",table][FrameProcessed,table]:pushArray(array(-1048574,1))
                 State["clearing", number] = 0
@@ -58,13 +61,13 @@ function number gifDrawStep() {
         if (!Gif["DS_Inited", number]) {
             Gif["DS_Inited", number] = 1
             Progress["progressDrew",number] = 1
-            
-            DS[1048569] = 2  
-            DS[1048574] = 0  
-            DS[1048575] = 1  
+                
+            DS[1048569+DsShift] = 2  
+            DS[1048574+DsShift] = 0  
+            DS[1048575+DsShift] = 1  
             
             # special custom flag mean drew, used in console ds mode
-            DS[1048500] = 1
+            DS[1048500+DsShift] = 1
             
             local MaxWidth = Gif["maxWidth",number]
             
@@ -73,14 +76,14 @@ function number gifDrawStep() {
                 Gif["Xadd", number] = (Height > Width ? floor((Height - Width) / 2) : 0)
                 Gif["Yadd", number] = (Width > Height ? floor((Width - Height) / 2) : 0)
                 Gif["posMul", number] = SWH
-                DS[1048573] = SWH 
-                DS[1048572] = SWH 
+                DS[1048573+DsShift] = SWH 
+                DS[1048572+DsShift] = SWH 
             } else {
                 Gif["Xadd", number] = 0
                 Gif["Yadd", number] = 0
                 Gif["posMul", number] = Width
-                DS[1048573] = Width
-                DS[1048572] = Height
+                DS[1048573+DsShift] = Width
+                DS[1048572+DsShift] = Height
             }
         }
     }
@@ -91,6 +94,8 @@ function number gifDrawStep() {
         local DrawIndex = Gif["renderIndex", number]
         local Total = DrawCache:count()
         while(perf(90)) {
+            if (DS["HitPerf",number]==1) { break }
+            
             if (DrawIndex >= Total) {
                 State["active", number] = 0
                 return 1
@@ -99,7 +104,8 @@ function number gifDrawStep() {
             local Arr = DrawCache[DrawIndex+1,array]
             
             if (Arr[1,number]==-1048574) {
-                DS[1048574] = 1
+                local DsShift = DS["DsShifted",number]
+                DS[1048574+DsShift] = 1
                 Gif["renderIndex", number] = DrawIndex + 1
                 return -1
             }

@@ -10,15 +10,17 @@ if (first()|duped()) {
 
 function bmpDsInit() {
     local DS = BmpData["DSContainer",table][1,wirelink]
-
+    
+    # special edge case 1024*1024
+    local DsShift = DS["DsShifted",number]
     BmpDrew = 1
     
-    DS[1048569] = 2
-    DS[1048574] = 0
-    DS[1048575] = 1
+    DS[1048569+DsShift] = 2
+    DS[1048574+DsShift] = 0
+    DS[1048575+DsShift] = 1
 
     # special custom flag mean drew, used in console ds mode
-    DS[1048500] = 1
+    DS[1048500+DsShift] = 1
     
     local NoKeepAR = BmpData["NoKeepAR",number]
     local ResizedWidth = BmpData["screenWidth", number]
@@ -26,11 +28,11 @@ function bmpDsInit() {
     
     if (!NoKeepAR) {            
         local SWH = max(ResizedWidth,ResizedHeight)
-        DS[1048573] = SWH
-        DS[1048572] = SWH
+        DS[1048573+DsShift] = SWH
+        DS[1048572+DsShift] = SWH
     } else {
-        DS[1048573] = ResizedWidth
-        DS[1048572] = ResizedHeight
+        DS[1048573+DsShift] = ResizedWidth
+        DS[1048572+DsShift] = ResizedHeight
     }
     
 }

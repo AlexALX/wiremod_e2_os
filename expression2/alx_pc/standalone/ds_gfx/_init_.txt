@@ -21,12 +21,13 @@ function dsInit(DSTable:table, Width:number, Height:number) {
     DsCacheDelay = 0
     
     local DS = DSTable[1,wirelink]
+    local DsShift = DS["DsShifted",number]
     
-    DS[1048569] = 2
-    DS[1048574] = 0
-    DS[1048575] = 1
-    DS[1048573] = Width
-    DS[1048572] = Height
+    DS[1048569+DsShift] = 2
+    DS[1048574+DsShift] = 0
+    DS[1048575+DsShift] = 1
+    DS[1048573+DsShift] = Width
+    DS[1048572+DsShift] = Height
 
     dsStopQueues()
 }

@@ -105,8 +105,9 @@ function dsDrawText(X:number, Y:number, Text:string)
 
 function dsTextClearLine(Y:number) {
     local DS = DSWLContainer[1,wirelink]
+    local DsShift = DS["DsShifted",number]
     
     for (Row = 0, DsFontHeight - 1) {
-        DS[1048570] = Y + Row
+        DS[1048570+DsShift] = Y + Row
     }
 }

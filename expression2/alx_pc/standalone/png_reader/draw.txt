@@ -164,12 +164,15 @@ function pngStartDraw()
     if (!Png["DS_Inited", number]) {
         Png["DS_Inited", number] = 1
         
-        DS[1048569] = 2
-        DS[1048574] = 0
-        DS[1048575] = 1
+        # special edge case 1024*1024
+        local DsShift = DS["DsShifted",number]
+        
+        DS[1048569+DsShift] = 2
+        DS[1048574+DsShift] = 0
+        DS[1048575+DsShift] = 1
         
         # special custom flag mean drew, used in console ds mode
-        DS[1048500] = 1
+        DS[1048500+DsShift] = 1
         
         local ScreenWidth = Png["screenWidth", number]
         local ScreenHeight = Png["screenHeight", number]
@@ -182,15 +185,15 @@ function pngStartDraw()
             
             Png["rowWidth", number] = SWH  
                 
-            DS[1048573] = SWH
-            DS[1048572] = SWH          
+            DS[1048573+DsShift] = SWH
+            DS[1048572+DsShift] = SWH          
         } else {
             Png["Xadd", number] = 0
             Png["Yadd", number] = 0
             Png["rowWidth", number] = ScreenWidth
             
-            DS[1048573] = ScreenWidth
-            DS[1048572] = ScreenHeight
+            DS[1048573+DsShift] = ScreenWidth
+            DS[1048572+DsShift] = ScreenHeight
         }
     }
 }
