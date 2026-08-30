@@ -1,6 +1,6 @@
 @name ZGPU Screen Renderer
-@inputs ZGPU:wirelink MemBus:wirelink
-@outputs VirtualScreen:wirelink DsImageDrew
+@inputs ZGPU:wirelink #MemBus:wirelink
+@outputs VirtualScreen:wirelink DsImageDrew HitPerf
 @persist ScrW ScrH 
 @persist DsBuffer:array DirtyRows:array BlockDraw
 @persist PtrAddress DataAddress MemSize # CacheFix LastPos
@@ -68,80 +68,8 @@ if (first() | duped()) {
     #include "alx_pc/shared/wirelinkcontroller"
 }
 
-event writeCell(Address:number, Value:number) {
-    if (Address!=1048500 & !perf(90)) { exit() } # bad way but what to do
-    
-    if (Address < 1048500) {
-        # block draw for buffer
-        # this fixes huge fps drop
-        BlockDraw = 2
-        
-        DsBuffer[Address, number] = Value
-        
-        local GlobalY = floor(Address / ScrW)
-      
-        if (DirtyRows[GlobalY, number] == 0) {
-            DirtyRows[GlobalY, number] = 1
-              
-            QueueWrite++
-            UpdateQueue[QueueWrite, number] = GlobalY
-        }
-    } else {
-        # special custom image drew flag
-        if (Address == 1048500) {
-            DsImageDrew = 1
-        } elseif (Address == 1048574) {
-            dsHWClear()
-        } elseif (Address == 1048573) {            
-            ScrW = Value
-            dsClear()
-        } elseif (Address == 1048572) {    
-            ScrH = Value
-            
-            local Ptr = ZGPU[PtrAddress]
-            
-            if (Ptr>MemSize) {
-                Ptr = 0
-                ZGPU[PtrAddress] = 0   
-            }
-            
-            # Set pointer to start of image always
-            ZGPU[PtrAddress+1] = Ptr
-        
-            # CMD_SET_SIZE
-            ZGPU[DataAddress + Ptr] = 1 
-            ZGPU[DataAddress+1 + Ptr] = ScrW        
-            ZGPU[DataAddress+2 + Ptr] = ScrH
-            
-            # CMD_CLEAR_SCREEN
-            ZGPU[DataAddress+3 + Ptr] = 2
-            
-            # TODO:
-            # check READ_PTR and queue overflow
-            
-            # Commit
-            ZGPU[PtrAddress] = Ptr + 4
-        } elseif (Address == 1048570) {        
-            local Row = Value
-        
-            QueueWrite++
-            UpdateQueue[QueueWrite, number] = -(Row + 1)
-        
-            local RowBase = Row * ScrW
-        
-            for (X = 0, ScrW - 1) {
-                DsBuffer[RowBase + X, number] = 0
-            }
-            
-            #BlockDraw = 2
-            #  | Address == 1048570 clear COL not supported
-        } else {  
-            #DsBuffer[Address, number] = Value
-        }
-    }
-}
-
 event tick() {
+    HitPerf = 0 
     if (QueueWrite == 0) {
         #[ 
         This will never work as espected
@@ -232,6 +160,79 @@ event tick() {
         QueueWrite = 0
         UpdateQueue = array()
     }    
+}
+
+event writeCell(Address:number, Value:number) {    
+    if (Address < 1048500) {
+        # block draw for buffer
+        # this fixes huge fps drop
+        BlockDraw = 2
+        
+        DsBuffer[Address, number] = Value
+        
+        local GlobalY = floor(Address / ScrW)
+      
+        if (DirtyRows[GlobalY, number] == 0) {
+            DirtyRows[GlobalY, number] = 1
+              
+            QueueWrite++
+            UpdateQueue[QueueWrite, number] = GlobalY
+        }
+    } else {
+        # special custom image drew flag
+        if (Address == 1048500) {
+            DsImageDrew = 1
+        } elseif (Address == 1048574) {
+            dsHWClear()
+        } elseif (Address == 1048573) {            
+            ScrW = Value
+            dsClear()
+        } elseif (Address == 1048572) {    
+            ScrH = Value
+            
+            local Ptr = ZGPU[PtrAddress]
+            
+            if (Ptr>MemSize) {
+                Ptr = 0
+                ZGPU[PtrAddress] = 0   
+            }
+            
+            # Set pointer to start of image always
+            ZGPU[PtrAddress+1] = Ptr
+        
+            # CMD_SET_SIZE
+            ZGPU[DataAddress + Ptr] = 1 
+            ZGPU[DataAddress+1 + Ptr] = ScrW        
+            ZGPU[DataAddress+2 + Ptr] = ScrH
+            
+            # CMD_CLEAR_SCREEN
+            ZGPU[DataAddress+3 + Ptr] = 2
+            
+            # TODO:
+            # check READ_PTR and queue overflow
+            
+            # Commit
+            ZGPU[PtrAddress] = Ptr + 4
+        } elseif (Address == 1048570) {        
+            local Row = Value
+        
+            QueueWrite++
+            UpdateQueue[QueueWrite, number] = -(Row + 1)
+        
+            local RowBase = Row * ScrW
+        
+            for (X = 0, ScrW - 1) {
+                DsBuffer[RowBase + X, number] = 0
+            }
+            
+            #BlockDraw = 2
+            #  | Address == 1048570 clear COL not supported
+        } else {  
+            #DsBuffer[Address, number] = Value
+        }
+    }
+    
+    if (!perf(90)) { HitPerf = 1 }
 }
 
 event input(InputName:string) {
