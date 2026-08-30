@@ -24,12 +24,15 @@ function alxos_executor_error(ErrorMsg:string, Width) {
     if (GpuData["lastProg", string]=="alxos_console") {
         "alxos_console_handlers"()
         "alxos_console_err"(ErrorMsg)
-    } else {        
+    } else {
+        "alxos_explorer_handlers"()
         "alxos_explorer_error"(ErrorMsg,Width)
     }
 }
 
 function alxos_executor_init(Args:table) {
+    GpuData["lastProg", string] = CurrentProg
+    
     #ifndef entity:remoteSetCode(string)
         if (1) {
             local Error = "Remote Upload E2 Extension is disabled,\n"+
@@ -74,8 +77,6 @@ function alxos_executor_init(Args:table) {
     dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(
         ExplorerFS,FInfo,0,FInfo["size",number]
     )))
-    
-    GpuData["lastProg", string] = CurrentProg
     
     if (CurrentProg=="alxos_console") {
         "alxos_hide_cursor"()                
