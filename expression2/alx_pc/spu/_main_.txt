@@ -22,6 +22,9 @@ EntID = entity():id()
 
 function spuClear() {
     SpuData = table()
+    if (Speaker:type()=="gmod_wire_expression2") {
+        dsSendDirect("SHUTDOWN",Speaker,dsGetArray())
+    }
 }
 
 function playgmsound(Index,Time,Sound:string) {
