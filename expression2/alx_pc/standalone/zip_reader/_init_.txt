@@ -5,6 +5,8 @@
 #include "alx_pc/standalone/zip_reader/bitreader"
 #include "alx_pc/standalone/zip_reader/inflate"
 
+ZipIncluded = 1
+
 function zipInit(Data:string, ChunkMode:number)
 {
     Zip = table()
@@ -101,15 +103,14 @@ function zipOpenFile(Entry:table) {
     }
 }
 
-event tick()
-{
+function zipProcess() {
     if (Zip["state",string] == "" | Zip["state",string] == "done" | Zip["state",string] == "ready" | ZipError) {
-        exit()
+        return
     }
     
     #print(Zip["state",string],Zip["decSubState", string])
 
-    while (perf(95)) {
+    while (perf(90)) {
         
         if (ZipError) { break }
 
@@ -133,7 +134,7 @@ event tick()
             
             if (DeflateInitState != "ready") {                
                 deflateInitTablesStep()
-                exit()
+                return
             }
             
             local Result = deflateDecompressStep(Zip)
@@ -147,5 +148,11 @@ event tick()
         } elseif (Zip["state",string] == "done") {
             break
         }
+    }
+}
+
+event tick() {
+    if (ZipIncluded) {
+        zipProcess()    
     }
 }

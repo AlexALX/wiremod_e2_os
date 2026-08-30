@@ -281,6 +281,7 @@ function number pngDrawStep()
 
     # 2. Main processing block (Restored with your canonical unpacked/packed pipeline)
     while (PassProgressIdx < PassMaxPixels & perf(90)) {
+        if (DS["HitPerf",number]==1) { break }
                 
         if (Interlaced == 1) {
             local PassLine = floor(PassProgressIdx / PassW)

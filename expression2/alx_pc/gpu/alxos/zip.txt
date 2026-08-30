@@ -906,7 +906,7 @@ function alxos_zip_progress() {
         }
     }
     
-    runCmd("alxos_zip_progress",1)     
+    runCmd("alxos_zip_progress",100,1)
 }
 
 function alxos_zip_ds(Name:string) {

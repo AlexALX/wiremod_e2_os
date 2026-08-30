@@ -1,6 +1,6 @@
 @name Quad Console Screen
 @inputs LinkTopLeft:wirelink LinkTopRight:wirelink LinkBottomLeft:wirelink LinkBottomRight:wirelink
-@outputs VirtualScreen:wirelink
+@outputs VirtualScreen:wirelink HitPerf
 @persist ScrW ScrH VirtW VirtH CsShift VRowOffset CsCursorVisible CsActiveScreen
 @persist CsBuffer:array
 @trigger none 
@@ -46,9 +46,11 @@ if (first() | duped()) {
     #include "alx_pc/shared/wirelinkcontroller"
 }
 
-event writeCell(Address:number, Value:number) {
-    if (!perf(90)) { exit() } # bad way but what to do
+event tick() {
+    HitPerf = 0    
+}
 
+event writeCell(Address:number, Value:number) {
     if (Address < 4320) {
         local MemX = Address % VirtW
         local GlobalY = floor(Address / VirtW)
@@ -201,6 +203,8 @@ event writeCell(Address:number, Value:number) {
             LinkBottomRight[Address] = Value
         }
     }
+    
+    if (!perf(90)) { HitPerf = 1 }
 }
 
 event input(InputName:string) {

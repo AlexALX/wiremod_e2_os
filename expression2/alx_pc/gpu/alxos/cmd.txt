@@ -54,7 +54,7 @@ function alxos_toggle_cursor(Show:number) {
 function alxos_upd_cursor() {
     if (CmdScreen==1) {
         local XPos = (GpuData[-2, number] - BIOS_X) / 10
-        CS[2045+CsShift] = (CmdLinesC - 1) * CsLineAddr + XPos * 2
+        csSetCursor(XPos, CmdLinesC - 1)
     } elseif (CmdScreen==2) {
         alxos_toggle_cursor(0)
     } else {
@@ -66,6 +66,10 @@ function alxos_upd_cursor() {
 
 function alxos_screen_write(X:number, Y:number, Str:string) {
     csScreenWrite(X,Y-1,Str,666)
+}
+
+function alxos_screen_clear_line(Line:number) {
+    csClearLine(Line)    
 }
 
 function alxos_console_move() {
@@ -188,7 +192,7 @@ function alxos_console_listcurdir() {
 
 function alxos_show_cursor() {
     if (CmdScreen==1) {
-        CS[2046+CsShift] = 1
+        csShowCursor(1)
     } else {
         alxos_toggle_cursor(!CmdCursor) 
         timer("cursor_draw",500)
@@ -197,7 +201,7 @@ function alxos_show_cursor() {
 
 function alxos_hide_cursor() {
     if (CmdScreen==1) {
-        CS[2046+CsShift] = 0  
+        csShowCursor(0)
     } elseif (CmdScreen==2) {
         alxos_toggle_cursor(0)
     } else {
@@ -210,7 +214,7 @@ function alxos_hide_cursor() {
 
 function alxos_draw_cursor() {
     if (CmdScreen==1) {
-        CS[2046+CsShift] = 1 
+        csShowCursor(1)
     } elseif (CmdScreen==2) {
         registerTimers("cursor_draw","alxos_show_cursor")
         timer("cursor_draw",500)
@@ -301,7 +305,7 @@ function alxos_console_err(Err:string) {
 
 function alxos_console_cls_safe() {
     if (CmdScreen==1) {
-        CS[2041+CsShift] = 1
+        csClear()
     } elseif (CmdScreen==2) {
         dsClear()
         dsStopQueues()
@@ -372,8 +376,7 @@ function alxos_console_screen_vars(Screen:number) {
     if (Screen==1) {
         csVars()
         CmdMaxLines = CsMaxLines-1
-        CS[2043+CsShift] = 0.5
-        CS[2044+CsShift] = 0.2
+        csSetCursorVars(0.5,0.2)
 
         CmdHeader = "ALX Wiremod E2 OS Console v1.1\n(c) 2018-2026 by AlexALX"
         

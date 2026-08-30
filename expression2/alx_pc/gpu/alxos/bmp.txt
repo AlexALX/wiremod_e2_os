@@ -234,7 +234,7 @@ function alxos_bmp_postinit() {
         registerTimers("bmp","bmpStep")
         bmpRun()
         
-        runCmd("alxos_bmp_progress_full",10)
+        runCmd("alxos_bmp_progress_full",100,1)
     }
 }
 
@@ -305,7 +305,7 @@ function alxos_bmp_progress_full() {
     }
 
     if (CalcP<100) {
-        runCmd("alxos_bmp_progress_full",10)
+        runCmd("alxos_bmp_progress_full",100,1)
     } else {
         alxos_bmp_finish()    
     }
@@ -421,7 +421,7 @@ function alxos_bmp_progress() {
     }
 
     if (CalcP<100) {
-        runCmd("alxos_bmp_progress",10)
+        runCmd("alxos_bmp_progress",100,1)
     }
 }
 

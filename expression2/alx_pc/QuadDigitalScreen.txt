@@ -1,6 +1,6 @@
 @name Quad Digital Screen
 @inputs LinkTopLeft:wirelink LinkTopRight:wirelink LinkBottomLeft:wirelink LinkBottomRight:wirelink
-@outputs VirtualScreen:wirelink DsImageDrew
+@outputs VirtualScreen:wirelink DsImageDrew HitPerf
 @persist ScrW ScrH VirtW VirtH
 @persist DsBuffer:array DirtyRows:array UpdateQueue:array QueueCount BlockDraw
 @persist ClearRowsQueue:array ClearRowsCount ClearColsQueue:array ClearColsCount
@@ -49,77 +49,9 @@ if (first() | duped()) {
     #include "alx_pc/shared/wirelinkcontroller"
 }
 
-event writeCell(Address:number, Value:number) {
-    if (Address!=1048500 & !perf(90)) { exit() } # bad way but what to do
-    
-    if (Address < 1048500) {
-        # block draw for buffer
-        # this fixes huge fps drop
-        BlockDraw = 2
-        
-        DsBuffer[Address, number] = Value
-        
-        local GlobalY = floor(Address / VirtW)
-      
-        if (DirtyRows[GlobalY, number] == 0) {
-            DirtyRows[GlobalY, number] = 1
-              
-            QueueCount++
-            UpdateQueue[QueueCount, number] = GlobalY
-        }
-    } else {
-        # special custom image drew flag
-        if (Address == 1048500) {
-            DsImageDrew = Value
-        } elseif (Address == 1048574) {
-            dsHWClear()
-        } elseif (Address == 1048573) {
-            VirtW = Value
-            
-            ScrW = floor(Value / 2)
-            
-            LinkTopLeft[1048573, number] = ScrW
-            LinkTopRight[1048573, number] = ScrW
-            LinkBottomLeft[1048573, number] = ScrW
-            LinkBottomRight[1048573, number] = ScrW
-            
-            dsClear()
-        } elseif (Address == 1048572) {
-            VirtH = Value
-            
-            ScrH = floor(Value / 2)
-            
-            LinkTopLeft[1048572, number] = ScrH
-            LinkTopRight[1048572, number] = ScrH
-            LinkBottomLeft[1048572, number] = ScrH
-            LinkBottomRight[1048572, number] = ScrH
-            
-            dsClear()
-        } elseif (Address == 1048570) {
-            ClearRowsCount++
-            ClearRowsQueue[ClearRowsCount, number] = Value
-            
-            local RowStart = Value * VirtW
-            for (X = 0, VirtW - 1) {
-                DsBuffer[RowStart + X, number] = 0
-            }
-        } elseif (Address == 1048571) {
-            ClearColsCount++
-            ClearColsQueue[ClearColsCount, number] = Value
-            
-            for (Y = 0, VirtH - 1) {
-                DsBuffer[Value + (Y * VirtW), number] = 0
-            }
-        } else {  
-            LinkTopLeft[Address, number] = Value
-            LinkTopRight[Address, number] = Value
-            LinkBottomLeft[Address, number] = Value
-            LinkBottomRight[Address, number] = Value
-        }
-    }
-}
-
 event tick() {
+    HitPerf = 0
+    
     if (QueueCount == 0 & ClearRowsCount == 0 & ClearColsCount == 0) { exit() }
     
     # move to next tick
@@ -189,6 +121,76 @@ event tick() {
             }
         }
     }
+}
+
+event writeCell(Address:number, Value:number) {    
+    if (Address < 1048500) {
+        # block draw for buffer
+        # this fixes huge fps drop
+        BlockDraw = 2
+        
+        DsBuffer[Address, number] = Value
+        
+        local GlobalY = floor(Address / VirtW)
+      
+        if (DirtyRows[GlobalY, number] == 0) {
+            DirtyRows[GlobalY, number] = 1
+              
+            QueueCount++
+            UpdateQueue[QueueCount, number] = GlobalY
+        }
+    } else {
+        # special custom image drew flag
+        if (Address == 1048500) {
+            DsImageDrew = Value
+        } elseif (Address == 1048574) {
+            dsHWClear()
+        } elseif (Address == 1048573) {
+            VirtW = Value
+            
+            ScrW = floor(Value / 2)
+            
+            LinkTopLeft[1048573, number] = ScrW
+            LinkTopRight[1048573, number] = ScrW
+            LinkBottomLeft[1048573, number] = ScrW
+            LinkBottomRight[1048573, number] = ScrW
+            
+            dsClear()
+        } elseif (Address == 1048572) {
+            VirtH = Value
+            
+            ScrH = floor(Value / 2)
+            
+            LinkTopLeft[1048572, number] = ScrH
+            LinkTopRight[1048572, number] = ScrH
+            LinkBottomLeft[1048572, number] = ScrH
+            LinkBottomRight[1048572, number] = ScrH
+            
+            dsClear()
+        } elseif (Address == 1048570) {
+            ClearRowsCount++
+            ClearRowsQueue[ClearRowsCount, number] = Value
+            
+            local RowStart = Value * VirtW
+            for (X = 0, VirtW - 1) {
+                DsBuffer[RowStart + X, number] = 0
+            }
+        } elseif (Address == 1048571) {
+            ClearColsCount++
+            ClearColsQueue[ClearColsCount, number] = Value
+            
+            for (Y = 0, VirtH - 1) {
+                DsBuffer[Value + (Y * VirtW), number] = 0
+            }
+        } else {  
+            LinkTopLeft[Address, number] = Value
+            LinkTopRight[Address, number] = Value
+            LinkBottomLeft[Address, number] = Value
+            LinkBottomRight[Address, number] = Value
+        }
+    }
+    
+    if (!perf(90)) { HitPerf = 1 }
 }
 
 event input(InputName:string) {

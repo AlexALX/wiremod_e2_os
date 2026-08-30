@@ -1,4 +1,4 @@
-@persist CS:wirelink
+@persist CS:wirelink CsQueue:table CsQueueCount:number CsQueueIndex:number CsIsE2:number
 @persist CsShift:number CsLineAddr:number CsMaxLines:number CsMaxChars:number
 
 function csVars() {
@@ -7,18 +7,29 @@ function csVars() {
         CsMaxLines = 36
         CsMaxChars = 60
         CsShift = 2350
+        CsIsE2 = 1
     } else {
         CsLineAddr = 60
         CsMaxLines = 18
         CsMaxChars = 30
         CsShift = 0
+        CsIsE2 = 0
     }
+    
 }
 
 function csClear() {
     csVars()
+    CsQueue = table()
+    CsQueueIndex = 1
+    CsQueueCount = 0
     CS[2041+CsShift] = 1
     CS[2046+CsShift] = 0
+}
+
+function csPushQueue(Item:array) {
+    CsQueueCount++
+    CsQueue[CsQueueCount, array] = Item
 }
 
 # write to console screen
@@ -28,11 +39,15 @@ function csScreenWrite(X:number, Y:number, Str:string, ColorParam:number) {
     
     local MaxY = Y * CsLineAddr + CsLineAddr
     
-    for(I = 1, StrArr:count()) {        
+    for(I = 1, StrArr:count()) {             
         local CharCode = toByte(StrArr[I,string])
         
-        CS[StartAddr] = CharCode
-        CS[StartAddr + 1] = ColorParam
+        if (CsIsE2) {
+            csPushQueue(array("write",StartAddr,CharCode,ColorParam))  
+        } else {        
+            CS[StartAddr] = CharCode
+            CS[StartAddr + 1] = ColorParam
+        }
         
         StartAddr += 2
         
@@ -40,10 +55,79 @@ function csScreenWrite(X:number, Y:number, Str:string, ColorParam:number) {
     }
 }
 
-function alxos_screen_clear_line(Line:number) {
-    CS[2039+CsShift] = Line-1
+function csSetCursor(X:number, Y:number) {
+    local Pos = Y * CsLineAddr + X * 2
+
+    if (CsIsE2) {
+        csPushQueue(array("cursor_pos",2045+CsShift,Pos))
+    } else {
+        CS[2045+CsShift] = Pos  
+    }
+}
+
+function csSetCursorVars(Delay:number,Size:number) {
+    if (CsIsE2) {
+        csPushQueue(array("cursor_vars",2043+CsShift,Delay,Size))
+    } else {
+        CS[2043+CsShift] = 0.5
+        CS[2044+CsShift] = 0.2
+    }
+}
+
+function csShowCursor(Show:number) {
+    if (CsIsE2) {
+        csPushQueue(array("cursor_show",2046+CsShift,Show))
+    } else {
+        CS[2046+CsShift] = Show
+    }
+}
+
+function csClearLine(Line:number) {
+    if (CsIsE2) {
+        csPushQueue(array("clear_line",2039+CsShift,Line-1))
+    } else {
+        CS[2039+CsShift] = Line-1
+    }
 }
 
 function csScreenMove(LinesToShift:number) {
-    CS[2038+CsShift] = LinesToShift
+    if (CsIsE2) {
+        csPushQueue(array("move",2038+CsShift,LinesToShift))
+    } else {
+        CS[2038+CsShift] = LinesToShift
+    }
+}
+
+function csScreenProcess() {
+    if (CsQueueCount==0) { return }
+    if (CsQueueIndex > CsQueueCount) { 
+        if (CsQueueCount > 0) {
+            CsQueue = table()
+            CsQueueIndex = 1
+            CsQueueCount = 0
+        }
+        return
+    }
+    
+    while(perf(90)) {
+        if (CS["HitPerf",number] | CsQueueIndex > CsQueueCount) { break }
+        
+        local Item = CsQueue[CsQueueIndex,array]
+        if (Item:count()) {
+            local Mode = Item[1,string]
+            local Address = Item[2,number]
+            local Value = Item[3,number]
+            if (Mode=="write" | Mode=="cursor_vars") {
+                CS[Address] = Value
+                CS[Address+1] = Item[4,number]
+            } else {
+                CS[Address] = Value
+            }
+            CsQueueIndex++
+        }
+    }
+}
+
+event tick() {
+    csScreenProcess()    
 }

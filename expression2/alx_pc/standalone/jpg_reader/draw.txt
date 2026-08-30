@@ -86,6 +86,7 @@ function number jpgDrawStep()
     local LastY = -1
 
     while (perf(90)) {
+        if (DS["HitPerf",number]==1) { break }
 
         local I = State["index",number]
 

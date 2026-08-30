@@ -63,6 +63,8 @@ function bmpDraw() {
     local End = BmpData[12,number]
 
     while(perf(90)) {
+        if (DS["HitPerf",number]==1) { break }
+        
         if (SI>=Max | Y<CY) {
             SI = Max
             break

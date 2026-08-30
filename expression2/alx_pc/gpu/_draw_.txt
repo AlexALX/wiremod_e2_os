@@ -27,7 +27,7 @@ function initDrawFunc() {
             InitLines++
         }
         InitClearLine = function(Line:number) {
-            alxos_screen_clear_line(Line+1)
+            csClearLine(Line+1)
         }
         InitDrawChar = function(X:number,Line:number,Char:string) {
             csScreenWrite(X,Line,Char,999)    

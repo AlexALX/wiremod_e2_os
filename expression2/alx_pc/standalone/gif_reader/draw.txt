@@ -140,6 +140,7 @@ function number gifDrawStep() {
     if (StepX < 1) { StepX = 1 }
 
     while (perf(90)) {
+        if (DS["HitPerf",number]==1) { break }
         
         if (IsClearing == 1) {
             if (ClearIDX >= TotalClearPixels) {

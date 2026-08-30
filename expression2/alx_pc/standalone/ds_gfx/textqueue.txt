@@ -45,6 +45,8 @@ function number dsDrawTextStep(DS:wirelink, DsText:table)
         if (Index > Length) {
             return 1
         }
+        
+        if (DS["HitPerf",number]==1) { break }
     
         local Char = toByte(Text, Index)
         
@@ -92,6 +94,8 @@ function number dsDrawCachedTextStep(DS:wirelink, Item:table)
         if (Index > Length) {
             return 1
         }
+        
+        if (DS["HitPerf",number]==1) { break }
     
         local Char = toByte(Text, Index)
     
@@ -183,7 +187,9 @@ function dsDrawProcess() {
     
     local DS = DSWLContainer[1,wirelink]
     
-    while (perf(90) & CheckedCount < QueueCount) { 
+    while (perf(90) & CheckedCount < QueueCount) {
+        if (DS["HitPerf",number]==1) { break }
+        
         if (DSTextQueue:count() <= 0) {
             DSCurrentStep = ""
             break

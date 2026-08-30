@@ -1,4 +1,3 @@
-@persist Zip:table ZIPDebug:number
+@persist Zip:table ZIPDebug:number ZipIncluded:number
 @persist Zip_BitBuffer:number Zip_BitCount:number Zip_CompressedData:string Zip_CompressedPos:number
 @persist ZipProcessing:number ZipError:string
-
