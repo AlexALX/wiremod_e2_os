@@ -123,7 +123,7 @@ function displayProgress()
 
     local Task = ImageProcessor["BmpCurrentStepText",string]
 
-    displayBlockDraw(0.5)
+    displayBlockDraw(1)
 
     dsDrawCachedText(2, 4 * FontLine, BmpStep+" / "+MaxSteps)
     dsDrawCachedText(2, 7 * FontLine, Task+ThreadsTxt)

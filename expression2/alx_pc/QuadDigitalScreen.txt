@@ -2,8 +2,7 @@
 @inputs LinkTopLeft:wirelink LinkTopRight:wirelink LinkBottomLeft:wirelink LinkBottomRight:wirelink DsShift:number
 @outputs VirtualScreen:wirelink DsImageDrew HitPerf DsShifted:number
 @persist ScrW ScrH VirtW VirtH DsPixelAddr
-@persist DsBuffer:array DirtyRows:array UpdateQueue:array QueueCount BlockDraw
-@persist ClearRowsQueue:array ClearRowsCount ClearColsQueue:array ClearColsCount
+@persist MaxPixelsPerTick PixelsThisTick
 @trigger none 
 @strict
 
@@ -15,6 +14,7 @@
 # When DsShift set then all commands must add this shift to its address!
 # This fixes edge 1024*1024 case
 # If you want to make it work as normal DS - set DsShift = 0, can work up to 1023*1023
+# Also make sure your script break while(perf()) by DS["HitPerf",number]==1
 function dsShift() {
     DsShifted = DsShift
     if (DsShift) {
@@ -24,28 +24,13 @@ function dsShift() {
     }
 }
 
-function dsClear() {
-    DsBuffer = array()
-    DirtyRows = array()
-    UpdateQueue = array()
-    QueueCount = 0
-    
-    ClearRowsQueue = array()
-    ClearRowsCount = 0
-    ClearColsQueue = array()
-    ClearColsCount = 0
-    BlockDraw = 0
-    
-    dsShift()
-}
-
 function dsHWClear() {  
-    dsClear()  
     LinkTopLeft[1048574, number] = 0
     LinkTopRight[1048574, number] = 0
     LinkBottomLeft[1048574, number] = 0
     LinkBottomRight[1048574, number] = 0   
     DsImageDrew = 0
+    dsShift()
 }
 
 if (first() | duped()) {    
@@ -54,6 +39,9 @@ if (first() | duped()) {
     
     VirtW = ScrW * 2
     VirtH = ScrH * 2
+    
+    # throttle to fix fps
+    MaxPixelsPerTick = 512
         
     VirtualScreen = wirelink()
     
@@ -69,93 +57,30 @@ if (dupefinished()) {
 
 event tick() {
     HitPerf = 0
-    
-    if (QueueCount == 0 & ClearRowsCount == 0 & ClearColsCount == 0) { exit() }
-    
-    # move to next tick
-    if (BlockDraw>0) {
-        BlockDraw--
-        exit()
-    }
-    
-    while (ClearRowsCount > 0 & perf(90)) {
-        local RowY = ClearRowsQueue[ClearRowsCount, number]
-        ClearRowsCount--
-        
-        if (RowY < ScrH) {
-            LinkTopLeft[1048570, number] = RowY
-            LinkTopRight[1048570, number] = RowY
-        } else {
-            local LocalY = RowY - ScrH
-            LinkBottomLeft[1048570, number] = LocalY
-            LinkBottomRight[1048570, number] = LocalY
-        }
-    }
-    
-    while (ClearColsCount > 0 & perf(90)) {
-        local ColX = ClearColsQueue[ClearColsCount, number]
-        ClearColsCount--
-        
-        if (ColX < ScrW) {
-            LinkTopLeft[1048571, number] = ColX
-            LinkBottomLeft[1048571, number] = ColX
-        } else {
-            local LocalX = ColX - ScrW
-            LinkTopRight[1048571, number] = LocalX
-            LinkBottomRight[1048571, number] = LocalX
-        }
-    }
-       
-    while (QueueCount > 0 & perf(90)) {
-          
-        local TargetY = UpdateQueue[QueueCount, number]
-        QueueCount--
-        
-        DirtyRows[TargetY, number] = 0
-        
-        local RowBaseAddress = TargetY * VirtW
-        
-        if (TargetY < ScrH) {
-            # ---    ---
-            local LocalY = TargetY
-            local LocalRowOffset = LocalY * ScrW
-            
-            for (LocalX = 0, ScrW - 1) {
-                LinkTopLeft[LocalX + LocalRowOffset, number] = DsBuffer[LocalX + RowBaseAddress, number]
-            }
-            for (LocalX = 0, ScrW - 1) {
-                LinkTopRight[LocalX + LocalRowOffset, number] = DsBuffer[(LocalX + ScrW) + RowBaseAddress, number]
-            }
-        } else {
-            # ---    ---
-            local LocalY = TargetY - ScrH
-            local LocalRowOffset = LocalY * ScrW
-            
-            for (LocalX = 0, ScrW - 1) {
-                LinkBottomLeft[LocalX + LocalRowOffset, number] = DsBuffer[LocalX + RowBaseAddress, number]
-            }
-            for (LocalX = 0, ScrW - 1) {
-                LinkBottomRight[LocalX + LocalRowOffset, number] = DsBuffer[(LocalX + ScrW) + RowBaseAddress, number]
-            }
-        }
-    }
+    PixelsThisTick = 0
 }
 
 event writeCell(Address:number, Value:number) {    
     if (Address < DsPixelAddr) {
-        # block draw for buffer
-        # this fixes huge fps drop
-        BlockDraw = 2
-        
-        DsBuffer[Address, number] = Value
-        
-        local GlobalY = floor(Address / VirtW)
+        PixelsThisTick++
+
+        local GlobalX = Address % VirtW
+        local GlobalY = (Address - GlobalX) / VirtW
       
-        if (DirtyRows[GlobalY, number] == 0) {
-            DirtyRows[GlobalY, number] = 1
-              
-            QueueCount++
-            UpdateQueue[QueueCount, number] = GlobalY
+        if (GlobalY < ScrH) {
+            local LocalRowOffset = GlobalY * ScrW
+            if (GlobalX < ScrW) {
+                LinkTopLeft[GlobalX + LocalRowOffset, number] = Value
+            } else {
+                LinkTopRight[(GlobalX - ScrW) + LocalRowOffset, number] = Value
+            }
+        } else {
+            local LocalRowOffset = (GlobalY - ScrH) * ScrW
+            if (GlobalX < ScrW) {
+                LinkBottomLeft[GlobalX + LocalRowOffset, number] = Value
+            } else {
+                LinkBottomRight[(GlobalX - ScrW) + LocalRowOffset, number] = Value
+            }
         }
     } else {
         Address = Address - DsShift
@@ -167,40 +92,37 @@ event writeCell(Address:number, Value:number) {
             dsHWClear()
         } elseif (Address == 1048573) {
             VirtW = Value
-            
             ScrW = floor(Value / 2)
             
             LinkTopLeft[1048573, number] = ScrW
             LinkTopRight[1048573, number] = ScrW
             LinkBottomLeft[1048573, number] = ScrW
             LinkBottomRight[1048573, number] = ScrW
-            
-            dsClear()
         } elseif (Address == 1048572) {
             VirtH = Value
-            
             ScrH = floor(Value / 2)
             
             LinkTopLeft[1048572, number] = ScrH
             LinkTopRight[1048572, number] = ScrH
             LinkBottomLeft[1048572, number] = ScrH
             LinkBottomRight[1048572, number] = ScrH
-            
-            dsClear()
         } elseif (Address == 1048570) {
-            ClearRowsCount++
-            ClearRowsQueue[ClearRowsCount, number] = Value
-            
-            local RowStart = Value * VirtW
-            for (X = 0, VirtW - 1) {
-                DsBuffer[RowStart + X, number] = 0
+            if (Value < ScrH) {
+                LinkTopLeft[1048570, number] = Value
+                LinkTopRight[1048570, number] = Value
+            } else {
+                local LocalY = Value - ScrH
+                LinkBottomLeft[1048570, number] = LocalY
+                LinkBottomRight[1048570, number] = LocalY
             }
         } elseif (Address == 1048571) {
-            ClearColsCount++
-            ClearColsQueue[ClearColsCount, number] = Value
-            
-            for (Y = 0, VirtH - 1) {
-                DsBuffer[Value + (Y * VirtW), number] = 0
+            if (Value < ScrW) {
+                LinkTopLeft[1048571, number] = Value
+                LinkBottomLeft[1048571, number] = Value
+            } else {
+                local LocalX = Value - ScrW
+                LinkTopRight[1048571, number] = LocalX
+                LinkBottomRight[1048571, number] = LocalX
             }
         } else {  
             LinkTopLeft[Address, number] = Value
@@ -210,7 +132,7 @@ event writeCell(Address:number, Value:number) {
         }
     }
     
-    if (!perf(90)) { HitPerf = 1 }
+    if (PixelsThisTick >= MaxPixelsPerTick | !perf(90)) { HitPerf = 1 }
 }
 
 event input(InputName:string) {
