@@ -1,7 +1,7 @@
 @name Quad Console Screen
 @inputs LinkTopLeft:wirelink LinkTopRight:wirelink LinkBottomLeft:wirelink LinkBottomRight:wirelink
 @outputs VirtualScreen:wirelink HitPerf
-@persist ScrW ScrH VirtW VirtH CsShift VRowOffset CsCursorVisible CsActiveScreen
+@persist ScrW ScrH VirtW VirtH HalfScrW CsShift VRowOffset CsCursorVisible CsActiveScreen
 @persist CsBuffer:array
 @trigger none 
 @strict
@@ -36,6 +36,8 @@ if (first() | duped()) {
 
     VirtW = ScrW * 2
     VirtH = ScrH * 2
+    
+    HalfScrW = ScrW / 2
         
     VirtualScreen = wirelink()
     CsShift = 2350
@@ -53,7 +55,7 @@ event tick() {
 event writeCell(Address:number, Value:number) {
     if (Address < 4320) {
         local MemX = Address % VirtW
-        local GlobalY = floor(Address / VirtW)
+        local GlobalY = (Address - MemX) / VirtW
 
         local StoreGY = (GlobalY + VRowOffset) % VirtH
         CsBuffer[StoreGY * VirtW + MemX, number] = Value
@@ -81,11 +83,12 @@ event writeCell(Address:number, Value:number) {
         } elseif (Address == 2038) {
             local Lines = Value
             if (Lines > 0 & Lines < VirtH) {
-                
+
                 for (Y = 0, Lines - 1) {
                     local ClearGY = (Y + VRowOffset) % VirtH
+                    local RowBase = ClearGY * VirtW
                     for (X = 0, VirtW - 1) {
-                        CsBuffer[ClearGY * VirtW + X, number] = 0
+                        CsBuffer[RowBase + X, number] = 0
                     }
                 }
                 
@@ -101,13 +104,14 @@ event writeCell(Address:number, Value:number) {
                     local CurSrcGY = (SourceGY + Y + VRowOffset) % VirtH
                     local CurDstRawY = TargetRawY + Y
                     
-                    for (X = 0, VirtW - 1) {
-                        local SrcAddr = CurSrcGY * VirtW + X
-                        local V = CsBuffer[SrcAddr, number]
-                        local LA = (CurDstRawY * ScrW) + (X % ScrW)
-                        
-                        if (X < ScrW) { LinkTopLeft[LA] = V } 
-                        else { LinkTopRight[LA] = V }
+                    local RowSrcBase = CurSrcGY * VirtW
+                    local RowDstBase = CurDstRawY * ScrW
+                    
+                    for (X = 0, ScrW - 1) {
+                        LinkTopLeft[RowDstBase + X] = CsBuffer[RowSrcBase + X, number]
+                    }
+                    for (X = ScrW, VirtW - 1) {
+                        LinkTopRight[RowDstBase + (X - ScrW)] = CsBuffer[RowSrcBase + X, number]
                     }
                 }
                     
@@ -139,14 +143,15 @@ event writeCell(Address:number, Value:number) {
                 LinkBottomRight[2040, number] = LocalX
             }
         } elseif (Address == 2045) {
-            local GlobalY = floor(Value / VirtW)
             local MemX = Value % VirtW
-            local GlobalCol = floor(MemX / 2)
+            local GlobalY = (Value - MemX) / VirtW
             
-            local HalfScrW = floor(ScrW / 2)
-            local LocalX = GlobalCol % HalfScrW
+            local LocalX = (MemX % 2)
+            local GlobalCol = (MemX - LocalX) / 2
+            
+            local LocalCursorX = GlobalCol % HalfScrW
             local LocalY = GlobalY % ScrH
-            local LocalCursorValue = LocalY * ScrW + LocalX * 2
+            local LocalCursorValue = LocalY * ScrW + LocalCursorX * 2
             
             LinkTopLeft[2046, number] = 0
             LinkTopRight[2046, number] = 0
