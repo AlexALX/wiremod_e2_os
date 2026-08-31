@@ -133,8 +133,9 @@ event tick() {
             ZGPU[DataAddress + Ptr + 1] = Value
             ZGPU[DataAddress + Ptr + 2] = ScrW
         
+            local ClearBase = DataAddress + Ptr + 3
             for (X = 0, ScrW - 1) {
-                ZGPU[DataAddress + Ptr + 3 + X] = 0
+                ZGPU[ClearBase + X] = 0
             }
 
             ZGPU[PtrAddress] = Ptr + 3 + ScrW
@@ -146,9 +147,10 @@ event tick() {
             ZGPU[DataAddress+2 + Ptr] = ScrW
             
             local RowBase = TargetY * ScrW
-    
+            
+            local WriteBase = DataAddress + 3 + Ptr
             for (X = 0, ScrW - 1) {
-                ZGPU[DataAddress + 3 + Ptr + X] = DsBuffer[RowBase + X, number]
+                ZGPU[WriteBase + X] = DsBuffer[RowBase + X, number]
             }
             
             ZGPU[PtrAddress] = Ptr + 3 + ScrW
@@ -170,7 +172,7 @@ event writeCell(Address:number, Value:number) {
         
         DsBuffer[Address, number] = Value
         
-        local GlobalY = floor(Address / ScrW)
+        local GlobalY = (Address - (Address % ScrW)) / ScrW
       
         if (DirtyRows[GlobalY, number] == 0) {
             DirtyRows[GlobalY, number] = 1
