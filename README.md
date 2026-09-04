@@ -20,7 +20,7 @@ ALX PC is a fully functional computer built entirely in Wiremod Expression 2.
 
 It provides its own simplified computer architecture with modular hardware, BIOS, storage, filesystem, networking, graphics, multimedia and applications. Everything is implemented in Expression 2 and designed specifically for the Wiremod environment.
 
-The addon also includes standalone image readers for BMP, JPEG, GIF and PNG, a MIDI player, and a Starfall BMP Reader.
+The addon also includes standalone image readers for BMP, JPEG, GIF and PNG, a MIDI player, a Starfall BMP Reader and **CHIP-8 Emulator**.
 
 ### Advanced Engineering Highlights
 This project pushes **Expression2** to its absolute limits, implementing complex low-level systems entirely from scratch:
