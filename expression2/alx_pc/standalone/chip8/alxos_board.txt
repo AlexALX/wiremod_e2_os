@@ -78,6 +78,7 @@ if (~InA) {
 
 if (~KB2_SocketA) {
     KB2 = getentity(KB2_SocketA)
+    KB2User = noentity()
 }
 
 if (!BIOS:isValid()) { exit() }
