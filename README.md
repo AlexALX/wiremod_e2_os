@@ -26,7 +26,7 @@ The addon also includes standalone image readers for BMP, JPEG, GIF and PNG, a M
 This project pushes **Expression2** to its absolute limits, implementing complex low-level systems entirely from scratch:
 
 * **Custom Binary Parsers** — Native E2 decoders for **Progressive JPG**, animated **GIF**, **PNG**, **BMP**, and standard **MIDI** files.
-* **CHIP-8 Emulation Stack** — A multi-specification interpreter supporting **CHIP-8**, **Super-CHIP**, and **XO-CHIP** architectures entirely within Expression 2. Features strict low-level execution state handling, multi-plane 4-color paletted rendering, deterministic hardware VBlank synchronization, and a custom audio engine with real-time frequency pitch shifting.
+* **CHIP-8 Interpreter** — A low-level emulator for **CHIP-8**, **Super-CHIP**, and **XO-CHIP** architectures, featuring 4-color multi-plane graphics, hardware scrolling, and dynamic audio pitch shifting.
 * **Multi-Channel MIDI Synthesizer** — Advanced player with 3 playback modes.
 * **Low-Level File Systems** — Custom **WM1** and **WCD** storage architectures for virtual HDDs, and CD-ROMs.
 * **Modular Component Architecture** — Custom interconnection layer using Expression2 Data Signals to simulate motherboard slots, BIOS, and boot sequence.
