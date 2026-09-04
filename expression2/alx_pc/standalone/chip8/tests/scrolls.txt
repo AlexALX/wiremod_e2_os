@@ -1,0 +1,92 @@
+#include "alx_pc/standalone/chip8/tests/_shared_"
+
+function resetTestEnv(Type:number) {
+    c8Reset()
+    ChipType = Type
+    PC = 0x200
+    ScreenW = 64
+    ScreenH = 32
+}
+
+# ==============================================================================
+# INDIVIDUAL TEST STEPS FOR SCROLLING OPERATIONS (00C0, 00D0, 00FB, 00FC)
+# ==============================================================================
+
+ExecuteTestStep = function(StepId:number) {
+    local Name = ""
+    
+    if (StepId == 1) {
+        Name = "OP 00C0 (SCROLL DOWN N PIXELS)"
+        resetTestEnv(2) # XO-CHIP mode
+        
+        # Place a pixel at (0, 0) on Plane 1
+        Display[0, number] = 1
+        c8WritePixel(0)
+        
+        # 00C2 -> Scroll down by 2 pixels
+        Memory[0x200, number] = 0x00
+        Memory[0x201, number] = 0xC2
+        c8Step()
+        
+        # For asynchronous scroll engines, we need to let c8RunScroll finish
+        IsRunning = 1
+        c8Run() 
+        
+        # Pixel from (0,0) should now be at (0,2) -> Index: 0 + 2 * 64 = 128
+        if (!assertCase(Name, 1, Display[0, number], 0)) { return 0 }
+        if (!assertCase(Name, 2, Display[128, number], 1)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 2) {
+        Name = "OP 00FB (SCROLL RIGHT 4 PIXELS)"
+        resetTestEnv(2)
+        
+        # Place a pixel at (0, 0)
+        Display[0, number] = 1
+        c8WritePixel(0)
+        
+        # 00FB -> Scroll right 4 pixels
+        Memory[0x200, number] = 0x00
+        Memory[0x201, number] = 0xFB
+        c8Step()
+        
+        IsRunning = 1
+        c8Run()
+        
+        # Pixel should be at (4, 0) -> Index: 4
+        if (!assertCase(Name, 1, Display[0, number], 0)) { return 0 }
+        if (!assertCase(Name, 2, Display[4, number], 1)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 3) {
+        Name = "OP 00D0 (SCROLL UP N PIXELS MULTI-PLANE)"
+        resetTestEnv(2) # XO-CHIP mode
+        
+        # Put pixels at (0, 5) on BOTH planes to test multi-plane synchronization
+        # Index: 0 + 5 * 64 = 320
+        Display[320, number] = 1
+        DisplayPlane2[320, number] = 1
+        c8WritePixel(320)
+        
+        # 00D3 -> Scroll up by 3 pixels
+        Memory[0x200, number] = 0x00
+        Memory[0x201, number] = 0xD3
+        c8Step()
+        
+        IsRunning = 1
+        c8Run()
+        
+        # Pixels should move up to (0, 2) -> Index: 0 + 2 * 64 = 128
+        if (!assertCase(Name, 1, Display[320, number], 0)) { return 0 }
+        if (!assertCase(Name, 2, DisplayPlane2[320, number], 0)) { return 0 }
+        
+        if (!assertCase(Name, 3, Display[128, number], 1)) { return 0 }
+        if (!assertCase(Name, 4, DisplayPlane2[128, number], 1)) { return 0 }
+        testPass(Name)
+    }
+
+    return 1
+}
+
+TotalCases = 3
+runTests()

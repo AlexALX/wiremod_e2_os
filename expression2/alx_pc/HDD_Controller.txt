@@ -236,7 +236,7 @@ function hddio_ds_fs(Name:string) {
         local Func = Info[2,string]:lower()+"_"+FName
         local Args = Info[3,table]        
         CmdCompleteCallback = table(Func+(FName=="readfile" ? "_finish" : ""),"hddio_fs",table(Name,Info[1,entity]))
-        if (!Func(Args)[number]) {
+        if (Func(Args)[number]<1) {
             dsSendDirect(Name,Info[1,entity],0)
             hddload(0)
         }

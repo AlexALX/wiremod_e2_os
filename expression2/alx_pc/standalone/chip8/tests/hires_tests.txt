@@ -1,0 +1,61 @@
+#include "alx_pc/standalone/chip8/tests/_shared_"
+
+function resetTestEnv(Type:number) {
+    c8Reset()
+    ChipType = Type
+    PC = 0x200
+}
+
+# ==============================================================================
+# INDIVIDUAL TEST STEPS FOR HIRES RESOLUTION AND SPRITE WRAPPING
+# ==============================================================================
+
+ExecuteTestStep = function(StepId:number) {
+    local Name = ""
+    
+    if (StepId == 1) {
+        Name = "HIRES MODE RESOLUTION INITIALIZATION (0x00FF)"
+        resetTestEnv(2) # XO-CHIP mode
+        
+        # 1. Load 0x00FF opcode into memory (HIRES mode switch)
+        Memory[0x200, number] = 0x00
+        Memory[0x201, number] = 0xFF
+        c8Step()
+        
+        # 2. Assert if resolution scales up to 128x64 strictly
+        if (!assertCase(Name, 1, ScreenW, 128)) { return 0 }
+        if (!assertCase(Name, 2, ScreenH, 64)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 2) {
+        Name = "SPRITE CLIP WRAPPING PRESERVATION IN HIRES"
+        # We stay in HIRES mode from previous step (ScreenW=128, ScreenH=64)
+        # Let's draw a beetle sprite at high coordinates: X = 96, Y = 40
+        # If ScreenW/H is broken, wrapping mode (%) will distort these coordinates.
+        
+        I = 0x300
+        Memory[0x300, number] = 0x80 # 10000000 (One pixel)
+        V[1, number] = 96
+        V[2, number] = 40
+        
+        # Execute D121 -> Draw 1 row sprite at (96, 40)
+        Memory[0x202, number] = 0xD1
+        Memory[0x203, number] = 0x21
+        c8Step()
+        
+        # Target pixel index inside 128x64 display buffer:
+        # PixelIndex = X + Y * ScreenW -> 96 + 40 * 128 = 5216
+        if (!assertCase(Name, 1, Display[5216, number], 1)) { return 0 }
+        
+        # Verify that it DID NOT wrap into 64x32 space:
+        # Broken index would be: (96%64) + (40%32)*64 -> 32 + 8*64 = 544
+        if (!assertCase(Name, 2, Display[544, number], 0)) { return 0 }
+        
+        testPass(Name)
+    }
+
+    return 1
+}
+
+TotalCases = 2
+runTests()

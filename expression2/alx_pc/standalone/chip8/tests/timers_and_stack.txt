@@ -1,0 +1,104 @@
+#include "alx_pc/standalone/chip8/tests/_shared_"
+
+function resetTestEnv(Type:number) {
+    c8Reset()
+    ChipType = Type
+    PC = 0x200
+    ClockSpeed = 1000 # Set safe default clock speed
+}
+
+# ==============================================================================
+# INDIVIDUAL TEST STEPS FOR TIMER LOGIC AND CALL STACK
+# ==============================================================================
+
+ExecuteTestStep = function(StepId:number) {
+    local Name = ""
+    
+    if (StepId == 1) {
+        Name = "STACK CALL AND RETURN (2NNN / 00EE)"
+        resetTestEnv(2)
+        
+        # Subroutine at 0x300 that just returns
+        Memory[0x300, number] = 0x00
+        Memory[0x301, number] = 0xEE # 00EE -> Return
+        
+        # Main program at 0x200 calling 0x300
+        Memory[0x200, number] = 0x23
+        Memory[0x201, number] = 0x00 # 2300 -> Call 0x300
+        
+        # Step 1: Execute CALL
+        c8Step()
+        if (!assertCase(Name, 1, PC, 0x300)) { return 0 }
+        if (!assertCase(Name, 2, SP, 1)) { return 0 }
+        if (!assertCase(Name, 3, Stack[0, number], 0x202)) { return 0 } # Saved return address
+        
+        # Step 2: Execute RETURN
+        c8Step()
+        if (!assertCase(Name, 4, PC, 0x202)) { return 0 }
+        if (!assertCase(Name, 5, SP, 0)) { return 0 }
+        
+        testPass(Name)
+    }
+    elseif (StepId == 2) {
+        Name = "TIMER SET AND GET (FX15 / FX07)"
+        resetTestEnv(2)
+        V[1, number] = 45
+        Memory[0x200, number] = 0xF1
+        Memory[0x201, number] = 0x15 # F115 -> DelayTimer = V1 (45)
+        c8Step()
+        
+        if (!assertCase(Name, 1, floor(DelayTimer), 45)) { return 0 }
+        
+        Memory[0x202, number] = 0xF2
+        Memory[0x203, number] = 0x07 # F207 -> V2 = DelayTimer
+        c8Step()
+        
+        if (!assertCase(Name, 2, V[2, number], 45)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 3) {
+        Name = "SOUND TIMER EMULATION (FX18)"
+        resetTestEnv(2)
+        V[5, number] = 10
+        Memory[0x200, number] = 0xF5
+        Memory[0x201, number] = 0x18 # F518 -> SoundTimer = V5 (10)
+        c8Step()
+        
+        if (!assertCase(Name, 1, SoundTimer, 10)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 4) {
+        if (!perf(50)) { return -1 }
+        
+        Name = "MAIN LOOP TIMER DECREMENT (60HZ TICK)"
+        resetTestEnv(2)
+        IsRunning = 1
+        ClockSpeed = 600 # 600 cycles per second -> 10 cycles per 60Hz tick
+        DelayTimer = 2
+        SoundTimer = 2
+        
+        # Fill memory with NOPs (7000 is ADD V0, 0 -> safe NOP)
+        for(Idx = 0, 40) {
+            Memory[0x200 + Idx, number] = 0x70
+        }
+        
+        # Fake DeltaTime to trigger exactly one 60Hz frame 
+        # Time per instruction = 1 / 600 = 0.001666
+        # Time for 10 instructions = 0.01666 seconds (~1/60th of a second)
+        LastRealTime = curtime() - 0.017 
+        
+        # c8Run will execute instructions and decrement timers inside its loop
+        c8Run()
+        
+        # Since 10 instructions passed, timers should decrement by exactly 1
+        if (!assertCase(Name, 1, floor(DelayTimer), 1)) { return 0 }
+        if (!assertCase(Name, 2, SoundTimer, 1)) { return 0 }
+        testPass(Name)
+    }
+
+    return 1
+}
+
+TotalCases = 4
+
+runTests()

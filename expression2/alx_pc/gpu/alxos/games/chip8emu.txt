@@ -1,0 +1,602 @@
+@name CHIP-8 Emulator (GPU)
+
+#[
+    ALX Wiremod E2 OS
+    Created by AlexALX
+]#
+
+#include "alx_pc/gpu/alxos/_main_"
+
+function array alxos_findChip8Emulator() {
+    
+    local PCI_Devices = Devices["pci_bus",table]
+            
+    foreach(K:number,V:array=PCI_Devices) {
+        if (V[1,string]=="chip8emu") {
+            return V
+        }
+    }
+    
+    return array()
+}
+
+function number alxos_chip8_check(Args:table) {
+    if (!DS:entity():isValid()) {
+        if (CurrentProg=="alxos_console") {
+            "alxos_console_err"("Digital screen not connected!\nRendering canceled.")
+        } else {
+            "alxos_explorer_error"("Digital screen not connected! Rendering canceled.",420)
+        }
+        return 0
+    }
+    
+    local Emulator = alxos_findChip8Emulator()
+    if (!Emulator:count()) {
+        if (CurrentProg=="alxos_console") {
+            "alxos_console_err"("CHIP-8 Emulator not found,\nplease insert PCI card and reboot.")
+        } else {
+            "alxos_explorer_error"("CHIP-8 Emulator not found, please insert PCI card and reboot.",500)
+        }
+        return 0
+    }
+    
+    GpuData["lastProg",string] = CurrentProg
+    GpuData["IMGInit",number] = 0
+    KeyHandler = "alxos_chip8_key"
+
+    local FInfo = Args[1,table]
+    local ExplorerFS = Args[2,table]
+    
+    ExplorerFile = FInfo["name",string]+(FInfo["ext",string]!="" ? "."+FInfo["ext",string] : "")
+    
+    GpuData[1,table] = ExplorerFS
+    GpuData[2,table] = FInfo
+    GpuData[5,number] = 0
+
+    return 1
+}
+
+function alxos_chip8_selectmode() {
+    local ChipMode = GpuPersistData["chip8mode",number]
+    "alxos_console_input"("Clipping mode (1/0): ", function(Input:string) {
+        if (Input=="_EXIT_") {
+            return -1
+        }
+
+        local Mode = clamp(Input:toNumber(),0,1)       
+        GpuPersistData["chip8mode",number] = Mode
+        
+        KeyHandler = "alxos_chip8_key"
+        
+        "alxos_chip8_postinit"()
+        
+        return 1
+    }, "^[0-9]$", ChipMode+"")
+}
+
+function alxos_chip8_init(Args:table) {
+    if (!alxos_chip8_check(Args)) {
+        return    
+    }
+    
+    if (CurrentProg=="alxos_console") {
+        DialogData = table()
+        local FreqCur = GpuPersistData["chip8freq",number]
+        if (!FreqCur) { FreqCur = 500 }
+        
+        "alxos_console_input"("Set frequency (Hz): ", function(Input:string) {
+            if (Input=="_EXIT_") {
+                return -1
+            }
+            
+            local Freq = Input:toNumber()
+            if (Freq==0) { Freq = 500 }
+            Freq = min(99999,Freq)
+            
+            GpuPersistData["chip8freq",number] = Freq
+            
+            alxos_chip8_selectmode()
+            
+            return 1
+        }, "^[0-9]$", FreqCur+"")
+        
+        
+        return
+    }
+    
+    local Width = 450
+    local Height = 170
+
+    local Parent = "alxos_explorer_dialog"("CHIP-8 Settings",Width,Height,"","alxos_chip8_close")[number]
+    
+    DialogData[7,number] = LAST_I
+    
+    local LAST_Y = 22
+    
+    local Entries = table()
+    local EntID = DialogData[-10,table]
+ 
+    # 1. Max Size Input
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Frequency (Hz):",vec2(22,LAST_Y))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) 
+    DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Default 500 Hz",vec2(225,LAST_Y))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) 
+    DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpBox(LAST_I,vec2(150,LAST_Y),vec2(65,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,168,168,255) 
+    DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
+        
+    DialogData[-10,table]:pushNumber(LAST_I)
+    local DefaultFreq = GpuPersistData["chip8freq",number] != 0 ? GpuPersistData["chip8freq",number]:toString() : "500"
+    Entries[1,table] = table(LAST_I,DefaultFreq,"^[0-9]$",5)
+    EGP:egpText(LAST_I,DefaultFreq,vec2(152,LAST_Y))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) 
+    DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
+    
+    LAST_Y += 10
+    
+    local HelpText = "
+- 500 Hz is default for CHIP-8 and Super-Chip ROMs.
+- For modern XO-CHIP games (like Chicken Scratch) you may need 5000 Hz or higher.
+- Set wire_expression2_unlimited 1 in server console for smooth gameplay!
+"
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpTextLayout(LAST_I,HelpText,vec2(20,LAST_Y),vec2(Width-35,80))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    LAST_Y += 85
+
+    # 2. Keep AR Input
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"Clipping Mode (1/0):",vec2(22,LAST_Y))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255)
+    DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpBox(LAST_I,vec2(220,LAST_Y),vec2(40,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,168,168,255) 
+    DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    local Chip8mode = GpuPersistData["chip8mode",number] == 1 ? "1" : "0"
+    Entries[2,table] = table(LAST_I,Chip8mode,"^[0-1]$",1)
+    EGP:egpText(LAST_I,Chip8mode,vec2(222,LAST_Y))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) 
+    DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
+
+    LAST_Y = Height - 25
+
+    # 3. OK Button (In focus by default)
+    local SzOK = 30
+    local AddOK = -100
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    Entries[3,number] = LAST_I
+    EGP:egpBox(LAST_I,vec2((SzOK/2)+AddOK+Width/2,Height-22),vec2(SzOK,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,168,0,255)
+    DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
+    
+    EGP:egpText(LAST_I,"OK",EGP:egpPos(LAST_I-1)+vec2(5,0))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255)
+    DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
+
+    # 4. Cancel Button
+    local SzCan = 60
+    local AddCan = 20
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    Entries[4,number] = LAST_I
+    EGP:egpBox(LAST_I,vec2((SzCan/2)+AddCan+Width/2,Height-22),vec2(SzCan,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,168,168,168,255)
+    DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
+    
+    EGP:egpText(LAST_I,"Cancel",EGP:egpPos(LAST_I-1)+vec2(5,0))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255)
+    DialogData[-10,table]:pushNumber(LAST_I) LAST_I++
+
+    DialogData[-5,number] = 3
+    DialogData[-4,table] = Entries
+    DialogData[10,table] = Entries
+    DialogData[11,number] = 3
+    DialogData[12,number] = 4
+    DialogData[-2,string] = "text"
+}
+
+function number alxos_chip8_close() {
+    dsClear()
+    
+    ShutHandler = "alxos_clear"
+    if (GpuData["lastProg",string]=="alxos_console") {
+        "alxos_console_cls"()
+        "alxos_console_handlers"()
+        "alxos_console_command"()
+    } else {
+        "alxos_explorer_handlers"()
+        "alxos_explorer_listcurdir"()
+    }
+    return 0
+}
+
+function alxos_prog_chip8_unplug() {
+    stopAllTimers()
+    ExplorerDsH = ""
+    ShutHandler = "alxos_clear"
+    
+    local Emulator = alxos_findChip8Emulator()
+    dsSendDirect("SHUTDOWN",Emulator[3,entity],0)
+    
+    if (GpuData["lastProg",string]=="alxos_console") {
+        "alxos_console_msg"("Disk was unplugged.")
+        "alxos_console_command"()
+        "alxos_console_handlers"()
+    } else {
+        "alxos_explorer_handlers"()
+        "alxos_explorer_msg"("Disk was unplugged.",200,"Information")    
+    }
+}
+
+function number alxos_chip8_cmd() {
+    return 0
+}
+
+function alxos_chip8_stop() {
+    ShutHandler = "alxos_clear"
+    
+    stoptimer("cmd")
+    dsSendDirect("clear",GpuData[1,table]["hdd_io",wirelink]:entity(),1)
+
+    local Emulator = alxos_findChip8Emulator()
+    dsSendDirect("SHUTDOWN",Emulator[3,entity],0)
+}
+
+function number alxos_chip8_clear() {
+    if (!checkPerf(7000)) {
+        runCmd("alxos_chip8_clear",1)
+        return 0
+    }
+    
+    alxos_chip8_stop()
+
+    if (GpuData["lastProg",string]=="alxos_console") {
+        "alxos_console_handlers"()
+        "alxos_console_command"()
+    } else {
+        "alxos_explorer_handlers"()
+        "alxos_explorer_listcurdir"()
+    }
+    return 0
+}
+
+
+function alxos_chip8_postinit() {
+    
+    local Format = GpuData["Format",string]
+
+    DsHandler = "alxos_chip8_ds"
+
+    ExplorerCurTask = "alxos_prog_chip8"
+    
+    local ExplorerFS = GpuData[1,table]
+    local FInfo = GpuData[2,table]
+    
+    if (GpuData["lastProg",string]=="alxos_console") {
+        "alxos_hide_cursor"()
+    }
+    
+    if (FInfo["content",string]) {
+        "alxos_chip8_load"(FInfo["content",string])
+        return
+    }
+
+    dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(
+        ExplorerFS,FInfo,0,FInfo["size",number]
+    )))
+    
+    if (GpuData["lastProg",string]=="alxos_console") {
+        "alxos_console_msg"("Opening file... Press ENTER or F8 to cancel")
+        "alxos_console_msg"("0%")
+        "alxos_console_move"()
+    } else {
+        local Parent = "alxos_explorer_dialog"("Opening file",400,80,"progress","alxos_chip8_clear")[number]
+    
+        DialogData[-10,table]:pushNumber(LAST_I)
+        EGP:egpText(LAST_I,"Please wait, this can take few minutes...",alxos_dlgPos(0,-22))
+        EGP:egpParent(LAST_I,Parent)
+        EGP:egpAlign(LAST_I,1)
+        EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    }
+    
+    DialogData[1,number] = 1
+    DialogData[3,number] = 1
+    DialogData[4,number] = 1
+    runCmd("alxos_chip8read_progress",100)
+}
+
+function alxos_chip8read_progress() {
+    local ExplorerFS = GpuData[1,table]
+    
+    local FS = ExplorerFS["hdd_io",wirelink]
+    local Step = DialogData[4,number]
+
+    local CurTask = FS["CurTask",table]
+    local I = CurTask[2,number]
+    local Max = CurTask[1,number]
+    local Last = DialogData[3,number]
+    
+    if (!Step) { return }
+
+    if (Max>0) {
+        local PercID = DialogData[-4,number]
+        local BoxID = DialogData[-5,number]
+        local BoxW = DialogData[-6,number]
+        local CalcP = round(I/Max*100)
+        BoxW = ceil(BoxW/100*CalcP)
+        if (BoxW<1) { BoxW = 1 }
+        
+        if (GpuData["lastProg",string]=="alxos_console") {
+            "alxos_console_redraw_last"(CalcP+"%")
+        } else {
+            EGP:egpSize(BoxID,vec2(BoxW,20))
+            EGP:egpSetText(PercID,CalcP+"%")
+        }
+    }
+    
+    runCmd("alxos_chip8read_progress",100) 
+}
+
+function alxos_chip8_load(Data:string) {
+    DialogData[4,number] = 0
+    
+    local Emulator = alxos_findChip8Emulator()
+    
+    if (!Emulator:count()) {
+        if (GpuData["lastProg",string]=="alxos_console") {
+            "alxos_console_err"("CHIP-8 Emulator not found,\nplease insert PCI card and reboot.")
+        } else {
+            "alxos_explorer_error"("CHIP-8 Emulator not found, please insert PCI card and reboot.",500)
+        }
+        return
+    }
+    
+    ExplorerCurTask = ""
+
+    GpuData["chip8Emulator",array] = Emulator
+    
+    dsSendDirect("loadROM",Emulator[3,entity],table(
+        Devices, DS, entity(), TickQuota, Data,
+        GpuPersistData["chip8mode",number],
+        GpuPersistData["chip8freq",number]
+    ))
+
+    if (GpuData["lastProg",string]=="alxos_console") {
+        "alxos_console_msg"("Running CHIP-8 ROM...")
+        return
+    }
+
+    local Width = 450
+    local Height = 410
+    
+    local Info = table()
+    Info["OK",array] = array("Abort",50,0)
+    
+    local Parent = "alxos_explorer_dialog"("Running CHIP-8 ROM",Width,Height,"ok","alxos_chip8_clear", Info)[number]
+
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpText(LAST_I,"CHIP-8 is Running...",vec2(Width/2,20))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpAlign(LAST_I,1)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+    
+    local HelpText = 
+"
+Default Key Mapping:
+- [ 1 ][ 2 ][ 3 ][ 4 ] -> CHIP-8 [ 1 ][ 2 ][ 3 ][ C ]
+- [ Q ][ W ][ E ][ R ] -> CHIP-8 [ 4 ][ 5 ][ 6 ][ D ]
+- [ A ][ S ][ D ][ F ] -> CHIP-8 [ 7 ][ 8 ][ 9 ][ E ]
+- [ Z ][ X ][ C ][ V ] -> CHIP-8 [ A ][ 0 ][ B ][ F ]
+
+Note: Different games have different key layouts, there is no single standard so you must figure out what to press yourself.
+    
+Navigation & Action Aliases:
+- [ UP ][ DOWN ][ LEFT ][ RIGHT ] -> [ 2 ][ 8 ][ 4 ][ 6 ]
+- [ SPACE ] -> CHIP-8 [ 5 ] (Action / Shoot)
+
+"
+
+    local TextSz = 260
+
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpTextLayout(LAST_I,HelpText,vec2(20,20),vec2(Width-30,TextSz))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+
+    local HelpText = "
+System Hotkeys:
+- [ F1 ] - Hard Reset & level reloading
+- [ F2 ] - Play / Pause switch
+- [ F3 ] - Toggle clipping mode (Clipping / Wrapping)
+- [ F8 ] - Stop emulator
+"
+    
+    DialogData[-10,table]:pushNumber(LAST_I)
+    EGP:egpTextLayout(LAST_I,HelpText,vec2(20,TextSz+10),vec2(Width-30,Height-TextSz-35))
+    EGP:egpParent(LAST_I,Parent)
+    EGP:egpColor(LAST_I,0,0,0,255) LAST_I++
+}
+
+function number alxos_chip8_key(Key:string,Pressed) {
+    if (!Pressed) { return 0 }
+    
+    local Index = DialogData[-5,number]
+    local Type = DialogData[-2,string]
+    
+    local Title = DialogData["title",string]   
+    
+    if (Key=="f8") {
+        stoptimer("cmd")
+        dsSendDirect("clear",GpuData[1,table]["hdd_io",wirelink]:entity(),1)
+        local Emulator = alxos_findChip8Emulator()
+        dsSendDirect("SHUTDOWN",Emulator[3,entity],0)  
+        alxos_chip8_close()
+        return 1
+    } elseif (Key=="enter" & Title!="Opening file" & Title!="CHIP-8 Settings") {
+        alxos_chip8_key("f8",1)
+        return 1
+    }
+    
+    if (Title!="CHIP-8 Settings") { return 0 }
+    
+    if (Key=="left" | Key=="right" | Key=="tab") {
+        local Max = 4
+        local Ind = Index
+        if (Key=="right" | Key=="tab") {
+            Index = (Index==Max ? 1 : Index+1)
+        } else {
+            Index = (Index==1 ? Max : Index-1)
+        }
+        DialogData[-5,number] = Index
+        DialogData[11,number] = Index
+        
+        local CurID = DialogData[-4,table][Index,number]     
+        local PrevID = DialogData[-4,table][Ind,number]  
+        
+        if (Ind >= 3) {
+            EGP:egpColor(PrevID, vec4(168,168,168,255))
+        }
+        
+        if (Index >= 3) { EGP:egpColor(CurID, vec4(0,168,0,255)) }
+        
+        # "_"
+        if (Index == 1 | Index == 2) {
+            local TxtTbl = DialogData[-4,table][Index,table]
+            EGP:egpText(TxtTbl[1,number],TxtTbl[2,string]+"_",EGP:egpPos(TxtTbl[1,number]))
+        }
+        if (Ind == 1 | Ind == 2) {
+            local TxtTbl = DialogData[-4,table][Ind,table]
+            EGP:egpText(TxtTbl[1,number],TxtTbl[2,string],EGP:egpPos(TxtTbl[1,number]))
+        }
+        return 1
+        
+    } elseif (Key=="up" | Key=="down") {
+        local Ind = Index
+        if (Key=="down") {
+            if (Index < 4) { Index++ } 
+            elseif (Index >= 4) { Index = 1 }
+        } else { # Key == "up"
+            if (Index <= 1) { Index = 4 } 
+            elseif (Index > 1) { Index-- }
+        }
+        DialogData[-5,number] = Index
+        DialogData[11,number] = Index
+        
+        local CurID = DialogData[-4,table][Index,number]     
+        local PrevID = DialogData[-4,table][Ind,number]  
+        
+        if (Ind >= 3) {
+            EGP:egpColor(PrevID, vec4(168,168,168,255))
+        }
+        
+        if (Index >= 3) { EGP:egpColor(CurID, vec4(0,168,0,255)) }
+        
+        if (Index == 1 | Index == 2) {
+            local TxtTbl = DialogData[-4,table][Index,table]
+            EGP:egpText(TxtTbl[1,number],TxtTbl[2,string]+"_",EGP:egpPos(TxtTbl[1,number]))
+        }
+        if (Ind == 1 | Ind == 2) {
+            local TxtTbl = DialogData[-4,table][Ind,table]
+            EGP:egpText(TxtTbl[1,number],TxtTbl[2,string],EGP:egpPos(TxtTbl[1,number]))
+        }
+        return 1        
+    } elseif (Key=="enter") {     
+        
+        if (Index == 4) {
+            alxos_chip8_key("f8",1)
+            return 1
+        }
+        
+        if (Index == 3) {
+            local Frequency = DialogData[-4,table][1,table][2,string]:toNumber()
+            local ClippingMode = DialogData[-4,table][2,table][2,string]
+            
+            if (Frequency==0) { Frequency = 500 }
+            if (ClippingMode=="") { ClippingMode = "0" }
+            
+            GpuPersistData["chip8freq",number] = Frequency
+            GpuPersistData["chip8mode",number] = (ClippingMode=="1" ? 1 : 0)
+            
+            "alxos_explorer_closedialog"()
+            alxos_chip8_postinit()
+            return 1
+        }
+        
+        return 0
+        
+    } else {
+        if (Index == 1 | Index == 2) {
+            local ITbl = DialogData[-4,table]
+            local D_I = ITbl[Index,table][1,number]
+            local D_V = ITbl[Index,table][2,string]
+            
+            if (Key=="backspace") {
+                D_V = D_V:sub(0,D_V:length()-1)
+                EGP:egpSetText(D_I,D_V+"_")
+                ITbl[Index,table][2,string] = D_V
+            } elseif (Key=="delete") {
+                EGP:egpSetText(D_I,"_")
+                ITbl[Index,table][2,string] = ""
+            } elseif (Pressed==2) {
+                local KMem = toByte(Key)
+                local Char = toChar((KMem>=128 ? KMem-80 : KMem))
+                local RE = ITbl[Index,table][3,string]
+                local MC = ITbl[Index,table][4,number]
+                
+                if (Char:findRE(RE) & (KMem<=122 | KMem>=128 & KMem<=143)) {
+                    if (D_V:length() < MC) {
+                        D_V = (D_V+Char)
+                        EGP:egpSetText(D_I,D_V+"_")
+                        ITbl[Index,table][2,string] = D_V
+                    }
+                }
+            }
+        }
+    }
+    return 0
+}
+
+function alxos_chip8_ds(Name:string) {
+    if (Name=="fs_readfile") {
+        alxos_chip8_load(dsGetString())
+    } elseif (Name=="clear") {
+        alxos_chip8_clear()
+    } elseif (Name=="chipError") {
+        local Err = "CHIP-8 Emulator Error:\n"+dsGetString()
+        if (GpuData["lastProg",string]=="alxos_console") {
+            "alxos_console_err"(Err) 
+        } else {
+            "alxos_explorer_error"(Err,420)
+        }
+    } elseif (Name=="initChip") {
+        local Info = dsGetTable()
+        GpuData["Chip8Wirelink",wirelink] = Info[1,wirelink]
+        GpuData["Chip8Init",number] = 1
+    }
+}

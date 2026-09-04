@@ -1,0 +1,66 @@
+#include "alx_pc/standalone/chip8/tests/_shared_"
+
+function resetTestEnv(Type:number) {
+    c8Reset()
+    ChipType = Type
+    PC = 0x200
+    ScreenW = 128
+    ScreenH = 64
+}
+
+# ==============================================================================
+# INDIVIDUAL TEST STEPS FOR BEETLE MAP PROBING AND CONDITIONAL SKIPS
+# ==============================================================================
+
+ExecuteTestStep = function(StepId:number) {
+    local Name = ""
+    
+    if (StepId == 1) {
+        Name = "BEETLE MAP PROBE: FX65 REGISTERS LOADING INTEGRITY"
+        resetTestEnv(2) # XO-CHIP mode
+        
+        # 1. Fill RAM memory map slot with a mock tile ID (0x00 means TILE_NONE)
+        I = 0x500
+        Memory[0x500, number] = 0x00 # V0 will load this (TILE_NONE)
+        Memory[0x501, number] = 0x42 # V1 will load this
+        
+        # 2. Execute F165 -> Load registers V0..V1 from memory address I
+        Memory[0x200, number] = 0xF1
+        Memory[0x201, number] = 0x65
+        c8Step()
+        
+        # Verify if registers loaded the memory tile bytes correctly
+        if (!assertCase(Name, 1, V[0, number], 0x00)) { return 0 }
+        if (!assertCase(Name, 2, V[1, number], 0x42)) { return 0 }
+        
+        # Crucial XO-CHIP Spec: Index I must remain completely UNTOUCHED (0x500)
+        if (!assertCase(Name, 3, I, 0x500)) { return 0 }
+        
+        testPass(Name)
+    }
+    elseif (StepId == 2) {
+        Name = "BEETLE AI BRANCHING: 3XNN CONDITION SUCCESSFUL SKIP"
+        # PC is now at 0x202 from previous execution step
+        # Let's write a conditional skip opcode: 3000 -> Skip next if V0 == 0x00
+        # Since V0 was loaded with 0x00 in Step 1, this condition is TRUE.
+        Memory[0x202, number] = 0x30
+        Memory[0x203, number] = 0x00
+        
+        # Write a NOP or Jump opcode that needs to be skipped at 0x204
+        Memory[0x204, number] = 0x12
+        Memory[0x205, number] = 0x34
+        
+        # Execute the 3000 opcode at 0x202
+        c8Step()
+        
+        # Under correct skip logic, PC must completely leap over 0x204 and land on 0x206!
+        if (!assertCase(Name, 1, PC, 0x206)) { return 0 }
+        
+        testPass(Name)
+    }
+
+    return 1
+}
+
+TotalCases = 2
+runTests()

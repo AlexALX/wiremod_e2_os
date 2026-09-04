@@ -1,0 +1,155 @@
+#include "alx_pc/standalone/chip8/tests/_shared_"
+
+function resetTestEnv(Type:number) {
+    c8Reset()
+    ChipType = Type
+    PC = 0x200
+}
+
+# ==============================================================================
+# INDIVIDUAL TEST STEPS
+# ==============================================================================
+
+ExecuteTestStep = function(StepId:number) {
+    local Name = ""
+    
+    if (StepId == 1) {
+        Name = "OP 8XY4 (ADD) - CASE 1"
+        resetTestEnv(2)
+        V[1, number] = 100
+        V[2, number] = 50
+        Memory[0x200, number] = 0x81
+        Memory[0x201, number] = 0x24
+        c8Step()
+        if (!assertCase(Name, 1, V[1, number], 150)) { return 0 }
+        if (!assertCase(Name, 2, V[15, number], 0)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 2) {
+        Name = "OP 8XY4 (ADD) - CASE 2"
+        resetTestEnv(2)
+        V[1, number] = 200
+        V[2, number] = 60
+        Memory[0x200, number] = 0x81
+        Memory[0x201, number] = 0x24
+        c8Step()
+        if (!assertCase(Name, 3, V[1, number], 4)) { return 0 }
+        if (!assertCase(Name, 4, V[15, number], 1)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 3) {
+        Name = "OP 8XY4 (ADD) - CASE 3"
+        resetTestEnv(2)
+        V[15, number] = 200
+        V[2, number] = 60
+        Memory[0x200, number] = 0x8F
+        Memory[0x201, number] = 0x24
+        c8Step()
+        if (!assertCase(Name, 5, V[15, number], 1)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 4) {
+        Name = "OP 8XY5 (SUB) - CASE 1"
+        resetTestEnv(2)
+        V[1, number] = 100
+        V[2, number] = 40
+        Memory[0x200, number] = 0x81
+        Memory[0x201, number] = 0x25
+        c8Step()
+        if (!assertCase(Name, 1, V[1, number], 60)) { return 0 }
+        if (!assertCase(Name, 2, V[15, number], 1)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 5) {
+        Name = "OP 8XY5 (SUB) - CASE 2"
+        resetTestEnv(2)
+        V[1, number] = 40
+        V[2, number] = 100
+        Memory[0x200, number] = 0x81
+        Memory[0x201, number] = 0x25
+        c8Step()
+        if (!assertCase(Name, 3, V[1, number], 196)) { return 0 }
+        if (!assertCase(Name, 4, V[15, number], 0)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 6) {
+        Name = "OP 8XY7 (SUBN) - CASE 1"
+        resetTestEnv(2)
+        V[1, number] = 30
+        V[2, number] = 100
+        Memory[0x200, number] = 0x81
+        Memory[0x201, number] = 0x27
+        c8Step()
+        if (!assertCase(Name, 1, V[1, number], 70)) { return 0 }
+        if (!assertCase(Name, 2, V[15, number], 1)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 7) {
+        Name = "OP 8XY6 (SHR) CHIP8 QUIRK"
+        resetTestEnv(0)
+        V[1, number] = 0   
+        V[2, number] = 0x03
+        Memory[0x200, number] = 0x81
+        Memory[0x201, number] = 0x26
+        c8Step()
+        if (!assertCase(Name, 1, V[1, number], 1)) { return 0 }  
+        if (!assertCase(Name, 2, V[15, number], 1)) { return 0 } 
+        testPass(Name)
+    }
+    elseif (StepId == 8) {
+        Name = "OP 8XY6 (SHR) XOCHIP QUIRK"
+        resetTestEnv(2)
+        V[1, number] = 0x06
+        V[2, number] = 0x03 
+        Memory[0x200, number] = 0x81
+        Memory[0x201, number] = 0x26
+        c8Step()
+        if (!assertCase(Name, 3, V[1, number], 3)) { return 0 }  
+        if (!assertCase(Name, 4, V[15, number], 0)) { return 0 } 
+        testPass(Name)
+    }
+    elseif (StepId == 9) {
+        Name = "OP 8XYE (SHL) CHIP8 QUIRK"
+        resetTestEnv(0)
+        V[1, number] = 0
+        V[2, number] = 0x85
+        Memory[0x200, number] = 0x81
+        Memory[0x201, number] = 0x2E
+        c8Step()
+        if (!assertCase(Name, 1, V[1, number], 0x0A)) { return 0 } 
+        if (!assertCase(Name, 2, V[15, number], 1)) { return 0 }   
+        testPass(Name)
+    }
+    elseif (StepId == 10) {
+        Name = "OP 8XYE (SHL) XOCHIP QUIRK"
+        resetTestEnv(2)
+        V[1, number] = 0x45
+        V[2, number] = 0x85 
+        Memory[0x200, number] = 0x81
+        Memory[0x201, number] = 0x2E
+        c8Step()
+        if (!assertCase(Name, 3, V[1, number], 0x8A)) { return 0 } 
+        if (!assertCase(Name, 4, V[15, number], 0)) { return 0 }   
+        testPass(Name)
+    }
+    elseif (StepId == 11) {
+        Name = "LOGIC OP VF RETENTION"
+        resetTestEnv(2)
+        V[1, number] = 0x0F
+        V[2, number] = 0xF0
+        V[15, number] = 1 
+        Memory[0x200, number] = 0x81
+        Memory[0x201, number] = 0x21
+        c8Step()
+        if (!assertCase(Name, 1, V[1, number], 0xFF)) { return 0 }
+        if (!assertCase(Name, 2, V[15, number], 1)) { return 0 } 
+        testPass(Name)
+    }
+
+    return 1
+}
+
+# Define test layout constraints for the included engine
+TotalCases = 11
+
+runTests()

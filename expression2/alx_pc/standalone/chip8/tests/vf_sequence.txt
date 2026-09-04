@@ -1,0 +1,62 @@
+#include "alx_pc/standalone/chip8/tests/_shared_"
+
+function resetTestEnv(Type:number) {
+    c8Reset()
+    ChipType = Type
+    PC = 0x200
+}
+
+# ==============================================================================
+# DIAGNOSTIC TEST FOR SEQUENTIAL ADDITIONS INVOLVING VF REGISTER (dontResetVf)
+# ==============================================================================
+
+function string combatValueString(Val:number) {
+    return "" + Val
+}
+
+ExecuteTestStep = function(StepId:number) {
+    local Name = ""
+    
+    if (StepId == 1) {
+        Name = "8XY4 REPEATED VALUE TARGETING VF REGISTER"
+        resetTestEnv(2) # XO-CHIP mode
+        
+        # In Chicken Scratch:
+        # V1 += VF (where VF is a constant 32, no overflow happens)
+        # V0 += VF (expects VF to STILL be 32, or behave according to Octo specs)
+        
+        V[1, number] = 10  # Low byte of address
+        V[0, number] = 0   # High byte of address
+        V[15, number] = 32 # VF holds the constant MAP_COLS (32)
+        
+        # 1. 81F4 -> V1 = V1 + VF (10 + 32 = 42). No overflow, so carry is 0.
+        Memory[0x200, number] = 0x81
+        Memory[0x201, number] = 0xF4
+        c8Step()
+        
+        if (!assertCase(Name, 1, V[1, number], 42)) { return 0 }
+        
+        # --- THE MOMENT OF TRUTH ---
+        # If your emulator reset V[15] to 0 because 10+32 did not overflow,
+        # then the next instruction 80F4 will add 0 instead of 32!
+        # In Octo specs, does VF retain 32 or change? Let's check what value remains.
+        local VF_Value = V[15, number]
+        
+        # 2. 0x80F4 -> V0 = V0 + VF
+        Memory[0x202, number] = 0x80
+        Memory[0x203, number] = 0xF4
+        c8Step()
+        
+        # If the game expects VF to stay 32 to add it to V0:
+        # V0 should become 32. If it becomes 0 or 1, the map address is corrupted!
+        # Let's see what your current engine produces:
+        print("[VF Quirk Debug] After first ADD, VF became: " + combatValueString(VF_Value))
+        
+        testPass(Name)
+    }
+
+    return 1
+}
+
+TotalCases = 1
+runTests()

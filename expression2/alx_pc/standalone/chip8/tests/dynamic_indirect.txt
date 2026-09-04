@@ -1,0 +1,53 @@
+#include "alx_pc/standalone/chip8/tests/_shared_"
+
+function resetTestEnv(Type:number) {
+    c8Reset()
+    ChipType = Type
+    PC = 0x200
+}
+
+# ==============================================================================
+# INDIVIDUAL TEST STEPS FOR SELF-MODIFYING CODE (DYNAMIC INDIRECT)
+# ==============================================================================
+
+ExecuteTestStep = function(StepId:number) {
+    local Name = ""
+    
+    if (StepId == 1) {
+        Name = "DYNAMIC SELF-MODIFYING CODE ADDRESS VERIFICATION (F000)"
+        resetTestEnv(2) # XO-CHIP mode
+        
+        # 1. We write the F000 opcode prefix at PC=0x200
+        Memory[0x200, number] = 0xF0
+        Memory[0x201, number] = 0x00
+        
+        # 2. Simulate 'save v1' modifying the next 2 bytes of program code dynamically.
+        # We inject a target address (0x1234) straight into the instruction body payload space!
+        I = 0x202 # Points right after the 0xF000 prefix
+        V[0, number] = 0x12 # High byte
+        V[1, number] = 0x34 # Low byte
+        
+        # Execute F155 -> Store V0..V1 at I (modifying Memory[0x202] and Memory[0x203])
+        Memory[0x250, number] = 0xF1
+        Memory[0x251, number] = 0x55
+        local SavedPC = PC
+        PC = 0x250
+        c8Step()
+        
+        # 3. Restore PC to 0x200 and execute the newly modified 4-byte F000 instruction
+        PC = 0x200
+        c8Step()
+        
+        # Assert if index register I successfully loaded the dynamically injected 0x1234 address
+        if (!assertCase(Name, 1, I, 0x1234)) { return 0 }
+        # PC must advance by 4 bytes past the long instruction -> 0x204
+        if (!assertCase(Name, 2, PC, 0x204)) { return 0 }
+        
+        testPass(Name)
+    }
+
+    return 1
+}
+
+TotalCases = 1
+runTests()

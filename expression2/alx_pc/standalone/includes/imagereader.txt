@@ -1,6 +1,6 @@
 @name Basic Image Reader
 @inputs DS:wirelink ImageSizeLimit:number ImageNoKeepAR:number
-@outputs DS_Out:wirelink ImageProcessor:wirelink
+@outputs DS_Out:wirelink E2Processor:wirelink
 @persist SizeLimit NoKeepAR
 @strict
 
@@ -12,7 +12,7 @@
 #include "alx_pc/standalone/includes/basicreader"
 
 if (first() | duped()) {
-    ImageProcessor = wirelink()    
+    E2Processor = wirelink()    
         
     NoKeepAR = ImageNoKeepAR # 0 - keep asset ratio, 1 - scale to screen size
     SizeLimit = ImageSizeLimit

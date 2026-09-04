@@ -1,0 +1,826 @@
+#include "alx_pc/standalone/chip8/_shared_"
+
+function c8WritePixel(Idx:number) {
+    local P1 = Display[Idx, number] == 1 ? 1 : 0
+
+    if (P1 == 1) {
+        DS[Idx] = 255
+        return  
+    }
+    
+    DS[Idx] = 0
+}
+
+function c8WritePixelColor(Idx:number) {
+    local P1 = Display[Idx, number] == 1 ? 1 : 0
+    local P2 = DisplayPlane2[Idx, number] == 1 ? 1 : 0
+    
+    if (P1 == 0 & P2 == 0) {
+        DS[Idx] = 0
+    } elseif (P1 == 1 & P2 == 0) {
+        DS[Idx] = 999000
+    } elseif (P1 == 0 & P2 == 1) {
+        DS[Idx] = 249000
+    } elseif (P1 == 1 & P2 == 1) {
+        DS[Idx] = 921000
+    }
+}
+
+function c8MemoryReset() {
+    Memory = table()
+    RomSize = 0
+    IsLoaded = 0
+}
+
+function c8DisplayClear() {
+    local DsShift = DS["DsShifted", number]
+    DS[1048574 + DsShift] = 1
+}
+
+function c8DisplayReset() {
+    ScreenW = 64
+    ScreenH = 32
+    
+    local DsShift = DS["DsShifted", number]
+    DS[1048573 + DsShift] = 64
+    DS[1048572 + DsShift] = 32
+    c8DisplayClear()    
+}
+
+function c8HardReset() {
+    V = table()
+    Stack = table()
+    Display = table()
+    KeyContainer = table()
+    RPLFlags = table()
+    ScrollQueue = table()
+    ScrollKeys = array()
+    ScrollKeysCount = 0
+    
+    DisplayPlane2 = table()
+    TargetPlane = 1
+    ScrollQueue2 = table()
+    
+    IsRunning = 0
+    RomData = ""
+    RomLast = 1
+    IsSoundPlaying = 0
+    soundStop(1)
+    ScrollKeyIdx = 1
+    ReDrawScreen = 0
+    TimerStepAccum = 0
+    
+    AudioPitchByte = 0
+    AudioPatternByte2 = 0
+    
+    PC = 0x200
+    I = 0
+    SP = 0
+    DelayTimer = 0
+    SoundTimer = 0
+    TimeAccumulator = 0
+    LastRealTime = curtime()
+}
+
+function c8Reset() {
+    c8MemoryReset()
+    c8HardReset()
+    c8DisplayReset() 
+    
+    ChipType = 0
+    
+    ScreenW = 64
+    ScreenH = 32
+    
+    local Font = array(
+        0xF0, 0x90, 0x90, 0x90, 0xF0, # 0
+        0x20, 0x60, 0x20, 0x20, 0x70, # 1
+        0xF0, 0x10, 0xF0, 0x80, 0xF0, # 2
+        0xF0, 0x10, 0xF0, 0x10, 0xF0, # 3
+        0x90, 0x90, 0xF0, 0x10, 0x10, # 4
+        0xF0, 0x80, 0xF0, 0x10, 0xF0, # 5
+        0xF0, 0x80, 0xF0, 0x90, 0xF0, # 6
+        0xF0, 0x10, 0x20, 0x40, 0x40, # 7
+        0xF0, 0x90, 0xF0, 0x90, 0xF0, # 8
+        0xF0, 0x90, 0xF0, 0x10, 0xF0, # 9
+        0xF0, 0x90, 0xF0, 0x90, 0x90, # A
+        0xE0, 0x90, 0xE0, 0x90, 0xE0, # B
+        0xF0, 0x80, 0x80, 0x80, 0xF0, # C
+        0xE0, 0x90, 0x90, 0x90, 0xE0, # D
+        0xF0, 0x80, 0xF0, 0x80, 0xF0, # E
+        0xF0, 0x80, 0xF0, 0x80, 0x80  # F
+    )
+    for(Idx=1, Font:count()) {
+        Memory[Idx-1, number] = Font[Idx, number]
+    }    
+    
+    local BigFont = array(
+        0x3C, 0x7E, 0xE7, 0xE7, 0xE7, 0xE7, 0xE7, 0xE7, 0x7E, 0x3C, # 0
+        0x18, 0x38, 0x78, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x7E, # 1
+        0x3E, 0x7F, 0x63, 0x06, 0x0C, 0x18, 0x30, 0x61, 0x7F, 0x7F, # 2
+        0x3E, 0x7F, 0x63, 0x06, 0x1E, 0x06, 0x63, 0x63, 0x7F, 0x3E, # 3
+        0x06, 0x0E, 0x1E, 0x36, 0x66, 0x66, 0x7F, 0x7F, 0x06, 0x06, # 4
+        0x7F, 0x7F, 0x60, 0x7C, 0x7F, 0x03, 0x03, 0x63, 0x7F, 0x3E, # 5
+        0x1E, 0x3F, 0x33, 0x60, 0x7C, 0x7F, 0x63, 0x63, 0x7F, 0x3E, # 6
+        0x7F, 0x7F, 0x03, 0x06, 0x0C, 0x18, 0x30, 0x30, 0x30, 0x30, # 7
+        0x3E, 0x7F, 0x63, 0x63, 0x3E, 0x3E, 0x63, 0x63, 0x7F, 0x3E, # 8
+        0x3E, 0x7F, 0x63, 0x63, 0x7F, 0x3E, 0x03, 0x33, 0x7F, 0x3E, # 9
+        0x18, 0x3C, 0x66, 0x66, 0x7E, 0x7E, 0x66, 0x66, 0x66, 0x66, # A
+        0x7C, 0x7E, 0x63, 0x63, 0x7C, 0x7C, 0x63, 0x63, 0x7E, 0x7C, # B
+        0x3E, 0x7F, 0x63, 0x60, 0x60, 0x60, 0x60, 0x63, 0x7F, 0x3E, # C
+        0x78, 0x7C, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x7C, 0x78, # D
+        0x7F, 0x7F, 0x60, 0x60, 0x7C, 0x7C, 0x60, 0x60, 0x7F, 0x7F, # E
+        0x7F, 0x7F, 0x60, 0x60, 0x7C, 0x7C, 0x60, 0x60, 0x60, 0x60  # F
+    )
+    for(Idx=1, BigFont:count()) {
+        Memory[80 + Idx - 1, number] = BigFont[Idx, number]
+    }    
+}
+
+function c8SetMode(SpriteMode:number) {
+    SpriteClipMode = SpriteMode
+}
+
+function c8SetFrequency(Freq:number) {
+    if (Freq<1) { Freq = 500 }
+    ClockSpeed = Freq
+}
+
+function c8Start() {
+    IsRunning = 1
+    LastRealTime = curtime()
+}
+
+function c8Stop() {
+    IsRunning = 0
+    soundStop(1)
+    IsSoundPlaying = 0
+}
+
+function string c8ChipMode() {
+    local ModeName = "CHIP-8"
+    if (ChipType == 2) { ModeName = "XO-CHIP" }
+    elseif (ChipType == 1) { ModeName = "Super-CHIP" }
+    return ModeName
+}
+
+function c8FillMemory() {
+    while (RomLast <= RomSize & perf(90)) {
+        local ByteVal = toByte(RomData, RomLast)
+        Memory[0x200 + RomLast - 1, number] = ByteVal
+        
+        if (RomLast < RomSize) {
+            local NextByte = toByte(RomData, RomLast + 1)
+            
+            if (ByteVal == 0x00 & (NextByte == 0xFF | NextByte == 0xFE | (NextByte >= 0xFB & NextByte <= 0xFD))) {
+                if (ChipType != 2) { ChipType = 1 }
+            }
+            
+            if ((ByteVal == 0x00 & NextByte == 0x1E) | (ByteVal == 0xF0 & (NextByte == 0x01 | NextByte == 0x02))) {
+                ChipType = 2
+            }
+        }
+        
+        RomLast++
+    }
+    
+    if (RomLast > RomSize) {
+        #RomData = ""
+        if (!ChipNoPrint) {
+            print(c8ChipMode()+" ROM Loaded.\nStarting CHIP, please wait...")
+        
+            if (ChipType != 2 & RomSize > 3584) {
+                print("Warning: ROM size exceeds 3.5KB but no XO-CHIP opcodes detected!")
+            }
+        }
+        
+        if (ChipType == 2) {
+            local DsShift = DS["DsShifted", number]
+            DS[1048569 + DsShift] = 0
+            C8WritePixel = function(Idx:number) {
+                c8WritePixelColor(Idx)    
+            }    
+        } else {
+            C8WritePixel = function(Idx:number) {
+                c8WritePixel(Idx)    
+            }    
+        }
+        
+        c8Start()        
+    } else {
+        timer(0.01,function() {
+            c8FillMemory()
+        })
+    }
+}
+
+function scrollPrepare() {
+    ScrollQueue = Display:copy()
+    ScrollQueue2 = DisplayPlane2:copy()
+    local Combined = ScrollQueue:merge(ScrollQueue2)
+    
+    ScrollKeys = Combined:keys()
+    ScrollKeysCount = ScrollKeys:count()
+    
+    ScrollKeyIdx = 1
+    
+    c8DisplayClear()   
+    Display = table()
+    DisplayPlane2 = table()
+}
+
+function number c8Skip() {
+    local NextOp = ((Memory[PC, number] << 8) || Memory[PC + 1, number]) && 0xFFFF
+    local IsLong = (NextOp == 0xF000)
+    PC += IsLong ? 4 : 2
+    return IsLong ? 3 : 2    
+}
+
+function number c8Step() {
+    local OpCode = (Memory[PC, number] << 8) || Memory[PC + 1, number]
+    
+    local NNN = OpCode && 0x0FFF
+    local NN  = OpCode && 0x00FF
+    local N   = OpCode && 0x000F
+    local X   = (OpCode && 0x0F00) >> 8
+    local Y   = (OpCode && 0x00F0) >> 4
+    
+    PC += 2
+    
+    local Category = OpCode && 0xF000
+    
+    if (Category == 0x0000) {
+        if (NN == 0xD4 & ChipType == 2) {
+            return 0
+        }
+        elseif (NN == 0xE0) {
+            if (ChipType != 2 | TargetPlane == 0 | TargetPlane == 3) {
+                Display = table()
+                DisplayPlane2 = table()
+                
+                local DsShift = DS["DsShifted", number]
+                DS[1048574 + DsShift] = 1
+            } else {            
+                local ClrP1 = (TargetPlane && 1) ? 1 : 0
+                local ClrP2 = (TargetPlane && 2) ? 1 : 0
+                
+                ScrollQueue = Display:copy()
+                ScrollQueue2 = DisplayPlane2:copy()
+    
+                if (ClrP1 == 1 | TargetPlane == 0) { Display = table() }
+                if (ClrP2 == 1) { DisplayPlane2 = table() }
+                
+                scrollPrepare()
+                
+                ReDrawScreen = 1
+                return 0
+            }
+        } elseif (NN == 0xEE) {
+            SP--
+            PC = Stack[SP, number]
+            Stack[SP, number] = 0
+        }
+        # ---   SUPER-CHIP ---
+        elseif ((OpCode && 0xFFF0) == 0x00C0 & ChipType) {
+            #PC -= 2
+            IsScreenSyncing = 1
+            ScrollType = 1
+            ScrollAmt = N
+             
+            scrollPrepare()            
+            return 0
+        }
+        elseif ((OpCode && 0xFFF0) == 0x00D0 & ChipType == 2) {
+            IsScreenSyncing = 1
+            ScrollType = 4
+            ScrollAmt = N
+             
+            scrollPrepare()
+            return 0
+        }
+        elseif (NN == 0xFB & ChipType) {
+            #PC -= 2
+            IsScreenSyncing = 1
+            ScrollType = 2
+            ScrollAmt = 4
+            
+            scrollPrepare()
+            
+            return 0
+        }
+        elseif (NN == 0xFC & ChipType) {
+            #PC -= 2
+            IsScreenSyncing = 1
+            ScrollType = 3
+            ScrollAmt = 4
+            
+            scrollPrepare()
+            
+            return 0
+        }
+        elseif (NN == 0xFD & ChipType) {
+            c8Stop()
+        }
+        elseif (NN == 0xFE & ChipType) {
+            ScreenW = 64
+            ScreenH = 32
+            Display = table()
+            DisplayPlane2 = table()
+            local DsShift = DS["DsShifted", number]
+            DS[1048573 + DsShift] = ScreenW
+            DS[1048572 + DsShift] = ScreenH            
+            c8DisplayClear()
+        }
+        elseif (NN == 0xFF & ChipType) {
+            ScreenW = 128
+            ScreenH = 64
+            Display = table()
+            DisplayPlane2 = table()
+            local DsShift = DS["DsShifted", number]
+            DS[1048573 + DsShift] = ScreenW
+            DS[1048572 + DsShift] = ScreenH            
+            c8DisplayClear()
+        }
+    }
+    elseif (Category == 0x1000) {
+        PC = NNN
+    }
+    elseif (Category == 0x2000) {
+        Stack[SP, number] = PC
+        SP++
+        PC = NNN
+    }
+    elseif (Category == 0x3000) {
+        if ((V[X, number] && 0xFF) == NN) { 
+            return c8Skip()
+        }
+    }
+    elseif (Category == 0x4000) {
+        if ((V[X, number] && 0xFF) != NN) {
+            return c8Skip()
+        }
+    }
+    elseif (Category == 0x5000) {
+        local SubCat5 = OpCode && 0x000F
+        if (SubCat5 == 0) {
+            if ((V[X, number] && 0xFF) == (V[Y, number] && 0xFF)) {
+                return c8Skip()
+            }
+        }
+        elseif (SubCat5 == 2) {
+            local Dist = abs(X - Y)
+            if (X < Y) {
+                local MemOffset = 0
+                for (Z = 0, Dist) {
+                    Memory[I + MemOffset, number] = V[X + Z, number]
+                    MemOffset++
+                }
+            } else {
+                local MemOffset = 0
+                for (Z = 0, Dist) {
+                    Memory[I + MemOffset, number] = V[X - Z, number]
+                    MemOffset++
+                }
+            }
+        }
+        elseif (SubCat5 == 3) {
+            local Dist = abs(X - Y)
+            if (X < Y) {
+                local MemOffset = 0
+                for (Z = 0, Dist) {                                        
+                    V[X + Z, number] = Memory[I + MemOffset, number]
+                    MemOffset++
+                }
+            } else {
+                local MemOffset = 0
+                for (Z = 0, Dist) {                    
+                    V[X - Z, number] = Memory[I + MemOffset, number]
+                    MemOffset++
+                }
+            }
+        }
+    }
+    elseif (Category == 0x6000) {
+        local HardX = (OpCode && 0x0F00) >> 8
+        V[HardX, number] = NN
+    }
+    elseif (Category == 0x7000) {
+        local HardX = (OpCode && 0x0F00) >> 8
+        V[HardX, number] = (V[HardX, number] + NN) && 0xFF
+    }
+    elseif (Category == 0x8000) {
+        local SubCat = OpCode && 0x000F
+        if (SubCat == 0) { V[X, number] = V[Y, number] }
+        elseif (SubCat == 1) { V[X, number] = V[X, number] || V[Y, number] }
+        elseif (SubCat == 2) { V[X, number] = V[X, number] && V[Y, number] }
+        elseif (SubCat == 3) { V[X, number] = V[X, number] ^^ V[Y, number] }
+        elseif (SubCat == 4) {
+            local Sum = (V[X, number] && 0xFF) + (V[Y, number] && 0xFF)
+            V[X, number] = Sum && 0xFF
+            V[15, number] = Sum > 255 ? 1 : 0
+        }
+        elseif (SubCat == 5) {
+            local RegX = V[X, number] && 0xFF
+            local RegY = V[Y, number] && 0xFF
+            local Res = RegX - RegY
+            V[X, number] = (Res % 256 + 256) % 256
+            V[15, number] = RegX >= RegY ? 1 : 0
+        }
+        elseif (SubCat == 6) {
+            local TargetVal = (ChipType == 0) ? V[Y, number] : V[X, number]
+            V[X, number] = TargetVal >> 1
+            V[15, number] = TargetVal && 1
+        }
+        elseif (SubCat == 7) {
+            local RegX = V[X, number] && 0xFF
+            local RegY = V[Y, number] && 0xFF
+            local Res = RegY - RegX
+            V[X, number] = (Res % 256 + 256) % 256
+            V[15, number] = RegY >= RegX ? 1 : 0
+        }
+        elseif (SubCat == 0xE) {
+            local TargetVal = (ChipType == 0) ? V[Y, number] : V[X, number]
+            V[X, number] = (TargetVal << 1) && 0xFF
+            V[15, number] = (TargetVal && 0x80) >> 7
+        }
+    }
+    elseif (Category == 0x9000) {
+        if (V[X, number] != V[Y, number]) {
+            return c8Skip()
+        }
+    }
+    elseif (Category == 0xA000) {
+        I = NNN
+    }
+    elseif (Category == 0xB000) {
+        if (ChipType) {
+            PC = ((OpCode && 0x0FFF) + V[X, number]) && 0xFFFF
+        } else {
+            PC = (NNN + (V[0, number] && 0xFF)) && 0xFFFF
+        }
+    }
+    elseif (Category == 0xC000) {
+        V[X, number] = randint(0, 255) && NN
+    }
+    elseif (Category == 0xD000) {
+        local VX = V[X, number] && 0xFF
+        local VY = V[Y, number] && 0xFF
+        V[15, number] = 0
+        
+        local IsBigSprite = (N == 0 & ChipType)
+        local RowsCount = IsBigSprite ? 16 : N
+        local RowsCountS = RowsCount - 1
+        local ColsCountS = IsBigSprite ? 15 : 7
+        
+        local WriteP1 = (TargetPlane && 1) ? 1 : 0
+        local WriteP2 = (TargetPlane && 2) ? 1 : 0
+        
+        local PlaneSize = RowsCount * (IsBigSprite ? 2 : 1)
+        local MemoryMul = (IsBigSprite ? 2 : 1)
+        
+        local IPlaneSize = I + (WriteP1 ? PlaneSize : 0)
+        
+        local HasCollision = 0
+        
+        for (Row = 0, RowsCountS) {
+            local P1_Left  = Memory[I + Row * MemoryMul, number]
+            local P1_Right = (WriteP1 & IsBigSprite) ? Memory[I + Row * 2 + 1, number] : 0
+            
+            local P2_Target = IPlaneSize + (Row * MemoryMul)
+            local P2_Left  = WriteP2 ? Memory[P2_Target, number] : 0
+            local P2_Right = (WriteP2 & IsBigSprite) ? Memory[P2_Target + 1, number] : 0
+            
+            for (Col = 0, ColsCountS) {
+                local Col8 = (Col < 8)
+                
+                local BitShift = Col8 ? Col : (Col - 8)
+                local Mask = (0x80 >> BitShift)
+                  
+                local CurrentByteP1 = Col8 ? P1_Left : P1_Right
+                local CurrentByteP2 = Col8 ? P2_Left : P2_Right
+                
+                local BitP1 = (WriteP1 & ((CurrentByteP1 && Mask) != 0)) ? 1 : 0
+                local BitP2 = (WriteP2 & ((CurrentByteP2 && Mask) != 0)) ? 1 : 0
+                
+                if (BitP1 | BitP2) {
+                    local PixelX = VX + Col
+                    local PixelY = VY + Row
+                    
+                    if (SpriteClipMode == 0) { 
+                        PixelX = PixelX % ScreenW
+                        PixelY = PixelY % ScreenH
+                    }
+                    
+                    if (PixelX >= 0 & PixelX < ScreenW & PixelY >= 0 & PixelY < ScreenH) {
+                        local PixelIndex = PixelX + (PixelY * ScreenW)
+                        
+                        if (BitP1 == 1) {
+                            if (Display[PixelIndex, number] == 1) {
+                                Display[PixelIndex, number] = 0
+                                HasCollision = 1
+                            } else {
+                                Display[PixelIndex, number] = 1
+                            }
+                        }
+
+                        if (BitP2 == 1) {
+                            if (DisplayPlane2[PixelIndex, number] == 1) {
+                                DisplayPlane2[PixelIndex, number] = 0
+                                HasCollision = 1
+                            } else {
+                                DisplayPlane2[PixelIndex, number] = 1
+                            }
+                        }
+                        
+                        C8WritePixel(PixelIndex)
+                    }
+                }
+            }
+        }
+        
+        if (HasCollision) {
+            V[15, number] = HasCollision
+        }
+        
+    }
+    elseif (Category == 0xE000) {
+        local TargetKey = V[X, number] && 0x0F
+        if (NN == 0x9E) {
+            if (KeyContainer[TargetKey, number] == 1) {
+                return c8Skip()
+            }
+        }
+        elseif (NN == 0xA1) {
+            if (KeyContainer[TargetKey, number] != 1) {
+                return c8Skip()
+            }
+        }
+    }
+    elseif (Category == 0xF000) {
+        local SubCat = OpCode && 0x00FF
+        if (OpCode == 0xF000) { 
+            local HighByte = Memory[PC, number]
+            local LowByte  = Memory[PC + 1, number]
+            I = ((HighByte << 8) || LowByte) && 0xFFFF
+            PC += 2
+        }
+        elseif (SubCat == 0x07) {
+            V[X, number] = floor(DelayTimer)
+        }
+        elseif (SubCat == 0x0A) {
+            local PressedKey = -1
+            for (KeyIdx = 0, 15) {
+                if (KeyContainer[KeyIdx, number] == 1) {
+                    PressedKey = KeyIdx
+                    break
+                }
+            }
+            if (PressedKey == -1) {
+                PC -= 2
+            } else {
+                V[X, number] = PressedKey
+            }
+        }
+        elseif (SubCat == 0x15) {
+            DelayTimer = V[X, number] && 0xFF
+        }
+        elseif (SubCat == 0x18) {
+            SoundTimer = V[X, number]
+            
+            AudioPitchByte = V[0, number] && 0xFF
+        }
+        elseif (SubCat == 0x1E) {
+            local NewI = I + V[X, number]
+            #V[15, number] = (NewI > 0x0FFF) ? 1 : 0
+            I = NewI && 0xFFFF
+        }
+        elseif (SubCat == 0x29) {
+            local Character = V[X, number] && 0x0F
+            I = (Character * 5) && 0xFFFF
+        }
+        elseif (SubCat == 0x30 & ChipType) {
+            local Character = V[X, number] && 0x0F
+            I = (80 + (Character * 10)) && 0xFFFF
+        }
+        elseif (SubCat == 0x75 & ChipType) {
+            for (RegIdx = 0, X) { 
+                RPLFlags[RegIdx, number] = V[RegIdx, number] 
+            }
+        }
+        elseif (SubCat == 0x85 & ChipType) {
+            for (RegIdx = 0, X) { 
+                V[RegIdx, number] = RPLFlags[RegIdx, number] 
+            }
+        }
+        elseif (SubCat == 0x55) {
+            for(RegIdx=0, X) {
+                Memory[I + RegIdx, number] = V[RegIdx, number]
+            }
+            if (ChipType == 0) { I = (I + X + 1) && 0xFFFF }
+        }
+        elseif (SubCat == 0x65) {
+            for(RegIdx=0, X) {
+                V[RegIdx, number] = Memory[I + RegIdx, number]
+            }
+            if (ChipType == 0) { I = (I + X + 1) && 0xFFFF }
+        }
+        elseif (SubCat == 0x33) {
+            local Value = V[X, number]
+            Memory[I, number] = floor(Value / 100)
+            Memory[I + 1, number] = floor((Value / 10) % 10)
+            Memory[I + 2, number] = Value % 10
+        }
+        elseif ((OpCode && 0xF0FF) == 0xF001) {
+            TargetPlane = X
+        }
+        elseif (SubCat == 0x7A) {            
+            AudioPitchByte = Memory[I, number]
+            AudioPatternByte2 = Memory[I + 1, number]
+        }
+    }
+    
+    return 1
+}
+
+function number c8RunScroll() {
+    if (ReDrawScreen) {
+        local MaxPx = ScreenW * ScreenH
+        while (ScrollKeyIdx <= ScrollKeysCount) {
+            if (DS["HitPerf", number] | !perf(90)) { break }
+            
+            local Px = ScrollKeys[ScrollKeyIdx, number]
+            
+            if (ScrollQueue[Px, number] == 1) { Display[Px, number] = 1 }
+            if (ScrollQueue2[Px, number] == 1) { DisplayPlane2[Px, number] = 1 }
+            C8WritePixel(Px)
+            ScrollKeyIdx++
+        }
+        
+        if (ScrollKeyIdx>ScrollKeysCount) {
+            ReDrawScreen = 0
+            ScrollKeyIdx = 1
+            ScrollQueue = table()
+            ScrollQueue2 = table()
+            return 1
+        }
+        
+        return 0
+    }
+    
+    if (IsScreenSyncing == 1) {                  
+        if (ScrollType == 1) {
+            local Shift = ScrollAmt * ScreenW
+            local MaxPx = ScreenW * ScreenH
+            while (ScrollKeyIdx <= ScrollKeysCount) {
+                if (DS["HitPerf", number] | !perf(90)) { break }
+                
+                local Px = ScrollKeys[ScrollKeyIdx, number]
+                local NewPx = Px + Shift
+                
+                if (NewPx < MaxPx) {
+                    if (ScrollQueue[Px, number] == 1) { Display[NewPx, number] = 1 }
+                    if (ScrollQueue2[Px, number] == 1) { DisplayPlane2[NewPx, number] = 1 }
+                    C8WritePixel(NewPx)
+                }
+                ScrollKeyIdx++
+            }
+        }
+        elseif (ScrollType == 2) {
+            while (ScrollKeyIdx <= ScrollKeysCount) {
+                if (DS["HitPerf", number] | !perf(90)) { break }
+                
+                local Px = ScrollKeys[ScrollKeyIdx, number]
+                local Rem = Px % ScreenW
+                local NewCol = Rem + 4
+                
+                if (NewCol < ScreenW) {
+                    local NewPx = NewCol + (Px - Rem)
+                    if (ScrollQueue[Px, number] == 1) { Display[NewPx, number] = 1 }
+                    if (ScrollQueue2[Px, number] == 1) { DisplayPlane2[NewPx, number] = 1 }
+                    C8WritePixel(NewPx)
+                }
+                ScrollKeyIdx++
+            }
+        } 
+        elseif (ScrollType == 3) {
+            while (ScrollKeyIdx <= ScrollKeysCount) {
+                if (DS["HitPerf", number] | !perf(90)) { break }
+                
+                local Px = ScrollKeys[ScrollKeyIdx, number]
+                local Rem = Px % ScreenW
+                local NewCol = Rem - 4
+                
+                if (NewCol >= 0) {
+                    local NewPx = NewCol + (Px - Rem)
+                    if (ScrollQueue[Px, number] == 1) { Display[NewPx, number] = 1 }
+                    if (ScrollQueue2[Px, number] == 1) { DisplayPlane2[NewPx, number] = 1 }
+                    C8WritePixel(NewPx)
+                }
+                ScrollKeyIdx++
+            }
+        }
+        elseif (ScrollType == 4) {
+            local Shift = ScrollAmt * ScreenW
+            while (ScrollKeyIdx <= ScrollKeysCount) {
+                if (DS["HitPerf", number] | !perf(90)) { break }
+                
+                local Px = ScrollKeys[ScrollKeyIdx, number]
+                local NewPx = Px - Shift
+                
+                if (NewPx >= 0) {
+                    if (ScrollQueue[Px, number] == 1) { Display[NewPx, number] = 1 }
+                    if (ScrollQueue2[Px, number] == 1) { DisplayPlane2[NewPx, number] = 1 }
+                    C8WritePixel(NewPx)
+                }
+                
+                ScrollKeyIdx++
+            }
+        }
+        
+        if (ScrollKeyIdx>ScrollKeysCount) {
+            IsScreenSyncing = 0
+            ScrollKeyIdx = 1
+            ScrollQueue = table()
+            ScrollQueue2 = table()
+            #PC += 2
+            return 1
+        }
+        
+        return 0
+    }
+    return 1
+}
+
+function c8Run() {
+    if (!IsRunning) { return }
+    
+    local CurrentTime = curtime()
+    local DeltaTime = CurrentTime - LastRealTime
+    LastRealTime = CurrentTime
+
+    if (!c8RunScroll()) {
+        return   
+    }
+
+    TimeAccumulator += DeltaTime
+    local TimePerInstruction = 1 / ClockSpeed
+    
+    local InstructionsPerTimerTick = ClockSpeed / 60
+    
+    while ((TimeAccumulator >= TimePerInstruction) & perf(80)) {
+        
+        local Break = 0
+        local StepResult = c8Step()
+        
+        if (StepResult==0) {            
+            Break = 1
+            StepResult = 1
+        }
+        TimeAccumulator -= TimePerInstruction #(TimePerInstruction * StepResult)
+        
+        TimerStepAccum++ #StepResult
+        if (TimerStepAccum >= InstructionsPerTimerTick) {
+            TimerStepAccum = 0
+            
+            if (DelayTimer > 0) { DelayTimer-- }
+            
+            if (SoundTimer > 0) {
+                if (!IsSoundPlaying) {
+                    SpeakerEnt:soundPlay(1, 1, "synth/square_440.wav")
+                    if (soundPlaying(1)) {
+                        if (ChipType == 2 & AudioPitchByte != 0) {
+
+                            if (AudioPitchByte == 0x02) {
+                                local TargetPitch = clamp(40 + (AudioPitchByte * 10), 40, 255) # Exactly 60 pitch
+                                soundPitch(1, TargetPitch)
+                            } 
+                            elseif (AudioPitchByte == 0xFF) {
+                                soundPitch(1, 240)
+                            }
+                            else {
+                                local TargetPitch = clamp(80 + (AudioPitchByte * 2), 40, 255)
+                                soundPitch(1, TargetPitch)
+                            }
+                        } else {
+                            soundPitch(1, 100)
+                        }
+                        
+                        IsSoundPlaying = 1 
+                    }
+                }
+                SoundTimer--
+            } else {
+                if (IsSoundPlaying) {
+                    soundStop(1)
+                    IsSoundPlaying = 0
+                }
+            }
+        }       
+        
+        if (Break) {
+            c8Run()
+            return   
+        } 
+    }
+}
+

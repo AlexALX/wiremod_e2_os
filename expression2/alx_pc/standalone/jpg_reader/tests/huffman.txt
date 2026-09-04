@@ -1,6 +1,6 @@
 @name Huffman tests
 
-#include "alx_pc/standalone/jpg_reader/tests/_shared_"
+#include "alx_pc/standalone/includes/testslib"
 #include "alx_pc/standalone/jpg_reader/huffman"
 
 function number assertHuffmanEntry(

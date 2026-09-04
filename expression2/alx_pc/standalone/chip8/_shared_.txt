@@ -1,0 +1,10 @@
+@persist DS:wirelink
+@persist Memory:table V:table I:number PC:number SP:number Stack:table SpeakerEnt:entity IsSoundPlaying:number
+@persist DelayTimer:number SoundTimer:number Display:table RomData:string RomSize:number RomLast:number
+@persist KeyContainer:table KeyMap:table SpriteClipMode:number RPLFlags:table TimerStepAccum:number
+@persist IsRunning:number ClockSpeed:number LastRealTime:number TimeAccumulator:number
+@persist ChipType:number ScreenW:number ScreenH:number IsLoaded:number NewDisplay:table
+@persist ScrollQueue:table ScrollKeyIdx:number ScrollKeys:array ScrollKeysCount:number
+@persist DisplayPlane2:table TargetPlane:number ScrollQueue2:table ReDrawScreen:number
+@persist C8WritePixel:function AudioPitchByte:number AudioPatternByte2:number ChipError:string
+@persist ChipNoPrint:number

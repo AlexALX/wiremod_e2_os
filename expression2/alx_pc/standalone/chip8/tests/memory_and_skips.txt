@@ -1,0 +1,144 @@
+#include "alx_pc/standalone/chip8/tests/_shared_"
+
+function resetTestEnv(Type:number) {
+    c8Reset()
+    ChipType = Type
+    PC = 0x200
+}
+
+# ==============================================================================
+# INDIVIDUAL TEST STEPS FOR SKIPS AND RANGE OPCODES
+# ==============================================================================
+
+ExecuteTestStep = function(StepId:number) {
+    local Name = ""
+    
+    if (StepId == 1) {
+        Name = "OP 3XNN (SE VX == NN) - SKIP"
+        resetTestEnv(2) # XO-CHIP mode
+        V[1, number] = 0x42
+        Memory[0x200, number] = 0x31
+        Memory[0x201, number] = 0x42 # 3142 -> Skip next if V1 == 0x42
+        Memory[0x202, number] = 0x12
+        Memory[0x203, number] = 0x34 # Normal 2-byte instruction to skip
+        c8Step()
+        # Normal step is 2 bytes. If skipped, PC must be 0x200 + 2 + 2 = 0x204
+        if (!assertCase(Name, 1, PC, 0x204)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 2) {
+        Name = "OP 3XNN (SE VX == NN) - NO SKIP"
+        resetTestEnv(2)
+        V[1, number] = 0x11
+        Memory[0x200, number] = 0x31
+        Memory[0x201, number] = 0x42 # 3142 -> No skip because 0x11 != 0x42
+        c8Step()
+        if (!assertCase(Name, 1, PC, 0x202)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 3) {
+        Name = "OP 4XNN (SNE VX != NN) - SKIP"
+        resetTestEnv(2)
+        V[2, number] = 0xAA
+        Memory[0x200, number] = 0x42
+        Memory[0x201, number] = 0xBB # 42BB -> Skip next if V2 != 0xBB
+        Memory[0x202, number] = 0x12
+        Memory[0x203, number] = 0x34 
+        c8Step()
+        if (!assertCase(Name, 1, PC, 0x204)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 4) {
+        Name = "OP 5XY0 (SE VX == VY) - SKIP"
+        resetTestEnv(2)
+        V[3, number] = 0x55
+        V[4, number] = 0x55
+        Memory[0x200, number] = 0x53
+        Memory[0x201, number] = 0x40 # 5340 -> Skip if V3 == V4
+        Memory[0x202, number] = 0x12
+        Memory[0x203, number] = 0x34
+        c8Step()
+        if (!assertCase(Name, 1, PC, 0x204)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 5) {
+        Name = "OP 9XY0 (SNE VX != VY) - SKIP"
+        resetTestEnv(2)
+        V[5, number] = 0x12
+        V[6, number] = 0x34
+        Memory[0x200, number] = 0x95
+        Memory[0x201, number] = 0x60 # 9560 -> Skip if V5 != V6
+        Memory[0x202, number] = 0x12
+        Memory[0x203, number] = 0x34
+        c8Step()
+        if (!assertCase(Name, 1, PC, 0x204)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 6) {
+        Name = "XO-CHIP LONG OP SKIP (F000 NNNN)"
+        resetTestEnv(2) # XO-CHIP mode
+        V[1, number] = 0x99
+        Memory[0x200, number] = 0x31
+        Memory[0x201, number] = 0x99 # 3199 -> Skip next if V1 == 0x99
+        Memory[0x202, number] = 0xF0
+        Memory[0x203, number] = 0x00 # Part 1 of 4-byte instruction (F000)
+        Memory[0x204, number] = 0x12
+        Memory[0x205, number] = 0x34 # Part 2 of 4-byte instruction (NNNN)
+        c8Step()
+        # Your interpreter checks: PC += (NextOp == 0xF000) ? 4 : 2
+        # Expected PC: 0x200 (base) + 2 (current instruction) + 4 (skipped long instruction) = 0x206
+        if (!assertCase(Name, 1, PC, 0x206)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 7) {
+        Name = "OP 5XY2 (SAVE RANGE X < Y)"
+        resetTestEnv(2)
+        I = 0x300
+        V[1, number] = 0xAA
+        V[2, number] = 0xBB
+        V[3, number] = 0xCC
+        Memory[0x200, number] = 0x51
+        Memory[0x201, number] = 0x32 # 5132 -> Save range from V1 up to V3 (Dist = 2)
+        c8Step()
+        if (!assertCase(Name, 1, Memory[0x300, number], 0xAA)) { return 0 }
+        if (!assertCase(Name, 2, Memory[0x301, number], 0xBB)) { return 0 }
+        if (!assertCase(Name, 3, Memory[0x302, number], 0xCC)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 8) {
+        Name = "OP 5XY2 (SAVE RANGE X > Y)"
+        resetTestEnv(2)
+        I = 0x400
+        V[4, number] = 0x11
+        V[3, number] = 0x22
+        V[2, number] = 0x33
+        Memory[0x200, number] = 0x54
+        Memory[0x201, number] = 0x22 # 5422 -> Save range from V4 down to V2 (Dist = 2)
+        c8Step()
+        if (!assertCase(Name, 1, Memory[0x400, number], 0x11)) { return 0 }
+        if (!assertCase(Name, 2, Memory[0x401, number], 0x22)) { return 0 }
+        if (!assertCase(Name, 3, Memory[0x402, number], 0x33)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 9) {
+        Name = "OP 5XY3 (LOAD RANGE X < Y)"
+        resetTestEnv(2)
+        I = 0x500
+        Memory[0x500, number] = 0x55
+        Memory[0x501, number] = 0x66
+        Memory[0x502, number] = 0x77
+        Memory[0x200, number] = 0x5A
+        Memory[0x201, number] = 0xC3 # 5AC3 -> Load registers VA up to VC (10 to 12)
+        c8Step()
+        if (!assertCase(Name, 1, V[10, number], 0x55)) { return 0 }
+        if (!assertCase(Name, 2, V[11, number], 0x66)) { return 0 }
+        if (!assertCase(Name, 3, V[12, number], 0x77)) { return 0 }
+        testPass(Name)
+    }
+
+    return 1
+}
+
+TotalCases = 9
+
+runTests()

@@ -1,0 +1,41 @@
+@persist TestsPassed TestsFailed TotalCases
+@persist TestState CurrentCase TestRunnerActive
+@persist ExecuteTestStep:function
+
+if (first() | duped()) {
+    
+    #include "alx_pc/standalone/includes/testslib"
+    #include "alx_pc/standalone/chip8/emulator"
+    
+    function runTests() {
+        if (TestState == 1) {
+            while ((CurrentCase <= TotalCases) & perf(90)) {
+                # Invoke the lambda function stored in the persist variable
+                local Ret = ExecuteTestStep(CurrentCase)[number]   
+                # wait for next tick
+                if (Ret==-1) { break }  
+                CurrentCase++
+            }
+            
+            if (CurrentCase > TotalCases) {
+                TestState = 2
+            } else {
+                timer(0.001, function() {
+                    runTests()    
+                })
+            }
+        }
+        
+        if (TestState == 2) {
+            TestRunnerActive = 0
+            testResults()
+        }
+    }
+    
+    TestsPassed = 0
+    TestsFailed = 0
+    TestState = 1 # 1: Run, 2: Done
+    CurrentCase = 1
+    TestRunnerActive = 1
+    TotalCases = 0
+}

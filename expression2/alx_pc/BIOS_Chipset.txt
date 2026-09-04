@@ -420,6 +420,7 @@ function init() {
         Devices["usb",table] = table()
         Devices["network",table] = table()
         Devices["nw_connects",table] = table()
+        Devices["buzzer",entity] = Speaker
         FS_TYPES = table()
         
         if (!->ROM) {

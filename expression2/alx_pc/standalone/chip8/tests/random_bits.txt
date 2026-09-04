@@ -1,0 +1,58 @@
+#include "alx_pc/standalone/chip8/tests/_shared_"
+
+function resetTestEnv(Type:number) {
+    c8Reset()
+    ChipType = Type
+    PC = 0x200
+}
+
+# ==============================================================================
+# DIAGNOSTIC TEST FOR CXNN (RANDOM) BITMASK MASKS IN E2
+# ==============================================================================
+
+ExecuteTestStep = function(StepId:number) {
+    local Name = ""
+    
+    if (StepId == 1) {
+        Name = "OP CXNN RANDOM VALUE BOUNDARY VERIFICATION"
+        resetTestEnv(2)
+        
+        # C003 -> V0 = randint(0, 255) && 0x03
+        Memory[0x200, number] = 0xC0
+        Memory[0x201, number] = 0x03
+        
+        # Run it multiple times to see the distribution of values in V0
+        local CombinedBits = 0
+        local HadZero = 0
+        local HadOne = 0
+        local HadTwo = 0
+        
+        for (Iteration = 1, 50) {
+            PC = 0x200
+            c8Step()
+            local Result = V[0, number]
+            
+            if (Result == 0) { HadZero = 1 }
+            if (Result == 1) { HadOne = 1 }
+            if (Result == 2) { HadTwo = 1 }
+            
+            # If Result ever goes above 3, it means the mask 0x03 failed!
+            if (Result > 3) {
+                if (!assertCase(Name, 1, Result, 3)) { return 0 }
+            }
+        }
+        
+        # Verify if the random opcode is capable of generating 0, 1, and 2
+        # If any of these are 0, the AI beetles will be completely paralyzed!
+        if (!assertCase(Name, 2, HadZero, 1)) { return 0 }
+        if (!assertCase(Name, 3, HadOne, 1)) { return 0 }
+        if (!assertCase(Name, 4, HadTwo, 1)) { return 0 }
+        
+        testPass(Name)
+    }
+
+    return 1
+}
+
+TotalCases = 1
+runTests()

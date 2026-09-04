@@ -1,0 +1,57 @@
+#include "alx_pc/standalone/chip8/tests/_shared_"
+
+function resetTestEnv(Type:number) {
+    c8Reset()
+    ChipType = Type
+    PC = 0x200
+}
+
+# ==============================================================================
+# DIAGNOSTIC TEST FOR VBLANK SYNC (00D4) AND AUDIO PATTERN LOADING (FX7A)
+# ==============================================================================
+
+ExecuteTestStep = function(StepId:number) {
+    local Name = ""
+    
+    if (StepId == 1) {
+        Name = "XO-CHIP VBLANK INTERRUPT VERIFICATION (0x00D4)"
+        resetTestEnv(2) # XO-CHIP mode
+        
+        # 0x00D4 -> Wait for vertical blank hardware frame sync
+        Memory[0x200, number] = 0x00
+        Memory[0x201, number] = 0xD4
+        
+        local StepResult = c8Step()
+        
+        # Under your precise E2 kernel architecture:
+        # VBlank MUST return exactly 0 to trigger the recursive loop 'Break' state!
+        if (!assertCase(Name, 1, StepResult, 0)) { return 0 }
+        
+        testPass(Name)
+    }
+    elseif (StepId == 2) {
+        Name = "XO-CHIP AUDIO PATTERN BUFFER REGISTRATION (0xFX7A)"
+        resetTestEnv(2)
+        
+        # Setup source memory pointer I at 0x400 containing simulated sound wave bytes
+        I = 0x400
+        Memory[0x400, number] = 0x02 # Pitch configuration byte used by Chicken Scratch
+        Memory[0x401, number] = 0x21 # Duration configuration byte
+        
+        # 0xF57A -> Load 16-byte audio pattern buffer from I into sound hardware channels
+        Memory[0x200, number] = 0xF5
+        Memory[0x201, number] = 0x7A
+        
+        local StepResult = c8Step()
+        
+        # Standard instruction cycle cost must equal 1
+        if (!assertCase(Name, 1, StepResult, 1)) { return 0 }
+        
+        testPass(Name)
+    }
+
+    return 1
+}
+
+TotalCases = 2
+runTests()

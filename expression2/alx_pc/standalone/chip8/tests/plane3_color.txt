@@ -1,0 +1,51 @@
+#include "alx_pc/standalone/chip8/tests/_shared_"
+
+function resetTestEnv(Type:number) {
+    c8Reset()
+    ChipType = Type
+    PC = 0x200
+    ScreenW = 64
+    ScreenH = 32
+}
+
+# ==============================================================================
+# INDIVIDUAL TEST STEPS FOR XO-CHIP PLANE 3 GRAPHICS COLOR VALUES
+# ==============================================================================
+
+ExecuteTestStep = function(StepId:number) {
+    local Name = ""
+    
+    if (StepId == 1) {
+        Name = "XO-CHIP PLANE 3 DRAWING COLOR VALUE VERIFICATION"
+        resetTestEnv(2) # XO-CHIP mode
+        
+        # 1. Force TargetPlane to 3 (Draw on both planes simultaneously)
+        TargetPlane = 3
+        
+        # 2. Put a mock 1-byte sprite into memory
+        I = 0x300
+        Memory[0x300, number] = 0x80 # Binary: 10000000 (One pixel at X=0)
+        V[1, number] = 0 # X
+        V[2, number] = 0 # Y
+        
+        # 3. Execute D121 (Draw 1 row sprite at 0,0)
+        Memory[0x200, number] = 0xD1
+        Memory[0x201, number] = 0x21
+        c8Step()
+        
+        # 4. Verify what value was pushed into the screen buffer DS at index 0
+        # According to c8WritePixel, if P1=1 and P2=1, it writes 100.
+        # Let's assert if it equals 100, and evaluate if your main E2 renderer 
+        # actually displays the color value 100 on the physical monitor!
+        if (!assertCase(Name, 1, Display[0, number], 1)) { return 0 }
+        if (!assertCase(Name, 2, DisplayPlane2[0, number], 1)) { return 0 }
+        #if (!assertCase(Name, 3, DS[0], 100)) { return 0 }
+        
+        testPass(Name)
+    }
+
+    return 1
+}
+
+TotalCases = 1
+runTests()

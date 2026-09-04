@@ -264,33 +264,42 @@ function alxos_console_command() {
     }
 }
 
-function alxos_console_input(Msg:string, Func:function, RE:string) {
+function alxos_console_input(Msg:string, Func:function, RE:string, Value:string) {
     CmdInputFunc = Func
     CmdInputRE = RE
-    
-    alxos_console_msg(Msg)
+     
+    alxos_console_msg(Msg + (CmdScreen ? Value : ""))
     
     GpuData[-1,number] = LAST_I
     GpuData[-2,number] = BIOS_X + Msg:length()*10
     GpuData["inputLen",number] = Msg:length()
     GpuData["inputMsg",string] = Msg
-    GpuData[-4,string] = ""
+    GpuData[-4,string] = Value
     
     alxos_console_move()
     
     if (!CmdScreen) {
-        EGP:egpText(LAST_I,"",vec2(GpuData[-2,number]-BIOS_X,0))
+        EGP:egpText(LAST_I,Value,vec2(GpuData[-2,number]-BIOS_X,0))
         EGP:egpFont(LAST_I,"Courier New")
         EGP:egpParent(LAST_I,LAST_I-1)
         EGP:egpColor(LAST_I,168,168,168,255) LAST_I++
     } else {
         CmdLinesC--
     }
+    
+    if (Value) {
+        GpuData[-2,number] = GpuData[-2,number] + Value:length()*10     
+    }
 
     KeyHandler = "alxos_console_inputkey"
     alxos_upd_cursor()
     alxos_show_cursor()
 }
+
+function alxos_console_input(Msg:string, Func:function, RE:string) {
+    alxos_console_input(Msg, Func, RE, "")     
+}
+
 function alxos_console_input(Msg:string, Func:function) {
     alxos_console_input(Msg, Func, "^[A-Za-z0-9_ /.:-]$")
 }
@@ -1229,10 +1238,9 @@ function alxos_console_inputkey(Key:string,Pressed) {
         }
         
         local Result = CmdInputFunc(GpuData[-4,string])[number]
-        #[
-        if (Result) {
-            alxos_console_noinput()
-        } ]#
+        if (Result) {            
+            #alxos_console_noinput()
+        } 
     } elseif (Key=="f8") {
         if (CmdScreen) {
             CmdLinesC++

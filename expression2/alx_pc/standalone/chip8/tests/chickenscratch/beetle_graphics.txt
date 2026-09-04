@@ -1,0 +1,87 @@
+#include "alx_pc/standalone/chip8/tests/_shared_"
+
+function resetTestEnv(Type:number) {
+    c8Reset()
+    ChipType = Type
+    PC = 0x200
+    ScreenW = 64
+    ScreenH = 32
+}
+
+# ==============================================================================
+# INDIVIDUAL TEST STEPS FOR CHICKEN SCRATCH BEETLE GRAPHICS MOTIONS
+# ==============================================================================
+
+ExecuteTestStep = function(StepId:number) {
+    local Name = ""
+    
+    if (StepId == 1) {
+        Name = "BEETLE POS CALCULATION & INITIAL DRAW (DXYN)"
+        resetTestEnv(2) # XO-CHIP mode
+        
+        # 1. Setup game-like state variables in registers (simulating beetle-pos)
+        # map-offset-x (VC) = 8, map-offset-y (VD) = 11
+        V[12, number] = 8
+        V[13, number] = 11
+        
+        # Beetle target: tile-x = 12, tile-y = 12. Direction = 1 (Left)
+        # In Chicken Scratch logic: 
+        # VX = (tile-x - map-offset-x) * 8 -> (12 - 8) * 8 = 32 pixels
+        # VY = (tile-y - map-offset-y) * 8 -> (12 - 11) * 8 = 8 pixels
+        V[1, number] = 32 # Calculated X
+        V[2, number] = 8  # Calculated Y
+        
+        # 2. Put a mock 8x8 beetle sprite into memory at address I (0x400)
+        I = 0x400
+        for(Idx = 0, 7) {
+            Memory[0x400 + Idx, number] = 0xFF # Solid 8x8 block for the beetle
+        }
+        
+        # 3. Execute D128 (Draw sprite from I at V1, V2 with height 8)
+        Memory[0x200, number] = 0xD1
+        Memory[0x201, number] = 0x28
+        c8Step()
+        
+        # Check if the solid block appeared at screen pixels (32, 8)
+        # PixelIndex = X + Y * ScreenW -> 32 + 8 * 64 = 544
+        if (!assertCase(Name, 1, Display[544, number], 1)) { return 0 }
+        if (!assertCase(Name, 2, V[15, number], 0)) { return 0 } # No collision yet
+        
+        testPass(Name)
+    }
+    elseif (StepId == 2) {
+        Name = "BEETLE ERASE (XOR INVERSION & VF COLLISION)"
+        # We continue from a state where the beetle is already drawn at (32, 8)
+        # Drawing it again at the exact same position must clear it and set VF = 1
+        Memory[0x202, number] = 0xD1
+        Memory[0x203, number] = 0x28
+        c8Step()
+        
+        if (!assertCase(Name, 1, Display[544, number], 0)) { return 0 }
+        if (!assertCase(Name, 2, V[15, number], 1)) { return 0 } # XOR turned pixels off!
+        
+        testPass(Name)
+    }
+    elseif (StepId == 3) {
+        Name = "BEETLE INDEX REGISTER FX1E PRECISION"
+        resetTestEnv(2)
+        
+        # In Chicken Scratch, 'i += v2' is heavily used to offset sprite pointers.
+        # Let's verify if index addition handles boundary wraps and retains integrity.
+        I = 0x0FFF
+        V[4, number] = 0x20
+        
+        # F41E -> I = I + V4 (0x0FFF + 0x20 = 0x101F)
+        Memory[0x200, number] = 0xF4
+        Memory[0x201, number] = 0x1E
+        c8Step()
+        
+        if (!assertCase(Name, 1, I, 0x101F)) { return 0 }
+        testPass(Name)
+    }
+
+    return 1
+}
+
+TotalCases = 3
+runTests()

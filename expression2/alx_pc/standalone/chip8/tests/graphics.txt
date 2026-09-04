@@ -1,0 +1,105 @@
+#include "alx_pc/standalone/chip8/tests/_shared_"
+
+function resetTestEnv(Type:number) {
+    c8Reset()
+    ChipType = Type
+    PC = 0x200
+    ScreenW = 64
+    ScreenH = 32
+}
+
+# ==============================================================================
+# INDIVIDUAL TEST STEPS FOR GRAPHICS, COLLIDERS AND PLANES (DXYN / F001)
+# ==============================================================================
+
+ExecuteTestStep = function(StepId:number) {
+    local Name = ""
+    
+    if (StepId == 1) {
+        Name = "OP DXYN (DRAW BASIC SPRITE & VF NO COLLISION)"
+        resetTestEnv(2) # XO-CHIP mode
+        I = 0x300
+        # 1-row sprite: 10101010 (0xAA)
+        Memory[0x300, number] = 0xAA 
+        V[1, number] = 0 # X coordinate
+        V[2, number] = 0 # Y coordinate
+        
+        Memory[0x200, number] = 0xD1
+        Memory[0x201, number] = 0x21 # D121 -> Draw 1-byte sprite from I at (V1, V2)
+        c8Step()
+        
+        # Check pixels on Plane 1 (index = X + Y * ScreenW)
+        if (!assertCase(Name, 1, Display[0, number], 1)) { return 0 } # 1
+        if (!assertCase(Name, 2, Display[1, number], 0)) { return 0 } # 0
+        if (!assertCase(Name, 3, Display[2, number], 1)) { return 0 } # 1
+        # VF should be 0 (no collision)
+        if (!assertCase(Name, 4, V[15, number], 0)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 2) {
+        Name = "OP DXYN (SPRITE XOR COLLISION DETECTION)"
+        resetTestEnv(2)
+        I = 0x300
+        Memory[0x300, number] = 0x80 # Sprite: 10000000
+        V[1, number] = 5
+        V[2, number] = 5
+        
+        # Draw it first time
+        Memory[0x200, number] = 0xD1
+        Memory[0x201, number] = 0x21
+        c8Step()
+        
+        # Draw it second time at same position to cause XOR collision
+        PC = 0x200
+        c8Step()
+        
+        # Pixel should be inverted back to 0
+        local PixIdx = 5 + (5 * ScreenW)
+        if (!assertCase(Name, 1, Display[PixIdx, number], 0)) { return 0 }
+        # VF must be 1 because a pixel was turned off
+        if (!assertCase(Name, 2, V[15, number], 1)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 3) {
+        Name = "XO-CHIP MULTI-PLANE DRAWING (F001 & DXYN)"
+        resetTestEnv(2) # XO-CHIP mode
+        I = 0x300
+        Memory[0x300, number] = 0xFF # Sprite layer 1
+        Memory[0x301, number] = 0xFF # Sprite layer 2
+        V[1, number] = 0
+        V[2, number] = 0
+        
+        # Step 3.1: Select Plane 1 (FN01 where X=1)
+        Memory[0x200, number] = 0xF1
+        Memory[0x201, number] = 0x01 # F101 -> TargetPlane = 1
+        c8Step()
+        if (!assertCase(Name, 1, TargetPlane, 1)) { return 0 }
+        
+        # Draw on Plane 1
+        Memory[0x202, number] = 0xD1
+        Memory[0x203, number] = 0x21 # Draw 1 row
+        c8Step()
+        if (!assertCase(Name, 2, Display[0, number], 1)) { return 0 }
+        if (!assertCase(Name, 3, DisplayPlane2[0, number], 0)) { return 0 }
+        
+        # Step 3.2: Select Plane 2 (FN01 where X=2)
+        Memory[0x204, number] = 0xF2
+        Memory[0x205, number] = 0x01 # F201 -> TargetPlane = 2
+        c8Step()
+        if (!assertCase(Name, 4, TargetPlane, 2)) { return 0 }
+        
+        # Draw on Plane 2
+        Memory[0x206, number] = 0xD1
+        Memory[0x207, number] = 0x21
+        c8Step()
+        # Now Plane 2 should have the pixel
+        if (!assertCase(Name, 5, DisplayPlane2[0, number], 1)) { return 0 }
+        
+        testPass(Name)
+    }
+
+    return 1
+}
+
+TotalCases = 3
+runTests()

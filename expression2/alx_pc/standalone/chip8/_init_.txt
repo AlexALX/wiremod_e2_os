@@ -1,0 +1,87 @@
+@name CHIP-8 Emulator Core Library
+
+#[
+    CHIP-8 Emulator
+    Created by AlexALX (c) 2026
+]#
+
+#include "alx_pc/standalone/chip8/_shared_"
+#include "alx_pc/standalone/chip8/emulator"
+#include "alx_pc/standalone/chip8/keymap"
+
+if (first() | duped()) {    
+    ClockSpeed = 500
+}
+
+function c8Init(Data:string, SpriteMode:number, Frequency:number, Speaker:entity) {
+    c8MemoryReset()
+    c8Reset()
+    
+    ChipError = ""
+    
+    local DataSize = Data:length()
+    if (DataSize>65024) {
+        ChipError = "Invalid ROM! It is too large: "+DataSize+" bytes."
+        if (!ChipNoPrint) {
+            print("Error: "+ChipError)
+        }
+        return    
+    } elseif (DataSize==0) {
+        ChipError = "Invalid ROM! Size is 0."
+        if (!ChipNoPrint) {
+            print("Error: "+ChipError)
+        }
+        return
+    }
+    
+    IsLoaded = 1
+    
+    if (!Frequency) { Frequency = 500 }
+    
+    c8SetMode(SpriteMode)
+    c8SetFrequency(Frequency)
+    
+    SpeakerEnt = Speaker
+    
+    RomData = Data
+    RomSize = DataSize
+
+    local DsShift = DS["DsShifted", number]
+    DS[1048569 + DsShift] = 4
+    DS[1048575 + DsShift] = 1
+    
+    DS[1048573 + DsShift] = ScreenW
+    DS[1048572 + DsShift] = ScreenH
+    
+    # special custom flag mean drew, used in console ds mode
+    DS[1048500+DsShift] = 1
+    
+    c8DisplayClear()
+    if (!ChipNoPrint) {
+        print("Loading CHIP ROM, Size: " + RomSize + " bytes.")
+    }
+        
+    c8FillMemory()
+}
+
+function c8Restart() {
+    c8Init(RomData,SpriteClipMode,ClockSpeed,SpeakerEnt)
+}
+
+function number c8HandleKeyEvent(Key:string, Down:number) {
+    if (KeyMap:exists(Key)) {
+        local TargetKey = KeyMap[Key, number]
+        KeyContainer[TargetKey, number] = Down
+        return 1
+    }
+    return 0
+}
+
+event tick() {
+    if (!IsRunning) { exit() }
+    c8Run()
+}
+
+event removed(Resetting:number) {
+    soundStop(1)    
+}

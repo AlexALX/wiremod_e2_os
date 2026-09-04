@@ -1,0 +1,93 @@
+@name CHIP-8 Helper for DS
+@persist Header:string Inited:number
+@inputs IsLoaded:number ChipError:string
+@strict
+
+#include "alx_pc/standalone/helpers/_shared_"
+
+function displayHelp() {
+    displayInit(1)
+
+    local Text = 
+"CHIP-8 Emulator Created by AlexALX (c) 2026
+-------------------
+Specifications:
+- Support CHIP-8, Super-CHIP, XO-CHIP
+- Support 64x32/128x64, 2 Planes (4 colors)
+- Support hardware screen scrolling
+- Audio Engine with dynamic Pitch
+- Automatic ROM specification detect
+- Supports multiplayer (Pong), 2 keyboards
+Usage via chat commands:
+!ch8 http://url - open ROM file
+Note: long url may be cut, use input LongURL 
+ instead for such case (via string value)
+!ch8file filename.ch8.txt - open ROM
+ from garrysmod/data/e2files/ folder
+ file extension must be renamed to .txt
+!ch8restart - restart exeution
+!ch8freq num - set CPU clock (500)
+!ch8abort - stop and clear memory
+!ch8mode 0/1 - wrap (0) or clipping (1) mode
+Default Key Mapping:
+- Row 1: [ 1 ][ 2 ][ 3 ][ 4 ] -> 1, 2, 3, C
+- Row 2: [ Q ][ W ][ E ][ R ] -> 4, 5, 6, D
+- Row 3: [ A ][ S ][ D ][ F ] -> 7, 8, 9, E
+- Row 4: [ Z ][ X ][ C ][ V ] -> A, 0, B, F
+ Note: Different games have different key 
+ layouts, no single standard!
+Aliases & System Hotkeys:
+- Arrows UP / DOWN / LEFT / RIGHT -> 2,8,4,6
+- Keyboard [ SPACE ] (Action)     -> 5
+- [ F1 ] - Reset       | [ F2 ] - Play/Pause
+- [ F3 ] - Toggle mode | [ F4 ] - Stop Emu
+Check E2 chip for more information
+"
+
+    dsDrawTextStart(2, 0, Text)
+}
+
+function displayError(Msg:string) {
+    displayInit(1)
+    
+    local Text = Header+
+"
+CHIP-8 Error:
+
+"+Msg+"
+"
+
+    dsDrawTextStart(2, 0, Text)
+}
+
+function displayMode() {
+    if (ChipError){ 
+        displayError(ChipError)
+    } elseif (!IsLoaded) {
+        displayHelp()    
+    }   
+}
+
+if (first() | duped()) {
+    Header = 
+"CHIP-8 Emulator 
+Created by AlexALX (c) 2026
+-------------------"
+    
+    displayMode()
+}
+
+
+event input(InputName:string) {    
+    if (InputName=="DS" & DS!=nowirelink()) {
+        displayMode()
+    } elseif (InputName=="ChipError" & ChipError) {
+        displayError(ChipError)
+    } elseif (InputName=="IsLoaded") {
+        if (IsLoaded) {    
+            dsStopQueues()
+        } else {
+            displayMode()
+        }
+    }
+}

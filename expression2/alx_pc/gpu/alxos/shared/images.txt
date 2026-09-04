@@ -54,6 +54,10 @@ function alxos_prog_img_unplug() {
     stopAllTimers()
     ExplorerDsH = ""
     ShutHandler = "alxos_clear"
+    
+    local IMGAccelerator = alxos_img_findAccelerator()
+    dsSendDirect("SHUTDOWN",IMGAccelerator[3,entity],0)
+    
     if (GpuData["lastProg",string]=="alxos_console") {
         "alxos_console_msg"("Disk was unplugged.")
         "alxos_console_command"()

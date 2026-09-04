@@ -22,7 +22,7 @@ function alxos_png_init(Args:table) {
     local Width = 450
     local Height = 110
 
-    local Parent = "alxos_explorer_dialog"("PNG Settings",Width,Height,"","alxos_png_close")[number]
+    local Parent = "alxos_explorer_dialog"("PNG Settings",Width,Height,"","alxos_img_close")[number]
     
     DialogData[7,number] = LAST_I
     

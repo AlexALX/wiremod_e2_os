@@ -1,6 +1,6 @@
 @name Jpg Block Test
 
-#include "alx_pc/standalone/jpg_reader/tests/_shared_"
+#include "alx_pc/standalone/includes/testslib"
 #include "alx_pc/standalone/jpg_reader/tests/_jpg_shared_"
 #include "alx_pc/standalone/jpg_reader/decoder"
 

@@ -1,5 +1,5 @@
 @persist Header:string BlockDraw:number
-@inputs DS:wirelink ImageProcessor:wirelink
+@inputs DS:wirelink E2Processor:wirelink
 @strict
 
 #include "alx_pc/standalone/ds_gfx/_init_"

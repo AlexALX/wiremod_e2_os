@@ -1,0 +1,100 @@
+#include "alx_pc/standalone/chip8/tests/_shared_"
+
+function resetTestEnv(Type:number) {
+    c8Reset()
+    ChipType = Type
+    PC = 0x200
+}
+
+# ==============================================================================
+# INDIVIDUAL TEST STEPS FOR MEMORY READ/WRITE AND CAPTURED QUIRKS
+# ==============================================================================
+
+ExecuteTestStep = function(StepId:number) {
+    local Name = ""
+    
+    if (StepId == 1) {
+        Name = "OP FX33 (BCD CONVERSION)"
+        resetTestEnv(2) # XO-CHIP mode
+        I = 0x400
+        V[3, number] = 237 # Number to convert: 2, 3, 7
+        Memory[0x200, number] = 0xF3
+        Memory[0x201, number] = 0x33 # F333 -> Store BCD of V3 at I
+        c8Step()
+        if (!assertCase(Name, 1, Memory[0x400, number], 2)) { return 0 }
+        if (!assertCase(Name, 2, Memory[0x401, number], 3)) { return 0 }
+        if (!assertCase(Name, 3, Memory[0x402, number], 7)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 2) {
+        Name = "OP FX55 (STORE REGS CHIP8 I-INCREMENT QUIRK)"
+        resetTestEnv(0) # Classical CHIP-8 mode
+        I = 0x300
+        V[0, number] = 0x11
+        V[1, number] = 0x22
+        V[2, number] = 0x33 # Store up to V2 (X = 2)
+        Memory[0x200, number] = 0xF2
+        Memory[0x201, number] = 0x55 # F255 -> Store V0..V2 at I
+        c8Step()
+        # Verify stored values
+        if (!assertCase(Name, 1, Memory[0x300, number], 0x11)) { return 0 }
+        if (!assertCase(Name, 2, Memory[0x301, number], 0x22)) { return 0 }
+        if (!assertCase(Name, 3, Memory[0x302, number], 0x33)) { return 0 }
+        # Classical CHIP-8 increments I by X + 1 -> 0x300 + 2 + 1 = 0x303
+        if (!assertCase(Name, 4, I, 0x303)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 3) {
+        Name = "OP FX55 (STORE REGS XOCHIP I-STAY QUIRK)"
+        resetTestEnv(2) # XO-CHIP mode
+        I = 0x300
+        V[0, number] = 0xAA
+        V[1, number] = 0xBB
+        Memory[0x200, number] = 0xF1
+        Memory[0x201, number] = 0x55 # F155 -> Store V0..V1 at I
+        c8Step()
+        if (!assertCase(Name, 1, Memory[0x300, number], 0xAA)) { return 0 }
+        if (!assertCase(Name, 2, Memory[0x301, number], 0xBB)) { return 0 }
+        # XO-CHIP / Super-CHIP leaves I untouched -> 0x300
+        if (!assertCase(Name, 3, I, 0x300)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 4) {
+        Name = "OP FX65 (LOAD REGS CHIP8 I-INCREMENT QUIRK)"
+        resetTestEnv(0) # Classical CHIP-8 mode
+        I = 0x500
+        Memory[0x500, number] = 0x55
+        Memory[0x501, number] = 0x66
+        Memory[0x502, number] = 0x77
+        Memory[0x200, number] = 0xF2
+        Memory[0x201, number] = 0x65 # F265 -> Load V0..V2 from I
+        c8Step()
+        if (!assertCase(Name, 1, V[0, number], 0x55)) { return 0 }
+        if (!assertCase(Name, 2, V[1, number], 0x66)) { return 0 }
+        if (!assertCase(Name, 3, V[2, number], 0x77)) { return 0 }
+        # I must increment by X + 1 -> 0x500 + 2 + 1 = 0x503
+        if (!assertCase(Name, 4, I, 0x503)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 5) {
+        Name = "OP FX65 (LOAD REGS XOCHIP I-STAY QUIRK)"
+        resetTestEnv(2) # XO-CHIP mode
+        I = 0x500
+        Memory[0x500, number] = 0x88
+        Memory[0x501, number] = 0x99
+        Memory[0x200, number] = 0xF1
+        Memory[0x201, number] = 0x65 # F165 -> Load V0..V1 from I
+        c8Step()
+        if (!assertCase(Name, 1, V[0, number], 0x88)) { return 0 }
+        if (!assertCase(Name, 2, V[1, number], 0x99)) { return 0 }
+        # I must remain unchanged -> 0x500
+        if (!assertCase(Name, 3, I, 0x500)) { return 0 }
+        testPass(Name)
+    }
+
+    return 1
+}
+
+TotalCases = 5
+
+runTests()

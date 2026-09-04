@@ -39,6 +39,7 @@ This project pushes **Expression2** to its absolute limits, implementing complex
 * **Virtual BIOS** with a complete boot sequence.
 * **WM1 File System** — low-level filesystem designed for wire DHDDs and EEPROMs.
 * **WCD File System** — filesystem used for Wiremod CD discs.
+* **CHIP-8 Emulator** — supports CHIP-8, Super-CHIP, and XO-CHIP specifications with dual resolution modes (up to 128×64), 4-color multi-plane graphics, hardware scrolling, dynamic audio pitch shifting, and local multiplayer.
 * **E2 BMP Reader** — outputs images to a Digital Screen up to 512×512 or a Quad Digital Screen up to 1024×1024.
 * **E2 JPEG Reader** — supports Baseline and Progressive JPEG.
 * **E2 GIF Reader** — supports animated GIFs.
@@ -59,6 +60,7 @@ This project pushes **Expression2** to its absolute limits, implementing complex
 * **Standalone image readers** for BMP, JPEG, GIF and PNG.
 * **Standalone MIDI player**.
 * **Standalone Starfall BMP Reader**.
+* **Standalone CHIP-8 Emulator**.
 * **Doom game prototype** (not included in workshop) - just map level loading and player movement.
 * And some other features and devices.
 

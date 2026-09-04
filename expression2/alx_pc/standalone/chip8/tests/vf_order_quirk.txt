@@ -1,0 +1,107 @@
+#include "alx_pc/standalone/chip8/tests/_shared_"
+
+function resetTestEnv(Type:number) {
+    c8Reset()
+    ChipType = Type
+    PC = 0x200
+}
+
+# ==============================================================================
+# DIAGNOSTIC TEST FOR VF WRITE ORDER COMPLIANCE (SHR / SHL / SUBN ON V15)
+# ==============================================================================
+
+ExecuteTestStep = function(StepId:number) {
+    local Name = ""
+    
+    if (StepId == 1) {
+        Name = "OP 8FF6 (SHR VF) WRITE ORDER COMPLIANCE (X == 15)"
+        resetTestEnv(2) # XO-CHIP mode
+        
+        # We load V15 (VF) with 0x03 (binary: 00000011).
+        # Target register X = 15, Source Y = 15.
+        V[15, number] = 0x03
+        
+        # Opcode 0x8FF6 -> SHR V15, V15
+        Memory[0x200, number] = 0x8F
+        Memory[0x201, number] = 0xF6
+        c8Step()
+        
+        # Evaluation:
+        # Step 1: 0x03 >> 1 = 1. (This is the intermediate shifted value).
+        # Step 2: The Least Significant Bit (LSB) of original 0x03 was 1, so Carry = 1.
+        # Default Octo Behavior: Carry MUST overwrite the shifted value in V15!
+        # Result: V15 must strictly equal 1.
+        if (!assertCase(Name, 1, V[15, number], 1)) { return 0 }
+        
+        testPass(Name)
+    }
+    elseif (StepId == 2) {
+        Name = "OP 8FFE (SHL VF) WRITE ORDER COMPLIANCE (X == 15)"
+        resetTestEnv(2) # XO-CHIP mode
+        
+        # We load V15 (VF) with 0x20 (decimal 32, just like MAP_COLS in Chicken Scratch!).
+        # Target register X = 15, Source Y = 15.
+        V[15, number] = 0x20
+        
+        # Opcode 0x8FFE -> SHL V15, V15
+        Memory[0x200, number] = 0x8F
+        Memory[0x201, number] = 0xFE
+        c8Step()
+        
+        # Evaluation:
+        # Step 1: 0x20 << 1 = 0x40 (decimal 64). (This is the shifted value).
+        # Step 2: The Most Significant Bit (MSB) of original 0x20 (00100000) was 0, so Carry = 0.
+        # Default Octo Behavior: The Carry (0) MUST overwrite the shifted value (64) in V15!
+        # Result: V15 must strictly reset back to 0. 
+        if (!assertCase(Name, 1, V[15, number], 0)) { return 0 }
+        
+        testPass(Name)
+    }
+    elseif (StepId == 3) {
+        Name = "OP 8FFE (SHL VF) WITH ACTIVE CARRY FLAG RETENTION"
+        resetTestEnv(2)
+        
+        # What if MSB is actually 1? Let's check with 0x80 (decimal 128).
+        V[15, number] = 0x80
+        
+        # Opcode 0x8FFE -> SHL V15, V15
+        Memory[0x200, number] = 0x8F
+        Memory[0x201, number] = 0xFE
+        c8Step()
+        
+        # Evaluation:
+        # Step 1: 0x80 << 1 = 0x100 -> masked to 8-bit becomes 0.
+        # Step 2: MSB of original 0x80 (10000000) was 1, so Carry = 1.
+        # Carry overwrites 0, so V15 must strictly become 1.
+        if (!assertCase(Name, 1, V[15, number], 1)) { return 0 }
+        
+        testPass(Name)
+    }
+    elseif (StepId == 4) {
+        Name = "OP 8F57 (SUBN VF) WRITE ORDER COMPLIANCE (X == 15)"
+        resetTestEnv(2) # XO-CHIP mode
+        
+        # Formula: VX = VY - VX -> VF = V5 - VF
+        V[5, number] = 10   # VY (Source)
+        V[15, number] = 4   # VX (Target, which is VF)
+        
+        # Opcode 0x8F57 -> SUBN V15, V5
+        Memory[0x200, number] = 0x8F
+        Memory[0x201, number] = 0x57
+        c8Step()
+        
+        # Evaluation:
+        # Step 1: V5 - V15 -> 10 - 4 = 6. (This is the intermediate math value).
+        # Step 2: Since VY >= VX (10 >= 4), no borrow is needed, so Borrow flag = 1.
+        # Default Octo Behavior: The Borrow flag (1) MUST overwrite the subtraction result (6) in V15!
+        # Result: V15 must strictly equal 1.
+        if (!assertCase(Name, 1, V[15, number], 1)) { return 0 }
+        
+        testPass(Name)
+    }
+
+    return 1
+}
+
+TotalCases = 4
+runTests()

@@ -1,0 +1,86 @@
+@name CHIP-8 Key Mapping
+
+KeyMap = table()
+
+# Row 1: Keyboard 1, 2, 3, 4 -> CHIP-8: 1, 2, 3, C
+KeyMap["1", number] = 0x1
+KeyMap["2", number] = 0x2
+KeyMap["3", number] = 0x3
+KeyMap["4", number] = 0xC
+
+# Row 2: Keyboard Q, W, E, R -> CHIP-8: 4, 5, 6, D
+KeyMap["q", number] = 0x4
+KeyMap["w", number] = 0x5
+KeyMap["e", number] = 0x6
+KeyMap["r", number] = 0xD
+
+# Row 3: Keyboard A, S, D, F -> CHIP-8: 7, 8, 9, E
+KeyMap["a", number] = 0x7
+KeyMap["s", number] = 0x8
+KeyMap["d", number] = 0x9
+KeyMap["f", number] = 0xE
+
+# Row 4: Keyboard Z, X, C, V -> CHIP-8: A, 0, B, F
+KeyMap["z", number] = 0xA
+KeyMap["x", number] = 0x0
+KeyMap["c", number] = 0xB
+KeyMap["v", number] = 0xF
+
+# Navigation mapping aliases (Arrows / WASD style for 2, 4, 6, 8 games)
+KeyMap["up", number]    = 0x2
+KeyMap["down", number]  = 0x8
+KeyMap["left", number]  = 0x4
+KeyMap["right", number] = 0x6
+
+# Action alias (mapping Space to CHIP-8 5)
+KeyMap["space", number] = 0x5 
+
+
+#[ Old code, not universal so disabled 
+
+KeyMap = table()
+
+# Row 1 (CHIP-8: 1, 2, 3, C) -> Keyboard: 4, 5, 6, 7
+KeyMap["4", number] = 0x1
+KeyMap["5", number] = 0x2
+KeyMap["6", number] = 0x3
+KeyMap["7", number] = 0xC
+
+# Row 2 (CHIP-8: 4, 5, 6, D) -> Keyboard: R, T, Y, U
+KeyMap["r", number] = 0x4
+KeyMap["t", number] = 0x5
+KeyMap["y", number] = 0x6
+KeyMap["u", number] = 0xD
+
+# Row 3 (CHIP-8: 7, 8, 9, E) -> Keyboard: F, G, H, J
+KeyMap["f", number] = 0x7
+KeyMap["g", number] = 0x8
+KeyMap["h", number] = 0x9
+KeyMap["j", number] = 0xE
+
+# Row 4 (CHIP-8: A, 0, B, F) -> Keyboard: V, B, N, M
+KeyMap["v", number] = 0xA
+KeyMap["b", number] = 0x0
+KeyMap["n", number] = 0xB
+KeyMap["m", number] = 0xF
+
+# Standard 4-way movement games (mapping to 2, 4, 6, 8)
+KeyMap["w", number] = 0x8 # Up
+KeyMap["a", number] = 0x4 # Left
+KeyMap["d", number] = 0x6 # Right
+KeyMap["s", number] = 0x2 # Down
+
+# Pong Duplicates (1/4 for Left, C/D for Right)
+KeyMap["q", number] = 0x1 # Pong Left Up
+KeyMap["z", number] = 0x4 # Pong Left Down
+KeyMap["up", number] = 0xC # Pong Right Up
+KeyMap["down", number] = 0xD # Pong Right Down
+
+KeyMap["e", number] = 0x5
+KeyMap["left", number] = 0x4
+KeyMap["right", number] = 0x6
+
+# Action / Shoot Button (mapping to space)
+KeyMap["space", number] = 0x5 # Action (T)
+
+]# 

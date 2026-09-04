@@ -1,0 +1,146 @@
+@name CHIP-8 Emulator Board
+@inputs InA Board:wirelink KB2_SocketA:number
+@outputs EntID:number
+@persist BIOS:entity Device_Name:string KB2:entity KB2User:entity
+@persist E2_GPU:entity Init Devices:table
+@strict
+
+#[
+    ALX Wiremod E2 PC
+    Created by AlexALX
+    -------------------
+]#
+
+if (first()|duped()) {
+#include "alx_pc/standalone/chip8/_init_"
+
+dsSetScope(2)
+
+function entity getentity(ID) {
+    local Ent = entity(ID)
+    if (Ent:isValid()) {
+        return Ent
+    }
+    return noentity()
+}
+
+BIOS = getentity(InA)
+Board["A",number] = entity():id()
+if (!duped()) {
+    dsSendDirect("reload",BIOS,"chip8emu")
+}
+
+Init = 0
+Device_Name = "CHIP-8 Emulator"
+
+function shutdown() {
+    if (!Init) { return }
+
+    stopAllTimers()
+    c8HardReset()
+    c8MemoryReset()
+
+    Init = 0
+    
+    KB2User = noentity()
+}
+
+function pci_init() {    
+    dsSendDirect("pci",BIOS,table("chip8emu",entity(),Device_Name))
+}
+
+function usb_init() {
+    Init = 1
+    local Info = dsGetTable()
+    local USB_Device = Info[2,entity]
+    dsSendDirect("usbcontroller",USB_Device,table("chip8emu",wirelink(),table()))
+}
+
+ChipNoPrint = 1
+
+EntID = entity():id()
+
+}
+
+if (dupefinished()) {
+    Board["A",number] = entity():id()
+    BIOS = getentity(InA)
+    EntID = entity():id()
+}
+
+if (~InA) {
+    local New_BIOS = entity(InA)
+    if (BIOS!=New_BIOS & Init) {
+        shutdown()
+    }
+    BIOS = New_BIOS
+}
+
+if (~KB2_SocketA) {
+    KB2 = getentity(KB2_SocketA)
+}
+
+if (!BIOS:isValid()) { exit() }
+
+event keyPressed(Player:entity, Key:string, Down:number, KeyBind:string) {
+    local KBUser = Devices["keyboard",table][2,entity]
+    
+    if (Player == KBUser | Player == KB2User) {
+        local Exists = c8HandleKeyEvent(Key,Down)
+        if (!Exists & Down) {
+            # not loaded
+            if (!RomSize) { exit() }
+            
+            if (Key=="f1") {
+                c8Restart()
+            } elseif (Key=="f2") {
+                if (IsRunning) {
+                    c8Stop()
+                } else {
+                    c8Start()
+                } 
+            } elseif (Key=="f3") {
+                c8SetMode(!SpriteClipMode)
+            }
+        }
+    }
+}
+
+if (dsClk()) {
+    local Name = dsClkName()
+    
+    if (Name=="loadROM") {
+        local Info = dsGetTable()
+        Devices = Info[1,table]
+        DS = Info[2,wirelink]
+        E2_GPU = Info[3,entity]
+        TickQuota = Info[4,number]
+        local RomData = Info[5,string]
+        local SpriteMode = Info[6,number]
+        local Frequency = Info[7,number]
+        Init = 1
+        
+        dsSendDirect("key_socket",KB2,1) 
+
+        c8Init(RomData, SpriteMode, Frequency, Devices["buzzer",entity])
+        
+        if (ChipError) {
+            dsSendDirect("chipError",E2_GPU,ChipError)    
+        }
+    } elseif (Name=="pci") {
+        pci_init()
+    } elseif (Name=="usbcontroller") {
+        usb_init()
+    } elseif (Name=="SHUTDOWN") {
+        shutdown()
+    } elseif (Name=="keyboard") {
+        local Info = dsGetTable()
+        local Type = Info[1,string]
+        if (Type=="User") {
+            KB2User = Info[2,entity]    
+        }
+    } elseif (Name=="key_socket") {
+        local Info = dsGetTable()
+        KB2User = Info[1,entity]
+    }
+}

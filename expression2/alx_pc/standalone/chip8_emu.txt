@@ -1,0 +1,192 @@
+@name CHIP-8 Emulator By AlexALX
+@inputs DS:wirelink KB:wirelink KB2:wirelink SpriteClip:number Frequency:number
+@outputs DS_Out:wirelink IsLoaded:number ChipError:string
+@persist SpriteMode:number LastCmd:string FreqNum:number
+@trigger none
+@strict
+
+#[
+    CHIP-8 Emulator
+    Created by AlexALX (c) 2026
+    -------------------
+    Specifications:
+    - Support CHIP-8, Super-CHIP and XO-CHIP specifications
+    - Support Low-Res (64x32) and High-Res (128x64) resolution modes
+    - Support up to 2 memory planes for 4-color paletted games
+    - Support hardware scrolling (Super-CHIP / XO-CHIP)
+    - Memory capacity up to 64KB for large XO-CHIP ROMs
+    - Precise Octo-interpreter Quirks handling (including vF order quirks)
+    - Support hardware VBlank synchronization (0x00D4)
+    - Sound engine with dynamic Pitch/Frequency shifting
+    - ROM type is automatically detected during binary stream loading
+    - Supports multiplayer (Pong), possible to connect a second keyboard
+
+    Chat Commands:
+    - !ch8 url         - Open ROM file from URL link
+    - !ch8file name    - Open ROM from garrysmod/data/e2files/ folder (must be renamed to .txt)
+    - !ch8restart      - Restart current game execution
+    - !ch8freq number  - Set custom CPU frequency clock (500 Hz default)
+    - !ch8abort        - Stop execution and clear context
+    - !ch8mode 0 / 1   - Force screen wrap mode (0) or edge clipping mode (1)
+    
+    Default Key Mapping:
+    - Keyboard [ 1 ][ 2 ][ 3 ][ 4 ] -> CHIP-8 [ 1 ][ 2 ][ 3 ][ C ]
+    - Keyboard [ Q ][ W ][ E ][ R ] -> CHIP-8 [ 4 ][ 5 ][ 6 ][ D ]
+    - Keyboard [ A ][ S ][ D ][ F ] -> CHIP-8 [ 7 ][ 8 ][ 9 ][ E ]
+    - Keyboard [ Z ][ X ][ C ][ V ] -> CHIP-8 [ A ][ 0 ][ B ][ F ]
+    
+    Note: Different games have different key layouts, there is no single standard
+    so you must figure out what to press yourself.
+    
+    Navigation & Action Aliases:
+    - Arrows [ UP ][ DOWN ][ LEFT ][ RIGHT ] -> CHIP-8 [ 2 ][ 8 ][ 4 ][ 6 ]
+    - Keyboard [ SPACE ]                     -> CHIP-8 [ 5 ] (Action / Shoot)
+    
+    System Hotkeys:
+    - [ F1 ] - Hard Reset & level reloading
+    - [ F2 ] - Play / Pause switch
+    - [ F3 ] - Toggle clipping mode (Clipping / Wrapping)
+    - [ F4 ] - Stop emulator (unloads memory, halts CPU and audio)
+    
+    Frequency Note: 
+    - 500 Hz is default for CHIP-8 and Super-Chip ROMs.
+    - For modern XO-CHIP games (like Chicken Scratch) you may need 5000 Hz or higher.
+    - Set "wire_expression2_unlimited 1" in server console for smooth gameplay!
+
+    Where to find ROMs & Games?
+    - Interactive Web Archive: https://johnearnest.github.io/chip8Archive/
+    - Raw Binary ROM Files (.ch8): https://github.com/JohnEarnest/chip8Archive/tree/master/roms
+    
+    Known issues / limitations:
+    - Games with fast screen scrolling (like racing games) may bug out due to 
+      the slow digital screen refresh rate. You can try decreasing the frequency.
+    - Full audio waveforms are not supported.
+
+]#
+
+if (first() | duped()) {
+    #include "alx_pc/standalone/includes/basicreader"
+    #include "alx_pc/standalone/chip8/_init_"
+    
+    Command = "!ch8"
+    
+    ExtWarning = "File extension must be changed to .txt!\nOr file will not load."
+
+    Funcs = table()
+    
+    Funcs["readerAbort", function] = function() {
+        print(_HUD_PRINTTALK,c8ChipMode()+" program aborted.")
+        c8HardReset()
+        c8MemoryReset()
+        c8DisplayReset()
+    }
+    
+    Funcs["readerLoad", function] = function(Body:string, Size:number, Path:string) {
+        c8Init(Body, SpriteMode, FreqNum, entity())
+    }
+    
+    Funcs["readerCheck", function] = function() {
+        return checkScreen(DS)
+    } 
+    
+    Funcs["readerError", function] = function(Error:string, Path:string) {
+        print(_HUD_PRINTTALK, Error)
+    }
+    
+    FreqNum = Frequency
+    c8SetFrequency(Frequency)
+}
+
+if (dupefinished()) {
+    FreqNum = Frequency
+    c8SetFrequency(Frequency)    
+}
+
+function ch8SetClipMode(Mode:string) {
+    if (Mode=="0" | Mode=="wrap" | Mode=="wrapping") {
+        SpriteMode = 0
+        c8SetMode(0)
+        print(_HUD_PRINTTALK,"Sprite mode changed to Wrapping.")
+    } elseif (Mode=="1" | Mode=="clip" | Mode=="clipping") {
+        SpriteMode = 1
+        c8SetMode(1)
+        print(_HUD_PRINTTALK,"Sprite mode changed to Clipping.")
+    } elseif (Mode=="") {
+        print(_HUD_PRINTTALK,"Available modes: 0 - Wrapping, 1 - Clipping")
+    } else {
+        print(_HUD_PRINTTALK,"Invalid sprite mode.\nAvailable modes: 0 - Wrapping, 1 - Clipping")
+    }    
+}
+
+function ch8SetFrequency(Freq:string) {
+    local FreqN = Freq:toNumber()   
+    if (FreqN) {
+        FreqNum = FreqN
+        c8SetFrequency(FreqNum)
+        print(_HUD_PRINTTALK,"Frequency set to "+Freq+" hz.")
+    } elseif (Freq=="") {
+        print(_HUD_PRINTTALK,"Set CHIP Frequency, default is 500 hz.\nCurrent Value: "+ClockSpeed+" hz.")
+    } else {
+        print(_HUD_PRINTTALK,"Invalid frequency: "+Freq)
+    }
+}
+
+event chat(Player:entity, Said:string, Team:number) {
+    if (Player==owner()) { 
+        
+        local Find = Said:lower():find(" ")
+        
+        local Cmd = Said:lower()
+        local Mode = ""        
+        if (Find) {
+            Cmd = Said:left(Find-1):lower()
+            Mode = Said:sub(Find+1):lower()
+        }
+
+        if (Cmd=="!ch8mode") {
+            ch8SetClipMode(Mode)
+        } elseif (Cmd=="!ch8freq") {
+            ch8SetFrequency(Mode)   
+        } elseif (Cmd=="!ch8restart") {
+            print(_HUD_PRINTTALK,"CHIP Restart")
+            c8Restart()   
+        }
+    }
+}
+
+event keyPressed(Player:entity, Key:string, Down:number, KeyBind:string) {
+    if (Player == KB["User",entity] | Player == KB2["User", entity]) {
+        local Exists = c8HandleKeyEvent(Key,Down)
+        if (!Exists & Down) {
+            # not loaded
+            if (!RomSize) { exit() }
+            
+            if (Key=="f1") {
+                print(_HUD_PRINTTALK,"CHIP Reastart.")
+                c8Restart()
+            } elseif (Key=="f2") {
+                if (IsRunning) {
+                    print(_HUD_PRINTTALK,"CHIP Paused.")
+                    c8Stop()
+                } else {
+                    print(_HUD_PRINTTALK,"CHIP Continued.")
+                    c8Start()    
+                } 
+            } elseif (Key=="f3") {
+                ch8SetClipMode(!SpriteMode + "")
+            } elseif (Key=="f4") {
+                print(_HUD_PRINTTALK,"CHIP Stopped.")
+                c8Reset()
+            }
+        }
+    }
+}
+
+event input(InputName:string) {
+    if (InputName=="SpriteClip") {
+        SpriteMode = SpriteClip
+    } elseif (InputName=="Frequency") {
+        FreqNum = Frequency
+        ch8SetFrequency(Frequency:toString())
+    }
+}

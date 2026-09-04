@@ -1,6 +1,6 @@
 @name IDCT tests
 
-#include "alx_pc/standalone/jpg_reader/tests/_shared_"
+#include "alx_pc/standalone/includes/testslib"
 #include "alx_pc/standalone/jpg_reader/idct"
 
 # valid will be all 28.284271247462

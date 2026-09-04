@@ -71,7 +71,7 @@ PNG Reader Error:
 
 function displayProgress()
 {
-    local ProcessorDS = ImageProcessor["DS_Out",wirelink]
+    local ProcessorDS = E2Processor["DS_Out",wirelink]
     local IsSameScreen = ProcessorDS==DS
     
     if (IsSameScreen & (CurrentState=="draw" | CurrentState=="done")) {

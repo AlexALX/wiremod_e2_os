@@ -26,11 +26,66 @@ function number checkScreen(DS:wirelink) {
     return 1  
 }
 
+function readerChatCommand(Command:string, Cmd:string, Url:string) {            
+    if (Cmd==Command+"abort" | Cmd==Command & Url:lower() == "abort") {        
+        Funcs["readerAbort", function]()
+    } elseif (Cmd == Command) {
+        if (!Funcs["readerCheck",function]()[number]) { exit() }            
+        #ifndef httpCanRequest()
+            print(_HUD_PRINTTALK,"HTTP extension is not enabled. Please enable via wire_expression2_extension_enable http") 
+        #else
+        
+            if (Url=="") {
+                print(_HUD_PRINTTALK,
+                    "Load file from the web."
+                ) 
+                exit()
+            }
+        
+            if (!httpCanRequest()) {
+                print(_HUD_PRINTTALK, "HTTP Busy. Please wait...")
+                exit()
+            }
+                
+            timer(0.01, function() {
+                httpRequest(Url) 
+            })
+        #endif
+    } elseif (Cmd == Command+"file") {
+        if (!Funcs["readerCheck",function]()[number]) { exit() }
+        
+        #ifndef fileCanLoad()
+            print(_HUD_PRINTTALK,"FILE extension is not enabled. Please enable via wire_expression2_extension_enable file") 
+        #else
+        
+            if (Url=="") {
+                print(_HUD_PRINTTALK,
+                    "Load file from the disk in garrysmod/data/e2files/ folder."+
+                    (ExtWarning!="" ? "\n"+ExtWarning : "")
+                )
+                exit()
+            }
+        
+            if (!fileCanLoad()) {
+                print(_HUD_PRINTTALK, "File Busy. Please wait...")
+                exit()
+            }
+            
+            timer(0.01, function() {
+                try {
+                    fileLoad(Url) 
+                } catch(E:string) {
+                    Funcs["readerError", function](E + (ExtWarning!="" ? "\n"+ExtWarning : ""), FileName)  
+                }
+            })
+        #endif
+    }
+}
+
 event chat(Player:entity, Said:string, Team:number) {
     if (!Command) { exit() }
     
     if (Player==owner()) { 
-        
         local Find = Said:find(" ")
         
         local Cmd = Said:lower()
@@ -39,60 +94,8 @@ event chat(Player:entity, Said:string, Team:number) {
             Cmd = Said:left(Find-1):lower()
             Url = Said:sub(Find+1)
         }
-                
-        if (Cmd==Command+"abort" | Cmd==Command & Url:lower() == "abort") {        
-            Funcs["readerAbort", function]()
-        } elseif (Cmd == Command) {
-            if (!Funcs["readerCheck",function]()[number]) { exit() }            
-            #ifndef httpCanRequest()
-                print(_HUD_PRINTTALK,"HTTP extension is not enabled. Please enable via wire_expression2_extension_enable http") 
-            #else
-            
-                if (Url=="") {
-                    print(_HUD_PRINTTALK,
-                        "Load file from the web."
-                    ) 
-                    exit()
-                }
-            
-                if (!httpCanRequest()) {
-                    print(_HUD_PRINTTALK, "HTTP Busy. Please wait...")
-                    exit()
-                }
-                    
-                timer(0.01, function() {
-                    httpRequest(Url) 
-                })
-            #endif
-        } elseif (Cmd == Command+"file") {
-            if (!Funcs["readerCheck",function]()[number]) { exit() }
-            
-            #ifndef fileCanLoad()
-                print(_HUD_PRINTTALK,"FILE extension is not enabled. Please enable via wire_expression2_extension_enable file") 
-            #else
-            
-                if (Url=="") {
-                    print(_HUD_PRINTTALK,
-                        "Load file from the disk in garrysmod/data/e2files/ folder."+
-                        (ExtWarning!="" ? "\n"+ExtWarning : "")
-                    )
-                    exit()
-                }
-            
-                if (!fileCanLoad()) {
-                    print(_HUD_PRINTTALK, "File Busy. Please wait...")
-                    exit()
-                }
-                
-                timer(0.01, function() {
-                    try {
-                        fileLoad(Url) 
-                    } catch(E:string) {
-                        Funcs["readerError", function](E + (ExtWarning!="" ? "\n"+ExtWarning : ""), FileName)  
-                    }
-                })
-            #endif
-        }
+        
+        readerChatCommand(Command, Cmd, Url)
     }
 }
 

@@ -1,0 +1,69 @@
+#include "alx_pc/standalone/chip8/tests/_shared_"
+
+function resetTestEnv(Type:number) {
+    c8Reset()
+    ChipType = Type
+    PC = 0x200
+}
+
+# ==============================================================================
+# DIAGNOSTIC TEST FOR DEEP SUBROUTINE CALL STACK WITH CONDITIONAL SKIPS
+# ==============================================================================
+
+ExecuteTestStep = function(StepId:number) {
+    local Name = ""
+    
+    if (StepId == 1) {
+        Name = "DEEP NESTED SUBROUTINE CALLS INTEGRITY (SP == 4)"
+        resetTestEnv(2) # XO-CHIP mode
+        
+        # 0x200: Call subroutine at 0x300
+        Memory[0x200, number] = 0x23
+        Memory[0x201, number] = 0x00
+        
+        # 0x300: Call subroutine at 0x400
+        Memory[0x300, number] = 0x24
+        Memory[0x301, number] = 0x00
+        
+        # 0x400: Call subroutine at 0x500
+        Memory[0x400, number] = 0x25
+        Memory[0x401, number] = 0x00
+        
+        # 0x500: SE V0 == 0 (True, V0 is 0). Should skip next 0x00EE instruction and land on 0x506
+        V[0, number] = 0x00
+        Memory[0x500, number] = 0x30
+        Memory[0x501, number] = 0x00
+        
+        # 0x502: 0x00EE (Return) -> This MUST be skipped!
+        Memory[0x502, number] = 0x00
+        Memory[0x503, number] = 0xEE
+        
+        # 0x504: 0x00EE (Return) -> This is the target return for depth 4
+        Memory[0x504, number] = 0x00
+        Memory[0x505, number] = 0xEE
+        
+        # --- Execution step-by-step ---
+        c8Step() # Exec 2300 -> PC=0x300, SP=1
+        c8Step() # Exec 2400 -> PC=0x400, SP=2
+        c8Step() # Exec 2500 -> PC=0x500, SP=3
+        
+        if (!assertCase(Name, 1, SP, 3)) { return 0 }
+        if (!assertCase(Name, 2, PC, 0x500)) { return 0 }
+        
+        c8Step() # Exec 3000 -> Condition True! Should invoke c8Skip and advance PC past 0x502
+        
+        # If skip worked perfectly, PC must leap over 0x502/0x503 and stand exactly on 0x504
+        if (!assertCase(Name, 3, PC, 0x504)) { return 0 }
+        
+        c8Step() # Exec 0x00EE at 0x504 -> Returns to depth 3 -> PC should become 0x402
+        if (!assertCase(Name, 4, SP, 2)) { return 0 }
+        if (!assertCase(Name, 5, PC, 0x402)) { return 0 }
+        
+        testPass(Name)
+    }
+
+    return 1
+}
+
+TotalCases = 1
+runTests()

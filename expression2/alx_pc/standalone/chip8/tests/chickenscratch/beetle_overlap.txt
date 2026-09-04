@@ -1,0 +1,75 @@
+#include "alx_pc/standalone/chip8/tests/_shared_"
+
+function resetTestEnv(Type:number) {
+    c8Reset()
+    ChipType = Type
+    PC = 0x200
+    ScreenW = 128 # Set to HIRES mode matching Chicken Scratch
+    ScreenH = 64
+}
+
+# ==============================================================================
+# CORRECTED MOVEMENT OVERLAP AND XOR INVERSION GRAPHICS TEST
+# ==============================================================================
+
+ExecuteTestStep = function(StepId:number) {
+    local Name = ""
+    
+    if (StepId == 1) {
+        Name = "MULTI-PLANE OVERLAP: INITIAL DRAW"
+        resetTestEnv(2) # XO-CHIP mode
+        TargetPlane = 3 # Both planes active
+        
+        # 1. Write two consecutive draw opcodes into program memory
+        # 0x200: D121 -> Draw 1 row from I at (V1, V2)
+        Memory[0x200, number] = 0xD1
+        Memory[0x201, number] = 0x21
+        # 0x202: D121 -> Draw 1 row from I at (V1, V2) again
+        Memory[0x202, number] = 0xD1
+        Memory[0x203, number] = 0x21
+        
+        # 2. Setup coordinates: V1 (X) = 10, V2 (Y) = 10
+        V[1, number] = 10
+        V[2, number] = 10
+        
+        # 3. Setup first sprite data at I = 0x300
+        # For N=1, Plane 1 is at I (0x300), Plane 2 is at I+1 (0x301)
+        I = 0x300
+        Memory[0x300, number] = 0x80 # Plane 1 bit active
+        Memory[0x301, number] = 0x80 # Plane 2 bit active
+        
+        # Execute the first draw opcode at 0x200
+        c8Step()
+        
+        # PixelIndex = 10 + 10 * 128 = 1290
+        if (!assertCase(Name, 1, Display[1290, number], 1)) { return 0 }
+        if (!assertCase(Name, 2, DisplayPlane2[1290, number], 1)) { return 0 }
+        testPass(Name)
+    }
+    elseif (StepId == 2) {
+        Name = "MULTI-PLANE OVERLAP: XOR INFERENCE EVALUATION"
+        # PC is now naturally at 0x202, perfectly pointing to the next draw opcode!
+        # Let's shift I to a new sprite definition at 0x400
+        # For N=1, Plane 1 is at I (0x400), Plane 2 is at I+1 (0x401)
+        I = 0x400
+        Memory[0x400, number] = 0x80 # Plane 1 bit active (will XOR invert to 0)
+        Memory[0x401, number] = 0x00 # Plane 2 bit is EMPTY (XOR with 0 must retain old 1)
+        
+        # Execute the second draw opcode at 0x202
+        c8Step()
+        
+        # Verify the true mathematical outcomes of the multi-plane XOR overlap:
+        # Plane 1: 1 XOR 1 = 0 (successfully turned off)
+        if (!assertCase(Name, 1, Display[1290, number], 0)) { return 0 }
+        
+        # Plane 2: 1 XOR 0 = 1 (must strictly RETAIN its previous value)
+        if (!assertCase(Name, 2, DisplayPlane2[1290, number], 1)) { return 0 }
+        
+        testPass(Name)
+    }
+
+    return 1
+}
+
+TotalCases = 2
+runTests()

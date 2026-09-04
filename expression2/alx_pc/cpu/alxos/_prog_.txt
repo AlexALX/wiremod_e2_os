@@ -22,6 +22,7 @@ ALXOS_PROG_ASOC["gms",string] = "alxos_soundplay"
 ALXOS_PROG_ASOC["mid",string] = "alxos_midi_player"
 ALXOS_PROG_ASOC["zip",string] = "alxos_zip_reader"
 ALXOS_PROG_ASOC["e2z",string] = "alxos_zip_reader"
+ALXOS_PROG_ASOC["ch8",string] = "alxos_chip8_emulator"
 
 # Add custom executables here
 
@@ -119,4 +120,9 @@ function alxos_game_pong(FInfo:table) {
 ALXOS_PROGS["alxos_game_bird",number] = 1
 function alxos_game_bird(FInfo:table) {
     dsSendDirect("alxos_runprog",E2_GPU,table("alxos_game_bird"))
+}
+
+ALXOS_PROGS["alxos_chip8_emulator",number] = 1
+function alxos_chip8_emulator(FInfo:table) {
+    dsSendDirect("alxos_runprog",E2_GPU,table("alxos_chip8_emulator",FInfo))
 }

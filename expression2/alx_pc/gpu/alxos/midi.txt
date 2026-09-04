@@ -38,6 +38,8 @@ function alxos_prog_midi_unplug() {
     stopAllTimers()
     ExplorerDsH = ""
     
+    dsSendDirect("midiStop",Devices["spu",entity],0)
+    
     local Msg = "Disk was unplugged."
     
     if (GpuData["lastProg",string]=="alxos_console") {

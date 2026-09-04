@@ -61,7 +61,7 @@ BMP Reader Error:
 function displayProgressStart() {
     if (Inited) { return }
     
-    local ProcessorDS = ImageProcessor["DS_Out",wirelink]
+    local ProcessorDS = E2Processor["DS_Out",wirelink]
     local IsSameScreen = ProcessorDS==DS
     
     if (IsSameScreen & (BmpDrew | BmpStep>2)) {
@@ -70,13 +70,13 @@ function displayProgressStart() {
         return
     }
     
-    local Threads = ImageProcessor["BmpThreads",number]
+    local Threads = E2Processor["BmpThreads",number]
     
     displayInit()
     
     displayBlockDraw(0.5)
     
-    local MaxSteps = ImageProcessor["BmpMaxSteps",number]
+    local MaxSteps = E2Processor["BmpMaxSteps",number]
     
     local Text = Header+
 "
@@ -95,7 +95,7 @@ Progress:
 
 function displayProgress()
 { 
-    local ProcessorDS = ImageProcessor["DS_Out",wirelink]
+    local ProcessorDS = E2Processor["DS_Out",wirelink]
     local IsSameScreen = ProcessorDS==DS
     
     if (IsSameScreen & BmpDrew) {
@@ -113,15 +113,15 @@ function displayProgress()
     
     local FontLine = DsFontHeight + DsFontSpacing
     
-    local Threads = ImageProcessor["BmpThreads",number]
+    local Threads = E2Processor["BmpThreads",number]
     local ThreadsTxt = ""
     if (BmpStep>2) {    
         ThreadsTxt = " ("+Threads+" Thread"+(Threads>1 ? "s" : "")+")"
     }
 
-    local MaxSteps = ImageProcessor["BmpMaxSteps",number]
+    local MaxSteps = E2Processor["BmpMaxSteps",number]
 
-    local Task = ImageProcessor["BmpCurrentStepText",string]
+    local Task = E2Processor["BmpCurrentStepText",string]
 
     displayBlockDraw(1)
 
@@ -162,7 +162,7 @@ event input(InputName:string) {
     } elseif ((InputName=="BmpPercent" | InputName=="BmpCurrentStep") & BmpStep) { 
         displayProgress() 
     } elseif (InputName=="BmpDrew" & BmpDrew) {
-        local ProcessorDS = ImageProcessor["DS_Out",wirelink]
+        local ProcessorDS = E2Processor["DS_Out",wirelink]
         local IsSameScreen = ProcessorDS==DS
             
         if (IsSameScreen) {

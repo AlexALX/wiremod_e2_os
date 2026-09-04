@@ -130,3 +130,9 @@ function alxos_game_bird(Args:table) {
     #include "alx_pc/gpu/alxos/games/bird"
     alxos_bird_init(Args)
 }
+
+ALXOS_PROGS["alxos_chip8_emulator",number] = 1
+function alxos_chip8_emulator(Args:table) {
+    #include "alx_pc/gpu/alxos/games/chip8emu"
+    alxos_chip8_init(Args)
+}

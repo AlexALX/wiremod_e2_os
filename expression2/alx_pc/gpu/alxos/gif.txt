@@ -22,7 +22,7 @@ function alxos_gif_init(Args:table) {
     local Width = 450
     local Height = 290
 
-    local Parent = "alxos_explorer_dialog"("GIF Settings",Width,Height,"","alxos_gif_close")[number]
+    local Parent = "alxos_explorer_dialog"("GIF Settings",Width,Height,"","alxos_img_close")[number]
     
     DialogData[7,number] = LAST_I
     DialogData[-10,table]:pushNumber(LAST_I)
