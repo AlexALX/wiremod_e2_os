@@ -14,7 +14,7 @@ A virtual computer and custom operating system built entirely within the **Wirem
 
 ----
 
-Build your own virtual PC from individual components, boot it, manage files, run programs, view images from the Internet, play MIDI files, and connect your PCs together over the virtual network.
+Build your own virtual PC from individual components, boot it, manage files, run programs and games, view images from the Internet, play MIDI files, and connect your PCs together over the virtual network.
 
 ALX PC is a fully functional computer built entirely in Wiremod Expression 2.
 
