@@ -2,6 +2,7 @@
 [![image](https://i.imgur.com/mEg4Fgl.jpg)](https://imgur.com/a/eUHZQ)
 More screenshots: https://imgur.com/a/eUHZQ
 <br>Video for v1.3 update: https://youtu.be/RN7DOjLFEVs
+<br>Video for v1.3 update in russian: https://youtu.be/fZgBTFUNIlw
 <br>Video: https://youtu.be/jfFnVnX7Kwg
 <br>Video in russian: https://youtu.be/ciM0uYEN5yw
 
