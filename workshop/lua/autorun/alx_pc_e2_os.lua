@@ -661,11 +661,13 @@ if SERVER then
         end
 
         if matchedQueue then
-            for k, v in pairs(info[1].CreatedEntities) do
-                table.insert(ALX_PC.AllEntities, v)
-            end
+            if ALX_PC.stepIndex>0 then
+                for k, v in pairs(info[1].CreatedEntities) do
+                    table.insert(ALX_PC.AllEntities, v)
+                end
 
-            ALX_PC.NextStep(ply)
+                ALX_PC.NextStep(ply)
+            end
         end
 
         local unfreeze_except = ""
@@ -1018,11 +1020,6 @@ if SERVER then
     function ALX_PC.AssembleALXPC(ply, type)
         if not IsValid(ply) then return end
 
-        if ALX_PC.stepIndex!=0 then
-            AdvDupe2.Notify(ply, "Already processing, Please wait...", NOTIFY_GENERIC)
-            return
-        end
-
         local basePos = ply:GetEyeTrace().HitPos
         local baseAng = Angle(0, ply:EyeAngles().y + 180, 0)
 
@@ -1095,6 +1092,12 @@ if SERVER then
             AdvDupe2.Notify(ply, "Please wait before spawning another dupe!", NOTIFY_ERROR)
             return
         end
+
+        if ALX_PC.stepIndex!=0 then
+            AdvDupe2.Notify(ply, "Already processing, Please wait...", NOTIFY_GENERIC)
+            return
+        end
+
         ply.ALX_NextDupeSpawn = CurTime() + 1.0
 
         if dupeFile == "alx_pc_assembler_case" or dupeFile == "alx_pc_assembler_min" then
