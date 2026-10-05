@@ -87,6 +87,8 @@ function number jpgDrawStep()
 
     local LastX = -1
     local LastY = -1
+    
+    local IsSingle = Jpg["componentCount",number]==1 ? 1 : 0
 
     while (perf(90)) {
         if (DS["HitPerf",number]==1) { break }
@@ -128,7 +130,7 @@ function number jpgDrawStep()
                         } else {
                             State["index",number] = I + SkipPixels
                         }
-                        continue 
+                        continue
                     }
                 }
             }
@@ -138,9 +140,15 @@ function number jpgDrawStep()
         local Cb = CbPlane[I,number] - 128
         local Cr = CrPlane[I,number] - 128
         
-        local R = clamp(Y + 1.402 * Cr, 0, 255)
-        local G = clamp(Y - 0.344136 * Cb - 0.714136 * Cr, 0, 255)
-        local B = clamp(Y + 1.772 * Cb, 0, 255)
+        local R = G = B = 0
+        
+        if (IsSingle) {
+            R = G = B = Y
+        } else {        
+            R = clamp(Y + 1.402 * Cr, 0, 255)
+            G = clamp(Y - 0.344136 * Cb - 0.714136 * Cr, 0, 255)
+            B = clamp(Y + 1.772 * Cb, 0, 255)
+        }
         
         local DSIndex = I
         

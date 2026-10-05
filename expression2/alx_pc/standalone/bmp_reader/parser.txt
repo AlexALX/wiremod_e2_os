@@ -120,26 +120,46 @@ function number bmpParseHeader() {
         
         BmpStep = 1
 
-        if (BitCount==32) {        
-            if (HSize == 56) {
-                BmpData[14,number] = 24
-                BmpData[15,number] = 16
-                BmpData[16,number] = 8
-                BmpData[33,number] = -1
-            } else {
+        if (BitCount==32) {                 
+            if (Compression == 0) {
                 BmpData[14,number] = 16
                 BmpData[15,number] = 8
                 BmpData[16,number] = 0
-                if (Compression==3) {
-                    BmpData[33,number] = 24
-                } else {
-                    BmpData[33,number] = -1   
-                } 
-            }
+                BmpData[33,number] = -1
             
-            BmpData[17,number] = 0xFF
-            BmpData[18,number] = 0xFF
-            BmpData[19,number] = 0xFF
+                BmpData[17,number] = 0xFF
+                BmpData[18,number] = 0xFF
+                BmpData[19,number] = 0xFF
+            } else {
+                local Off = 55
+                
+                local RM = Data:bmpRead_uint32(Off)
+                local GM = Data:bmpRead_uint32(Off + 4)
+                local BM = Data:bmpRead_uint32(Off + 8)
+                local AM = (HSize >= 56 | Compression == 3) ? Data:bmpRead_uint32(Off + 12) : 0
+
+                local RS = bmpTrailingZeros(RM)
+                local GS = bmpTrailingZeros(GM)
+                local BS = bmpTrailingZeros(BM)
+
+                BmpData[14,number] = RS
+                BmpData[15,number] = GS
+                BmpData[16,number] = BS
+                BmpData[17, number] = (RM >> RS) && 0xFF
+                BmpData[18, number] = (GM >> GS) && 0xFF
+                BmpData[19, number] = (BM >> BS) && 0xFF
+                BmpData[33,number] = -1
+                
+                if (AM!=0) {
+                    local AS = bmpTrailingZeros(AM)
+                    
+                    BmpData[33,number] = AS
+                    BmpData[34, number] = (AM >> AS) && 0xFF
+                } else {
+                    BmpData[33,number] = -1      
+                }           
+                
+            }
         } elseif (BitCount==24) {
             BmpData[14,number] = 16
             BmpData[15,number] = 8

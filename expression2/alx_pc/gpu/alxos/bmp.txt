@@ -178,7 +178,7 @@ function alxos_bmp_postinit() {
 
     if (!FInfo["content",string]) {        
         dsSendDirect("fs_readfile",ExplorerFS["hdd_io",wirelink]:entity(),table(entity(),ExplorerFS["fs_str_id",string],table(
-            ExplorerFS,FInfo,0,66
+            ExplorerFS,FInfo,0,140
         )))
         
         GpuData["bmpFull",number] = 0

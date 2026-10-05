@@ -370,9 +370,9 @@ function BMP.readPixel16()
         local r = BMP.unpackField(pixel, BMP.rField)
         local g = BMP.unpackField(pixel, BMP.gField)
         local b = BMP.unpackField(pixel, BMP.bField)
-        local a = BMP.unpackField(pixel, BMP.aField)
+        --local a = BMP.unpackField(pixel, BMP.aField)
 
-        return BMP.processPixel(r,g,b,a)
+        return BMP.processPixel(r,g,b)
 
     else
         print("Unsupported 16-bit compression")
@@ -390,26 +390,26 @@ function BMP.readPixel24()
 end
 
 function BMP.readPixel32()
-    local file = BMP.file
-
-    local b = file:readByte()
-    local g = file:readByte()
-    local r = file:readByte()
-    file:readByte()
+    local pixel = BMP.file:readULong()
+    
+    local r = BMP.unpackField(pixel, BMP.rField)
+    local g = BMP.unpackField(pixel, BMP.gField)
+    local b = BMP.unpackField(pixel, BMP.bField)
 
     return BMP.processPixel(r, g, b)
 end
 
 function BMP.readPixel32Alpha()
-    local file = BMP.file
     
-    local b = file:readByte()
-    local g = file:readByte()
-    local r = file:readByte()
-    local a = file:readByte()
+    local pixel = BMP.file:readULong()
+    
+    local r = BMP.unpackField(pixel, BMP.rField)
+    local g = BMP.unpackField(pixel, BMP.gField)
+    local b = BMP.unpackField(pixel, BMP.bField)
+    local a = BMP.unpackField(pixel, BMP.aField)
 
     local AlphaFactor = a / 255
-    
+
     r = math.floor(r * AlphaFactor)
     g = math.floor(g * AlphaFactor)
     b = math.floor(b * AlphaFactor)
@@ -418,12 +418,11 @@ function BMP.readPixel32Alpha()
 end
 
 function BMP.readPixel32Inversed()
-    local file = BMP.file
+    local pixel = BMP.file:readULong()
 
-    file:readByte()
-    local b = file:readByte()
-    local g = file:readByte()
-    local r = file:readByte()
+    local b = bit.band(pixel, 0xFF)
+    local g = bit.band(bit.rshift(pixel, 8), 0xFF)
+    local r = bit.band(bit.rshift(pixel, 16), 0xFF)
 
     return BMP.processPixel(r, g, b)
 end

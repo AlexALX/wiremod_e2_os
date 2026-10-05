@@ -45,6 +45,7 @@ function bmpDraw() {
     local RL = BmpData[17,number]
     local GL = BmpData[18,number]
     local BL = BmpData[19,number]
+    local AL = BmpData[34,number]
     local FY = BmpData[20,number]
 
     local LI = BmpData[27,number]
@@ -153,8 +154,9 @@ function bmpDraw() {
                 G *= floor(0xFF/GL)
                 B *= floor(0xFF/BL)
                 
-                if (II == 4 & BmpData[33,number]>=0) {
-                    local A = floor((Sub >> AS) && 0xFF)
+                if (II == 4 & AS>=0) {
+                    local A = floor((Sub >> AS) && AL)
+                    A *= floor(0xFF/AL)
                     
                     local AlphaFactor = A / 255
                     R = floor(R * AlphaFactor)
