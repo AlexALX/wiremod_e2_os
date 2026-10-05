@@ -1,5 +1,7 @@
 //if (AlxPcInited!=nil) then return end -- prevent calling this file twice
 
+AddCSLuaFile()
+
 -- Fix for file.* functions, needed for advdupe2, finding lua files from dupes on workshop.
 local file_Open = file.Open
 local file_Find = file.Find

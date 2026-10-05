@@ -556,6 +556,7 @@ if CLIENT then
 end
 
 if SERVER then
+    AddCSLuaFile()
     util.AddNetworkString("ALX_PC_SpawnDupe")
 
     local basePath = "lua/data/advdupe2/alx_pc_readonly"
